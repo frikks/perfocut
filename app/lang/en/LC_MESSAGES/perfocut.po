@@ -1,0 +1,589 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en\n"
+
+msgid "CypCut, AutoCAD · R12, окружности"
+msgstr "CypCut, AutoCAD · R12, circles"
+
+msgid "DXF: слой на каждый размер"
+msgstr "DXF: a layer per size"
+
+msgid "HPGL, плоттеры"
+msgstr "HPGL, plotters"
+
+msgid "Inkscape, LightBurn, веб"
+msgstr "Inkscape, LightBurn, web"
+
+msgid "PerfoCut превращает картинку в перфорацию для лазерной резки металла: считает отверстия, длину реза и стоимость, выгружает DXF, G-code и другие форматы"
+msgstr "PerfoCut turns a picture into perforation for laser cutting of sheet metal: counts holes, cut length and cost, exports DXF, G-code and other formats"
+
+msgid "PerfoCut превращает картинку в перфорацию для лазерной резки металла: считает отверстия, длину реза и стоимость, выгружает DXF, G-code и другие форматы."
+msgstr "PerfoCut turns an image into perforation for laser cutting of metal: it counts holes, cut length and cost, and exports DXF, G-code and other formats."
+
+msgid "PerfoCut — перфорация для лазерной резки"
+msgstr "PerfoCut — perforation for laser cutting"
+
+msgid "settings.json не читается"
+msgstr "settings.json cannot be read"
+
+msgid "{n} контуров · {p} %"
+msgstr "{n} contours · {p} %"
+
+msgid "{n} отв. у края не поместились в поле и пропущены"
+msgstr "{n} holes at the edge did not fit the margin and were skipped"
+
+msgid "Автор"
+msgstr "Author"
+
+msgid "Амплитуда"
+msgstr "Amplitude"
+
+msgid "В архиве нет settings.json"
+msgstr "settings.json is missing in the archive"
+
+msgid "В светлых"
+msgstr "In light areas"
+
+msgid "В тёмных местах"
+msgstr "In dark areas"
+
+msgid "Валюта"
+msgstr "Currency"
+
+msgid "Вектор для согласования и печати"
+msgstr "Vector for approval and print"
+
+msgid "Версия"
+msgstr "Version"
+
+msgid "Вибрация при нажатиях"
+msgstr "Vibrate on taps"
+
+msgid "Вид для клиента"
+msgstr "Client preview"
+
+msgid "Включить"
+msgstr "On"
+
+msgid "Вписать"
+msgstr "Fit"
+
+msgid "Вписать в окно"
+msgstr "Fit to window"
+
+msgid "Врезки"
+msgstr "Pierces"
+
+msgid "Врезок"
+msgstr "Pierces"
+
+msgid "Время"
+msgstr "Time"
+
+msgid "Время врезки"
+msgstr "Pierce time"
+
+msgid "Выберите файл или откройте пример"
+msgstr "Choose a file or open the sample"
+
+msgid "Выбрать файл"
+msgstr "Choose file"
+
+msgid "Выключить"
+msgstr "Off"
+
+msgid "Высота"
+msgstr "Height"
+
+msgid "Высота по пропорциям картинки"
+msgstr "Height from image proportions"
+
+msgid "Гамма"
+msgstr "Gamma"
+
+msgid "Диаметр растёт от нуля вместе с темнотой, как в SVG tracing. Отверстия меньше мин. размера не режутся."
+msgstr "Diameter grows from zero with darkness, like in SVG tracing. Holes below the min size are not cut."
+
+msgid "Длина волны"
+msgstr "Wavelength"
+
+msgid "Длина реза"
+msgstr "Cut length"
+
+msgid "Загрузите картинку"
+msgstr "Load an image"
+
+msgid "Заказ"
+msgstr "Order"
+
+msgid "Заказ .perfo"
+msgstr ".perfo order"
+
+msgid "Заказ открыт:"
+msgstr "Order opened:"
+
+msgid "Закрыть"
+msgstr "Close"
+
+msgid "Заменить"
+msgstr "Replace"
+
+msgid "Заполнить"
+msgstr "Fill"
+
+msgid "Знаков после точки"
+msgstr "Decimal places"
+
+msgid "Изделие"
+msgstr "Product"
+
+msgid "Изображение"
+msgstr "Image"
+
+msgid "Итог"
+msgstr "Summary"
+
+msgid "Как в SVG tracing"
+msgstr "Like SVG tracing"
+
+msgid "Как в SVG tracing: квадратная сетка, круги, диаметр пропорционален тону"
+msgstr "Like SVG tracing: square grid, circles, diameter proportional to tone"
+
+msgid "Как в системе"
+msgstr "System"
+
+msgid "Картинка для перфорации"
+msgstr "Image for perforation"
+
+msgid "Квадрат"
+msgstr "Square"
+
+msgid "Квадратная"
+msgstr "Square"
+
+msgid "Клиент"
+msgstr "Client"
+
+msgid "Команды лазера"
+msgstr "Laser commands"
+
+msgid "Комментарий"
+msgstr "Comment"
+
+msgid "Конец программы"
+msgstr "Program end"
+
+msgid "Контраст"
+msgstr "Contrast"
+
+msgid "Контуров"
+msgstr "Contours"
+
+msgid "Контуры"
+msgstr "Outlines"
+
+msgid "Круг"
+msgstr "Circle"
+
+msgid "Крупные отверстия"
+msgstr "Large holes"
+
+msgid "Левый верх"
+msgstr "Top left"
+
+msgid "Левый низ"
+msgstr "Bottom left"
+
+msgid "Линии"
+msgstr "Lines"
+
+msgid "Лист"
+msgstr "Sheet"
+
+msgid "Макс. размер"
+msgstr "Max size"
+
+msgid "Макс. размер по шагу и перемычке"
+msgstr "Max size from pitch and bridge"
+
+msgid "Макс. ширина"
+msgstr "Max width"
+
+msgid "Масса листа"
+msgstr "Sheet weight"
+
+msgid "Масштаб"
+msgstr "Scale"
+
+msgid "Металл"
+msgstr "Metal"
+
+msgid "Металл и лазер"
+msgstr "Metal and laser"
+
+msgid "Металл, за м²"
+msgstr "Metal, per m²"
+
+msgid "Метр реза"
+msgstr "Per metre of cut"
+
+msgid "Мин. отверстие, × толщины"
+msgstr "Min hole, × thickness"
+
+msgid "Мин. перемычка"
+msgstr "Min bridge"
+
+msgid "Мин. размер"
+msgstr "Min size"
+
+msgid "Мин. ширина"
+msgstr "Min width"
+
+msgid "Настройки"
+msgstr "Settings"
+
+msgid "Настройки сброшены"
+msgstr "Settings reset"
+
+msgid "Начало программы"
+msgstr "Program start"
+
+msgid "Не удалось запустить ядро:"
+msgstr "Could not start the core:"
+
+msgid "Не удалось открыть картинку:"
+msgstr "Could not open the image:"
+
+msgid "Не удалось сохранить заказ:"
+msgstr "Could not save the order:"
+
+msgid "Не удалось сохранить:"
+msgstr "Could not save:"
+
+msgid "Неверный цвет"
+msgstr "Invalid color"
+
+msgid "Ноль координат"
+msgstr "Origin"
+
+msgid "Номер заказа"
+msgstr "Order no."
+
+msgid "Номера строк N"
+msgstr "Line numbers N"
+
+msgid "О программе"
+msgstr "About"
+
+msgid "Одна врезка"
+msgstr "Per pierce"
+
+msgid "Окружности дугами G02"
+msgstr "Circles as G02 arcs"
+
+msgid "Оригинал"
+msgstr "Original"
+
+msgid "Основная"
+msgstr "Main"
+
+msgid "От мин. до макс."
+msgstr "Min to max"
+
+msgid "Отверстий по длине"
+msgstr "Holes along length"
+
+msgid "Отверстия"
+msgstr "Holes"
+
+msgid "Отверстия по размерам"
+msgstr "Holes by size"
+
+msgid "Открыть"
+msgstr "Open"
+
+msgid "Открыть картинку или заказ"
+msgstr "Open an image or an order"
+
+msgid "Отметьте хотя бы один формат"
+msgstr "Select at least one format"
+
+msgid "Ошибка экспорта:"
+msgstr "Export error:"
+
+msgid "Паспорт заказа"
+msgstr "Order sheet"
+
+msgid "Перетащите изображение или файл заказа сюда"
+msgstr "Drop an image or an order file here"
+
+msgid "Перетащите файл в окно или выберите его"
+msgstr "Drop a file into the window or choose it"
+
+msgid "Перфорация"
+msgstr "Open area"
+
+msgid "Плотность"
+msgstr "Density"
+
+msgid "Поворот"
+msgstr "Rotation"
+
+msgid "Подготовка"
+msgstr "Setup"
+
+msgid "Подготовка заказа"
+msgstr "Order setup"
+
+msgid "Показаны 14 из {n}. Увеличьте шаг размеров"
+msgstr "Showing 14 of {n}. Increase the size step"
+
+msgid "Поле без отверстий"
+msgstr "Hole-free margin"
+
+msgid "Порог"
+msgstr "Threshold"
+
+msgid "Порог: светлее — без отверстий"
+msgstr "Threshold: lighter means no holes"
+
+msgid "Пример"
+msgstr "Sample"
+
+msgid "Проверка под лазер"
+msgstr "Laser check"
+
+msgid "Пропорционально"
+msgstr "Proportional"
+
+msgid "Работает на телефоне"
+msgstr "Works on a phone"
+
+msgid "Работает на телефоне."
+msgstr "Works on phones."
+
+msgid "Размер от тона"
+msgstr "Size from tone"
+
+msgid "Размеры от {a} до {b} мм, перемычка не меньше {c} мм"
+msgstr "Sizes from {a} to {b} mm, bridge at least {c} mm"
+
+msgid "Размеры, мм"
+msgstr "Sizes, mm"
+
+msgid "Растянуть"
+msgstr "Stretch"
+
+msgid "Режим резки"
+msgstr "Cutting mode"
+
+msgid "Резать наружный контур листа"
+msgstr "Cut the sheet outline"
+
+msgid "Резка"
+msgstr "Cutting"
+
+msgid "Ромб"
+msgstr "Diamond"
+
+msgid "Русский"
+msgstr "Русский"
+
+msgid "Сбросить настройки"
+msgstr "Reset settings"
+
+msgid "Светлая"
+msgstr "Light"
+
+msgid "Сводка для Excel"
+msgstr "Summary for Excel"
+
+msgid "Свои"
+msgstr "Custom"
+
+msgid "Свой цвет"
+msgstr "Custom color"
+
+msgid "Сдвиг X / Y"
+msgstr "Offset X / Y"
+
+msgid "Сетка"
+msgstr "Grid"
+
+msgid "Синусоида"
+msgstr "Sine wave"
+
+msgid "Скачано:"
+msgstr "Downloaded:"
+
+msgid "Скачать"
+msgstr "Download"
+
+msgid "Скачать выбранные, ZIP"
+msgstr "Download selected, ZIP"
+
+msgid "Скорость резки"
+msgstr "Cutting speed"
+
+msgid "Сначала загрузите картинку"
+msgstr "Load an image first"
+
+msgid "Собираю архив…"
+msgstr "Building the archive…"
+
+msgid "Сохранено:"
+msgstr "Saved:"
+
+msgid "Сохранить заказ .perfo"
+msgstr "Save .perfo order"
+
+msgid "Сохранить файл заказа .perfo"
+msgstr "Save the .perfo order file"
+
+msgid "Сохранять пропорции"
+msgstr "Keep proportions"
+
+msgid "Стоимость"
+msgstr "Cost"
+
+msgid "Стоимость резки"
+msgstr "Cutting cost"
+
+msgid "Текст с расчётом"
+msgstr "Text with the estimate"
+
+msgid "Телефон"
+msgstr "Phone"
+
+msgid "Тема"
+msgstr "Theme"
+
+msgid "Толщина металла"
+msgstr "Metal thickness"
+
+msgid "Только заданные размеры"
+msgstr "Fixed sizes only"
+
+msgid "Тон"
+msgstr "Tone"
+
+msgid "Тот же код с расширением .cnc"
+msgstr "Same code with the .cnc extension"
+
+msgid "Треуг."
+msgstr "Triang."
+
+msgid "Треуг. 2"
+msgstr "Triang. 2"
+
+msgid "Узор"
+msgstr "Pattern"
+
+msgid "Узор пустой: проверьте настройки"
+msgstr "The pattern is empty: check the settings"
+
+msgid "Файл заказа повреждён или сжат другой программой"
+msgstr "The order file is damaged or was compressed by another program"
+
+msgid "Фон"
+msgstr "Back"
+
+msgid "Форма"
+msgstr "Shape"
+
+msgid "Форматы"
+msgstr "Formats"
+
+msgid "Холостой ход"
+msgstr "Rapid travel"
+
+msgid "Цвет за листом"
+msgstr "Colour behind the sheet"
+
+msgid "Цвет листа"
+msgstr "Sheet color"
+
+msgid "Цвет фона"
+msgstr "Background color"
+
+msgid "Центр"
+msgstr "Centre"
+
+msgid "Шаг выборки"
+msgstr "Sampling step"
+
+msgid "Шаг линий"
+msgstr "Line pitch"
+
+msgid "Шаг размеров"
+msgstr "Size step"
+
+msgid "Шаг сетки"
+msgstr "Grid pitch"
+
+msgid "Ширина"
+msgstr "Width"
+
+msgid "Ширина от {a} до {b} мм, перемычка не меньше {c} мм"
+msgstr "Width from {a} to {b} mm, bridge at least {c} mm"
+
+msgid "Ширина от тона"
+msgstr "Width from tone"
+
+msgid "Экспорт"
+msgstr "Export"
+
+msgid "Язык"
+msgstr "Language"
+
+msgid "Яркость"
+msgstr "Brightness"
+
+msgid "г/см³"
+msgstr "g/cm³"
+
+msgid "кг"
+msgstr "kg"
+
+msgid "м"
+msgstr "m"
+
+msgid "мин"
+msgstr "min"
+
+msgid "мм"
+msgstr "mm"
+
+msgid "мм/мин"
+msgstr "mm/min"
+
+msgid "пример"
+msgstr "sample"
+
+msgid "с"
+msgstr "s"
+
+msgid "формат не поддерживается"
+msgstr "format is not supported"
+
+msgid "ч"
+msgstr "h"
+
+msgid "шт"
+msgstr "pcs"
+
+msgid "пустая картинка"
+msgstr "empty image"
+
+msgid "Не удалось открыть файл:"
+msgstr "Could not open the file:"
+
+msgid "Картинка или заказ"
+msgstr "Image or order"
+
+msgid "Все файлы"
+msgstr "All files"
+
+msgid "Не удалось открыть ссылку:"
+msgstr "Could not open the link:"
