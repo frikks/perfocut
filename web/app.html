@@ -2,24 +2,43 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="dark">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0f0f10">
 <title>PerfoCut — перфорация для лазерной резки</title>
 <style>
 :root{
   --bg0:#0f0f10;--bg:#141415;--card:#19191b;--raised:#232325;--raised2:#2c2c2f;
-  --line:rgba(237,237,237,.08);--line2:rgba(237,237,237,.14);
+  --line:rgba(237,237,237,.08);--line2:rgba(237,237,237,.14);--field-line:rgba(237,237,237,.26);--field-hover:rgba(237,237,237,.40);
   --t1:#ededed;--t2:#a1a1a6;--t3:#85858b;
-  --acc:#e8833a;--acc-ink:#1b1209;--acc-text:#f0a36b;
+  --acc:#e8833a;--acc-hover:#ef9150;--acc-ink:#1b1209;--acc-text:#f0a36b;
+  --seg-on:#38383c;--seg-shadow:inset 0 1px 0 rgba(255,255,255,.08);--bar:#4a4a4f;--toast:#2c2c2f;--empty-bg:rgba(25,25,27,.6);--scroll:#333;
+  --dim:rgba(237,237,237,.28);--frame:rgba(237,237,237,.18);--scrim:rgba(0,0,0,.6);
   --warn:#d9a441;--bad:#e5484d;--ok:#4cc38a;
   --ease:cubic-bezier(.22,1,.36,1);
   --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
   --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-  --row:32px;
+  --row:32px;color-scheme:dark;
 }
+:root[data-theme=amoled]{
+  --bg0:#000000;--bg:#000000;--card:#0b0b0c;--raised:#141415;--raised2:#1d1d1f;
+  --line:rgba(237,237,237,.09);--line2:rgba(237,237,237,.16);--field-line:rgba(237,237,237,.30);--field-hover:rgba(237,237,237,.45);
+  --seg-on:#2a2a2d;--bar:#3d3d42;--toast:#1d1d1f;--empty-bg:rgba(0,0,0,.6);--scroll:#262626;--scrim:rgba(0,0,0,.72);
+}
+:root[data-theme=light]{
+  --bg0:#ffffff;--bg:#f3f3f2;--card:#f7f7f6;--raised:#ffffff;--raised2:#efefed;
+  --line:rgba(24,24,27,.10);--line2:rgba(24,24,27,.18);--field-line:rgba(24,24,27,.34);--field-hover:rgba(24,24,27,.52);
+  --t1:#18181b;--t2:#52525a;--t3:#71717a;
+  --acc:#e8833a;--acc-hover:#dc7429;--acc-ink:#1b1209;--acc-text:#b45a17;
+  --seg-on:#ffffff;--seg-shadow:0 1px 2px rgba(24,24,27,.14),0 0 0 1px rgba(24,24,27,.08);--bar:#c7c7cc;--toast:#18181b;--empty-bg:rgba(255,255,255,.7);--scroll:#c9c9cc;
+  --dim:rgba(24,24,27,.35);--frame:rgba(24,24,27,.22);--scrim:rgba(24,24,27,.42);
+  --warn:#b7791f;--ok:#2f9e6b;color-scheme:light;
+}
+:root[data-theme=light] .toast{color:#fafafa;border-color:transparent}
 @media (pointer:coarse){:root{--row:40px}}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--t1);font:14px/20px var(--sans);-webkit-font-smoothing:antialiased}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--t1);font:14px/20px var(--sans);-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html{-webkit-tap-highlight-color:transparent}
 body{overflow:hidden}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -38,14 +57,14 @@ header{display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px
 .btn:hover{background:var(--raised2)}
 .btn:active{transform:scale(.98)}
 .btn.primary{background:var(--acc);border-color:transparent;color:var(--acc-ink);font-weight:500}
-.btn.primary:hover{background:#ef9150}
+.btn.primary:hover{background:var(--acc-hover)}
 .btn.ghost{background:transparent;border-color:transparent;color:var(--t2)}
 .btn.ghost:hover{background:var(--raised);color:var(--t1)}
 .btn.icon{width:36px;padding:0}
 .btn[disabled]{opacity:.45;pointer-events:none}
 
 .main{display:grid;grid-template-columns:320px minmax(0,1fr) 300px;min-height:0}
-.panel{background:var(--bg0);overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:#333 transparent}
+.panel{background:var(--bg0);overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
 .panel.left{border-right:1px solid var(--line)}
 .panel.right{border-left:1px solid var(--line)}
 
@@ -62,21 +81,23 @@ details.sec>summary .meta{margin-left:auto;font:12px/16px var(--mono);color:var(
 .row{display:flex;align-items:center;gap:12px;min-height:var(--row)}
 .row>label,.row>.lbl{flex:1;color:var(--t2);font-size:13px;line-height:18px}
 .field{position:relative;width:112px;flex:none}
-.field input{width:100%;height:var(--row);padding:0 34px 0 10px;border-radius:8px;border:1px solid var(--line);background:var(--raised);font:13px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--t1);transition:border-color .15s var(--ease)}
-.field input:hover{border-color:var(--line2)}
-.field input:focus{border-color:var(--acc);outline:none}
+.field input{width:100%;height:var(--row);padding:0 34px 0 10px;border-radius:8px;border:1px solid var(--field-line);background:var(--raised);font:13px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--t1);transition:border-color .15s var(--ease),box-shadow .15s var(--ease)}
+.field input:hover{border-color:var(--field-hover)}
+.field input:focus{border-color:var(--acc);outline:none;box-shadow:0 0 0 1px var(--acc)}
 .field .u{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:12px/1 var(--mono);color:var(--t3);pointer-events:none}
 .field.wide{width:100%}
 .field.wide input{padding-right:10px;font-family:var(--sans)}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 input[type=number]{-moz-appearance:textfield}
-textarea{width:100%;min-height:64px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--raised);font:12px/18px var(--mono);resize:vertical}
-textarea:focus{border-color:var(--acc);outline:none}
+textarea{width:100%;min-height:64px;padding:8px 10px;border-radius:8px;border:1px solid var(--field-line);background:var(--raised);font:12px/18px var(--mono);resize:vertical}
+textarea:hover{border-color:var(--field-hover)}
+textarea:focus{border-color:var(--acc);outline:none;box-shadow:0 0 0 1px var(--acc)}
 
 .seg{display:flex;padding:2px;border-radius:10px;background:var(--raised);border:1px solid var(--line);gap:2px}
 .seg button{flex:1;height:calc(var(--row) - 6px);border:0;border-radius:8px;background:transparent;color:var(--t2);font-size:13px;padding:0 8px;transition:background-color .15s var(--ease),color .15s var(--ease)}
 .seg button:hover{color:var(--t1)}
-.seg button.on{background:#38383c;color:var(--t1);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.seg button.on{background:var(--seg-on);color:var(--t1);box-shadow:var(--seg-shadow)}
+.seg.grid2{display:grid;grid-template-columns:1fr 1fr}
 
 .range{display:flex;align-items:center;gap:10px;width:100%;margin:-2px 0 6px}
 .row:has(+.range){min-height:24px;margin-top:4px}
@@ -105,7 +126,7 @@ textarea:focus{border-color:var(--acc);outline:none}
 canvas#cv{position:absolute;inset:0;width:100%;height:100%;cursor:grab}
 canvas#cv.drag{cursor:grabbing}
 .empty{position:absolute;inset:0;display:grid;place-items:center;padding:24px}
-.empty .box{width:min(440px,100%);border:1px dashed var(--line2);border-radius:16px;padding:32px 24px;text-align:center;background:rgba(25,25,27,.6)}
+.empty .box{width:min(440px,100%);border:1px dashed var(--line2);border-radius:16px;padding:32px 24px;text-align:center;background:var(--empty-bg)}
 .empty h2{margin:12px 0 4px;font-size:18px;line-height:24px;font-weight:500}
 .empty p{margin:0 0 20px;color:var(--t2);font-size:13px}
 .empty .acts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
@@ -127,7 +148,7 @@ canvas#cv.drag{cursor:grabbing}
 .fig b{display:block;margin-top:4px;font:500 17px/22px var(--mono);font-variant-numeric:tabular-nums}
 .sizes{display:grid;gap:4px}
 .sz{display:grid;grid-template-columns:64px 1fr 52px;align-items:center;gap:8px;font:12px/16px var(--mono);color:var(--t2)}
-.sz i{display:block;height:4px;border-radius:2px;background:#4a4a4f}
+.sz i{display:block;height:4px;border-radius:2px;background:var(--bar)}
 .sz .n{text-align:right;color:var(--t1)}
 .warns{display:grid;gap:8px;margin:0;padding:0;list-style:none}
 .warns li{display:flex;gap:8px;font-size:13px;line-height:18px;color:var(--t2)}
@@ -145,8 +166,24 @@ canvas#cv.drag{cursor:grabbing}
 .fmt .btn.icon{width:32px;height:32px}
 .exp-acts{display:grid;gap:8px;margin-top:12px}
 
-.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,8px);opacity:0;pointer-events:none;max-width:min(560px,calc(100% - 32px));padding:10px 14px;border-radius:10px;background:#2c2c2f;border:1px solid var(--line2);color:var(--t1);font-size:13px;transition:opacity .2s var(--ease),transform .2s var(--ease);z-index:10}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,8px);opacity:0;pointer-events:none;max-width:min(560px,calc(100% - 32px));padding:10px 14px;border-radius:10px;background:var(--toast);border:1px solid var(--line2);color:var(--t1);font-size:13px;transition:opacity .2s var(--ease),transform .2s var(--ease);z-index:30}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+
+.hint{margin:0;font-size:12px;line-height:16px;color:var(--t3)}
+
+/* Modal */
+.modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:16px;background:var(--scrim);opacity:0;transition:opacity .18s var(--ease)}
+.modal.show{opacity:1}
+.modal .sheet{width:min(400px,100%);max-height:calc(100dvh - 32px);overflow:auto;border-radius:16px;background:var(--bg0);border:1px solid var(--line2);box-shadow:0 24px 64px rgba(0,0,0,.35);transform:translateY(8px) scale(.98);transition:transform .2s var(--ease)}
+.modal.show .sheet{transform:none}
+.mhead{display:flex;align-items:center;gap:4px;padding:12px 12px 4px 20px}
+.mhead h2{flex:1;margin:0;font-size:16px;line-height:24px;font-weight:600}
+.mbody{display:grid;gap:8px;padding:4px 20px 20px}
+.mbody p{margin:0;color:var(--t2);font-size:13px;line-height:20px}
+.mbody a{color:var(--acc-text);text-decoration:none;font-weight:500}
+.mbody a:hover{text-decoration:underline}
+.mbody .kv{padding:6px 0;border-top:1px solid var(--line)}
+.ibtn{font:600 15px/1 Georgia,"Times New Roman",serif;font-style:italic}
 
 .tabs{display:none}
 [hidden]{display:none!important}
@@ -155,17 +192,59 @@ canvas#cv.drag{cursor:grabbing}
 @media (max-width:900px){
   body{overflow:auto}
   .app{display:block;height:auto}
-  header{position:sticky;top:0;z-index:5;height:52px;padding:0 12px;gap:8px}
+  header{position:sticky;top:0;z-index:5;height:56px;padding:0 12px;gap:6px}
   header .hide-m{display:none}
   .main{display:flex;flex-direction:column}
   .stage{order:1}.tabs{order:2}.panel{order:3}
-  .stage{position:sticky;top:52px;z-index:4;height:46vh;height:46dvh;border-bottom:1px solid var(--line)}
-  .tabs{display:flex;position:sticky;top:calc(52px + 46dvh);z-index:4;background:var(--bg0);border-bottom:1px solid var(--line);padding:8px 12px}
+  .stage{position:sticky;top:56px;z-index:4;height:44vh;height:44dvh;border-bottom:1px solid var(--line);transition:height .2s var(--ease)}
+  .tabs{display:flex;position:sticky;top:calc(56px + 44dvh);z-index:4;background:var(--bg0);border-bottom:1px solid var(--line);padding:8px 12px}
   .tabs .seg{width:100%}
   .panel{overflow:visible;border:0!important}
   .panel[data-tab]:not(.active){display:none}
   .panel.right .blk-exp[data-tab-part]:not(.active),.panel.right .blk-sum[data-tab-part]:not(.active){display:none}
   .toolbar .lbl-m{display:none}
+  html,body{overflow-x:hidden}
+  .toolbar{gap:6px;padding:0 8px;min-width:0}
+  .toolbar .seg{min-width:0;flex:0 1 auto}
+  .toolbar .seg button{padding:0 10px;font-size:14px}
+  .toolbar .swatch input{width:32px;height:32px}
+  .toolbar .btn.icon{width:40px}
+  /* клавиатура открыта: превью ниже, поле ввода по центру */
+  body.kb .stage{height:26dvh}
+  body.kb .tabs{display:none}
+  body.kb .panel{padding-bottom:50dvh}
+}
+@media (max-width:430px){.brand .bname{display:none}}
+/* Телефон: крупнее текст и цели под палец */
+@media (pointer:coarse),(max-width:900px){
+  :root{--row:48px}
+  html,body{font-size:16px;line-height:22px}
+  .btn{height:44px;padding:0 16px;font-size:15px}
+  .btn.icon{width:44px}
+  .fmt .btn.icon{width:44px;height:44px}
+  details.sec>summary{height:56px;font-size:16px}
+  .sec-body{gap:10px}
+  .row>label,.row>.lbl,.check{font-size:15px;line-height:20px}
+  .field{width:136px}
+  .field input{font-size:16px;padding-left:12px}
+  .field .u{font-size:13px}
+  .field.wide input,textarea{font-size:16px}
+  .seg button{font-size:15px}
+  .check input,.fmt input{width:22px;height:22px}
+  .sub,.hint{font-size:13px;line-height:18px}
+  .range output{font-size:14px;width:52px}
+  .range input[type=range]{height:32px}
+  .fmt{min-height:56px}
+  .fmt label b{font-size:15px;line-height:20px}
+  .fmt label span{font-size:13px;line-height:18px}
+  .kv{font-size:15px}
+  .block h3{font-size:15px}
+  .fig span{font-size:13px}.fig b{font-size:18px;line-height:24px}
+  .sz{font-size:13px;line-height:20px}
+  .warns li,.okline{font-size:14px;line-height:20px}
+  .toast{font-size:15px;bottom:max(24px,env(safe-area-inset-bottom))}
+  .mhead h2{font-size:18px}
+  .mbody p{font-size:15px;line-height:22px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -175,12 +254,13 @@ canvas#cv.drag{cursor:grabbing}
   <header>
     <div class="brand">
       <svg class="mark" viewBox="0 0 20 20" aria-hidden="true"><rect x="1" y="1" width="18" height="18" rx="4" fill="#2c2c2f"/><circle cx="6" cy="6" r="1.4" fill="#ededed"/><circle cx="10" cy="6" r="1.8" fill="#ededed"/><circle cx="14" cy="6" r="2.2" fill="#e8833a"/><circle cx="6" cy="10" r="1.8" fill="#ededed"/><circle cx="10" cy="10" r="2.2" fill="#ededed"/><circle cx="14" cy="10" r="1.8" fill="#ededed"/><circle cx="6" cy="14" r="2.2" fill="#ededed"/><circle cx="10" cy="14" r="1.8" fill="#ededed"/><circle cx="14" cy="14" r="1.4" fill="#ededed"/></svg>
-      PerfoCut <small class="hide-m">/*VERSION*/</small>
+      <span class="bname">PerfoCut</span> <small class="hide-m">/*VERSION*/</small>
     </div>
     <div class="hgap"></div>
     <button class="btn ghost" id="bOpen" title="Открыть картинку или заказ"><svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="hide-m">Открыть</span></button>
     <button class="btn" id="bSaveOrder" disabled title="Сохранить файл заказа .perfo"><svg class="i" viewBox="0 0 24 24"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M8 3v5h7V3"/><path d="M8 21v-7h8v7"/></svg><span class="hide-m">Заказ .perfo</span></button>
     <button class="btn primary" id="bZip" disabled><svg class="i" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>Экспорт</button>
+    <button class="btn ghost icon" id="bSettings" title="Настройки" aria-label="Настройки"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
     <input type="file" id="file" accept="image/*,.perfo,.zip" hidden>
   </header>
 
@@ -216,6 +296,7 @@ canvas#cv.drag{cursor:grabbing}
         <div class="sec-body">
           <div class="row"><label>Ширина</label><div class="field"><input type="number" step="1" data-k="sheet_w"><span class="u">мм</span></div></div>
           <div class="row"><label>Высота</label><div class="field"><input type="number" step="1" data-k="sheet_h"><span class="u">мм</span></div></div>
+          <label class="check"><input type="checkbox" id="lockRatio">Сохранять пропорции</label>
           <div class="row"><label>Поле без отверстий</label><div class="field"><input type="number" step="1" data-k="border"><span class="u">мм</span></div></div>
           <label class="check"><input type="checkbox" data-k="outline">Резать наружный контур листа</label>
           <button class="btn" id="bAspect" disabled>Высота по пропорциям картинки</button>
@@ -232,11 +313,16 @@ canvas#cv.drag{cursor:grabbing}
             <div class="sub">Форма</div>
             <div class="seg" data-k="shape"><button data-v="circle">Круг</button><button data-v="square">Квадрат</button><button data-v="diamond">Ромб</button></div>
             <div class="row"><label>Шаг сетки</label><div class="field"><input type="number" step="0.5" data-k="pitch"><span class="u">мм</span></div></div>
+            <div class="row"><label>Отверстий по длине</label><div class="field"><input type="number" step="1" min="1" id="holesN"><span class="u">шт</span></div></div>
             <div class="row"><label>Поворот</label><div class="field"><input type="number" step="1" data-k="angle"><span class="u">°</span></div></div>
             <div class="row"><label>Сдвиг X / Y</label><div class="field" style="width:80px"><input type="number" step="0.5" data-k="offset_x"><span class="u">мм</span></div><div class="field" style="width:80px"><input type="number" step="0.5" data-k="offset_y"><span class="u">мм</span></div></div>
             <div class="row"><label>Мин. размер</label><div class="field"><input type="number" step="0.1" data-k="d_min"><span class="u">мм</span></div></div>
             <div class="row"><label>Макс. размер</label><div class="field"><input type="number" step="0.1" data-k="d_max"><span class="u">мм</span></div></div>
             <button class="btn" id="bFit">Макс. размер по шагу и перемычке</button>
+            <div class="sub">Размер от тона</div>
+            <div class="seg" data-k="size_mode"><button data-v="range">От мин. до макс.</button><button data-v="prop">Пропорционально</button></div>
+            <p class="hint" data-show="size_mode=prop">Диаметр растёт от нуля вместе с темнотой, как в SVG tracing. Отверстия меньше мин. размера не режутся.</p>
+            <button class="btn" id="bTrace">Как в SVG tracing</button>
             <div class="row"><label>Шаг размеров</label><div class="field"><input type="number" step="0.1" data-k="quant"><span class="u">мм</span></div></div>
             <label class="check"><input type="checkbox" data-k="fixed">Только заданные размеры</label>
             <div class="field wide" data-show="fixed=true"><input type="text" data-k="fixed_sizes" data-str placeholder="3, 5, 7, 9" aria-label="Размеры, мм"></div>
@@ -246,6 +332,8 @@ canvas#cv.drag{cursor:grabbing}
             <div class="row"><label>Поворот</label><div class="field"><input type="number" step="1" data-k="line_angle"><span class="u">°</span></div></div>
             <div class="row"><label>Мин. ширина</label><div class="field"><input type="number" step="0.1" data-k="w_min"><span class="u">мм</span></div></div>
             <div class="row"><label>Макс. ширина</label><div class="field"><input type="number" step="0.1" data-k="w_max"><span class="u">мм</span></div></div>
+            <div class="sub">Ширина от тона</div>
+            <div class="seg" data-k="size_mode"><button data-v="range">От мин. до макс.</button><button data-v="prop">Пропорционально</button></div>
             <label class="check"><input type="checkbox" data-k="wave">Синусоида</label>
             <div data-show="wave=true" class="sec-body" style="padding:0">
               <div class="row"><label>Длина волны</label><div class="field"><input type="number" step="1" data-k="wave_len"><span class="u">мм</span></div></div>
@@ -379,294 +467,33 @@ canvas#cv.drag{cursor:grabbing}
     </aside>
   </div>
 </div>
+<div class="modal" id="mSettings" hidden role="dialog" aria-modal="true" aria-labelledby="mSetT">
+  <div class="sheet">
+    <div class="mhead"><h2 id="mSetT">Настройки</h2><button class="btn ghost icon" id="bInfo" title="О программе" aria-label="О программе"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><path d="M12 7.5v.5"/></svg></button><button class="btn ghost icon" data-close title="Закрыть" aria-label="Закрыть"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="mbody">
+      <div class="sub">Тема</div>
+      <div class="seg grid2" id="setTheme"><button data-v="dark">Основная</button><button data-v="light">Светлая</button><button data-v="system">Как в системе</button><button data-v="amoled">AMOLED</button></div>
+      <div class="sub">Язык</div>
+      <div class="seg" id="setLang"><button data-v="ru">Русский</button><button data-v="en">English</button></div>
+      <label class="check"><input type="checkbox" id="setVibro">Вибрация при нажатиях</label>
+      <p class="hint">Работает на телефоне.</p>
+    </div>
+  </div>
+</div>
+<div class="modal" id="mInfo" hidden role="dialog" aria-modal="true" aria-labelledby="mInfoT">
+  <div class="sheet">
+    <div class="mhead"><h2 id="mInfoT">О программе</h2><button class="btn ghost icon" data-close title="Закрыть" aria-label="Закрыть"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="mbody">
+      <p>PerfoCut превращает картинку в перфорацию для лазерной резки металла: считает отверстия, длину реза и стоимость, выгружает DXF, G-code и другие форматы.</p>
+      <div class="kv"><span>Версия</span><span class="num">/*VERSION*/</span></div>
+      <div class="kv"><span>Автор</span><a href="https://t.me/Frikks" target="_blank" rel="noopener">@Frikks</a></div>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script id="wasm" type="application/octet-stream">/*WASM_BASE64*/</script>
-<script>
-'use strict';
-const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
-const enc=new TextEncoder(), dec=new TextDecoder();
-const fmtN=(v,d=0)=>Number(v).toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d});
-let ex, DEF, P, stats=null, geom=null, img=null, mode='metal', view={z:1,x:0,y:0}, runT=0;
-const STORE='perfocut.params.v1';
-
-// ---------- WASM ----------
-function put(bytes){const n=bytes.length,p=ex.pc_alloc(n);new Uint8Array(ex.memory.buffer,p,n).set(bytes);return [p,n]}
-function out(){const p=ex.pc_out_ptr(),n=ex.pc_out_len();return new Uint8Array(ex.memory.buffer,p,n).slice()}
-function call(fn,bytes){const [p,n]=put(bytes);try{return fn(p,n)}finally{ex.pc_free(p,n)}}
-function exportFmt(id){const rc=call(ex.pc_export,enc.encode(id));if(rc!==0)throw new Error('format '+id);return out()}
-function zipBuild(files){ex.pc_zip_new();for(const [name,data] of files){const nb=enc.encode(name);const [np,nl]=put(nb);const [dp,dl]=put(data);ex.pc_zip_add(np,nl,dp,dl);ex.pc_free(np,nl);ex.pc_free(dp,dl)}ex.pc_zip_finish();return out()}
-
-async function boot(){
-  try{
-    const b64=$('#wasm').textContent.trim();
-    const bin=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
-    const {instance}=await WebAssembly.instantiate(bin,{});
-    ex=instance.exports;
-  }catch(e){toast('Не удалось запустить ядро: '+e.message,8000);return}
-  ex.pc_defaults(); DEF=JSON.parse(dec.decode(out()));
-  let saved={}; try{saved=JSON.parse(localStorage.getItem(STORE)||'{}')}catch(e){}
-  P=Object.assign({},DEF,saved);
-  buildFormats(); bindInputs(); syncInputs(); bindStage(); resize();
-  new ResizeObserver(resize).observe($('#wrap'));
-  schedule();
-}
-
-// ---------- Inputs ----------
-function bindInputs(){
-  $$('[data-k]').forEach(el=>{
-    const k=el.dataset.k;
-    if(el.classList.contains('seg')){
-      el.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-        P[k]=('bool' in el.dataset)?b.dataset.v==='true':b.dataset.v;changed()});
-      return;
-    }
-    const ev=(el.type==='checkbox')?'change':'input';
-    el.addEventListener(ev,()=>{
-      if(el.type==='checkbox')P[k]=el.checked;
-      else if('str' in el.dataset)P[k]=el.value;
-      else{const v=parseFloat(String(el.value).replace(',','.'));if(!isFinite(v))return;P[k]=v*(parseFloat(el.dataset.scale)||1);
-        if(k==='gc_decimals')P[k]=Math.max(1,Math.min(6,Math.round(v)))}
-      if(el.type==='range')rangeOut(el);
-      changed(el);
-    });
-  });
-  $('#gcPreset').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||'custom' in b.dataset)return;P.gc_on=b.dataset.on;P.gc_off=b.dataset.off;changed()});
-  $('#bFit').onclick=()=>{P.d_max=Math.max(0,+(P.pitch-P.bridge).toFixed(2));changed()};
-  $('#bAspect').onclick=()=>{if(!img)return;P.sheet_h=Math.round(P.sheet_w*img.h/img.w);changed()};
-  $('#bReset').onclick=()=>{const keep={name:P.name,order_no:P.order_no,client:P.client,phone:P.phone,email:P.email,comment:P.comment};P=Object.assign({},DEF,keep);changed();toast('Настройки сброшены')};
-}
-function rangeOut(el){const o=el.parentElement.querySelector('output');if(!o)return;const k=el.dataset.k;const v=P[k];
-  o.textContent=k==='gamma'?v.toFixed(2):k==='tone_cut'?Math.round(v*100)+'%':(v>0?'+':'')+Math.round(v*100)}
-function syncInputs(skip){
-  $$('[data-k]').forEach(el=>{
-    if(el===skip)return;const k=el.dataset.k,v=P[k];
-    if(el.classList.contains('seg')){$$('button',el).forEach(b=>b.classList.toggle('on',String(v)===b.dataset.v));return}
-    if(el.type==='checkbox')el.checked=!!v;
-    else if('str' in el.dataset)el.value=v??'';
-    else{const s=parseFloat(el.dataset.scale)||1;const sv=v/s;el.value=el.type==='range'?sv:+sv.toFixed(4);if(el.type==='range')rangeOut(el)}
-  });
-  $$('[data-show]').forEach(el=>{const [k,v]=el.dataset.show.split('=');el.hidden=String(P[k])!==v});
-  const pre=$$('#gcPreset button');let m=false;pre.forEach(b=>{const on=!('custom' in b.dataset)&&b.dataset.on===P.gc_on&&b.dataset.off===P.gc_off;b.classList.toggle('on',on);m=m||on});
-  pre[pre.length-1].classList.toggle('on',!m);
-  $$('[data-cur]').forEach(e=>e.textContent=P.currency);
-  $('#mSheet').textContent=`${fmtN(P.sheet_w)} × ${fmtN(P.sheet_h)}`;
-  $('#mMetal').textContent=`${fmtN(P.thickness,1)} мм`;
-}
-function changed(src){syncInputs(src);try{localStorage.setItem(STORE,JSON.stringify(P))}catch(e){}schedule()}
-function schedule(){clearTimeout(runT);runT=setTimeout(run,90)}
-
-// ---------- Generation ----------
-function run(){
-  const rc=call(ex.pc_generate,enc.encode(JSON.stringify(P)));
-  if(rc!==0){toast(dec.decode(out()),5000);return}
-  stats=JSON.parse(dec.decode(out()));
-  ex.pc_geometry();const g=out();geom=new Float32Array(g.buffer,0,g.byteLength>>2);
-  renderStats();draw();
-  const has=!!img&&stats.count>0;['bZip','bZip2','bSaveOrder','bSaveOrder2'].forEach(id=>$('#'+id).disabled=!(id.startsWith('bSave')?!!img:has));
-}
-
-function renderStats(){
-  const s=stats,c=P.currency;
-  if(!img){$('#sCost').textContent='—';['sCount','sPierce','sCut','sTime','sOpen','sMass'].forEach(i=>$('#'+i).textContent='—');$('#sCostRows').innerHTML='';$('#bSizes').hidden=true;
-    $('#sWarn').innerHTML='<div class="okline">Загрузите картинку</div>';$('#hud').textContent='';return}
-  $('#sCost').innerHTML=`${fmtN(s.cost,0)} <small>${esc(c)}</small>`;
-  const rows=[['Резка',s.cost_cut],['Врезки',s.cost_pierce]];if(s.cost_material>0)rows.push(['Металл',s.cost_material]);if(s.cost_fixed>0)rows.push(['Подготовка',s.cost_fixed]);
-  $('#sCostRows').innerHTML=rows.map(r=>`<div class="kv"><span>${r[0]}</span><span class="num">${fmtN(r[1],0)} ${esc(c)}</span></div>`).join('');
-  $('#sCount').textContent=fmtN(s.count);$('#sPierce').textContent=fmtN(s.pierces);
-  $('#sCut').textContent=fmtN(s.cut_len_m,1)+' м';$('#sTime').textContent='≈ '+fmtTime(s.time_min);
-  $('#sOpen').textContent=fmtN(s.open_area_pct,1)+' %';$('#sMass').textContent=fmtN(s.weight_kg,1)+' кг';
-  const bs=s.by_size||[];$('#bSizes').hidden=!bs.length;
-  if(bs.length){const mx=Math.max(...bs.map(b=>b.count));const list=bs.length>14?[...bs].sort((a,b)=>b.count-a.count).slice(0,14).sort((a,b)=>a.size-b.size):bs;
-    $('#sSizes').innerHTML=list.map(b=>`<div class="sz"><span>Ø ${fmtN(b.size,b.size%1?1:0)}</span><i style="width:${Math.max(2,b.count/mx*100)}%"></i><span class="n">${fmtN(b.count)}</span></div>`).join('')+(bs.length>14?`<div class="sub">Показаны 14 из ${bs.length}. Увеличьте шаг размеров</div>`:'')}
-  const w=[...(s.warnings||[])];if(s.removed_edge>0)w.push(`${fmtN(s.removed_edge)} отв. у края не поместились в поле и пропущены`);
-  $('#sWarn').innerHTML=w.length?`<ul class="warns">${w.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:`<div class="okline">${P.pattern==='lines'?'Ширина':'Размеры'} от ${fmtN(s.size_min,1)} до ${fmtN(s.size_max,1)} мм, перемычка не меньше ${fmtN(P.bridge,1)} мм</div>`;
-  $('#hud').textContent=`${fmtN(s.count)} контуров · ${fmtN(s.open_area_pct,1)} %`;
-}
-function fmtTime(m){if(m<60)return fmtN(m,m<10?1:0)+' мин';const h=Math.floor(m/60);return `${h} ч ${Math.round(m-h*60)} мин`}
-function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-
-// ---------- Drawing ----------
-const cv=$('#cv'),ctx=cv.getContext('2d');let dpr=1,W=0,H=0;
-function resize(){const r=$('#wrap').getBoundingClientRect();dpr=Math.min(window.devicePixelRatio||1,2);W=r.width;H=r.height;cv.width=Math.max(1,Math.round(W*dpr));cv.height=Math.max(1,Math.round(H*dpr));draw()}
-function base(){const pad=W<600?36:56;return Math.min((W-pad*2)/P.sheet_w,(H-pad*2)/P.sheet_h)}
-function tf(){const s=base()*view.z;const ox=W/2-P.sheet_w*s/2+view.x,oy=H/2+P.sheet_h*s/2+view.y;return {s,ox,oy}}
-function shapesPath(target,s,ox,oy){
-  const g=geom;if(!g)return;let i=0;const n=g.length;
-  while(i<n){const k=g[i];
-    if(k===0){const x=ox+g[i+1]*s,y=oy-g[i+2]*s,r=g[i+3]*s/2;target.moveTo(x+r,y);target.arc(x,y,r,0,Math.PI*2);i+=4}
-    else{const m=g[i+1];target.moveTo(ox+g[i+2]*s,oy-g[i+3]*s);for(let j=1;j<m;j++)target.lineTo(ox+g[i+2+j*2]*s,oy-g[i+3+j*2]*s);target.closePath();i+=2+m*2}
-  }
-}
-function imgRect(){ // повторяет размещение картинки в ядре
-  const iw=img.w,ih=img.h,w=P.sheet_w,h=P.sheet_h;let a,b;
-  if(P.fit==='contain'){a=b=Math.min(w/iw,h/ih)}else if(P.fit==='stretch'){a=w/iw;b=h/ih}else{a=b=Math.max(w/iw,h/ih)}
-  a*=P.img_scale;b*=P.img_scale;const dw=iw*a,dh=ih*b;return {left:w/2+P.img_dx-dw/2,top:h/2-P.img_dy-dh/2,dw,dh}
-}
-function draw(){
-  if(!P)return;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
-  $('#empty').hidden=!!img;if(!img)return;
-  const {s,ox,oy}=tf();const sw=P.sheet_w*s,sh=P.sheet_h*s,top=oy-sh;
-  paintSheet(ctx,s,ox,oy,mode);
-  // размерные линии
-  ctx.save();ctx.strokeStyle='rgba(237,237,237,.28)';ctx.fillStyle='#85858b';ctx.lineWidth=1;ctx.font='12px '+getComputedStyle(document.body).getPropertyValue('--mono');
-  const yb=oy+20,xl=ox-20;
-  line(ox,oy+6,ox,yb+6);line(ox+sw,oy+6,ox+sw,yb+6);line(ox,yb,ox+sw,yb);tick(ox,yb);tick(ox+sw,yb);
-  line(ox-6,oy,xl-6,oy);line(ox-6,top,xl-6,top);line(xl,top,xl,oy);tick(xl,oy);tick(xl,top);
-  ctx.textAlign='center';ctx.textBaseline='middle';
-  label(`${fmtN(P.sheet_w)} мм`,ox+sw/2,yb);
-  ctx.save();ctx.translate(xl,top+sh/2);ctx.rotate(-Math.PI/2);label(`${fmtN(P.sheet_h)} мм`,0,0);ctx.restore();
-  ctx.restore();
-  function line(a,b,c,d){ctx.beginPath();ctx.moveTo(a+.5,b+.5);ctx.lineTo(c+.5,d+.5);ctx.stroke()}
-  function tick(x,y){ctx.beginPath();ctx.moveTo(x-4+.5,y+4+.5);ctx.lineTo(x+4+.5,y-4+.5);ctx.stroke()}
-  function label(t,x,y){const w=ctx.measureText(t).width+12;ctx.save();ctx.fillStyle=getComputedStyle(document.body).getPropertyValue('--bg');ctx.fillRect(x-w/2,y-8,w,16);ctx.restore();ctx.fillText(t,x,y+.5)}
-}
-function paintSheet(c,s,ox,oy,m){
-  const sw=P.sheet_w*s,sh=P.sheet_h*s,top=oy-sh;const sheetCol=$('#cSheet').value,backCol=$('#cBack').value;
-  if(m==='metal'){
-    const gr=c.createLinearGradient(ox,top,ox+sw,oy);gr.addColorStop(0,shade(sheetCol,12));gr.addColorStop(.55,sheetCol);gr.addColorStop(1,shade(sheetCol,-14));
-    c.fillStyle=gr;c.fillRect(ox,top,sw,sh);
-    c.beginPath();shapesPath(c,s,ox,oy);c.fillStyle=backCol;c.fill();
-    c.strokeStyle='rgba(0,0,0,.35)';c.lineWidth=1;c.strokeRect(ox+.5,top+.5,sw-1,sh-1);
-  }else if(m==='lines'){
-    c.fillStyle='#19191b';c.fillRect(ox,top,sw,sh);
-    const b=P.border*s;c.save();c.setLineDash([4,4]);c.strokeStyle='rgba(237,237,237,.18)';c.strokeRect(ox+b+.5,top+b+.5,sw-2*b-1,sh-2*b-1);c.restore();
-    c.beginPath();shapesPath(c,s,ox,oy);c.strokeStyle='#ededed';c.lineWidth=Math.max(.5,Math.min(1,s*.15));c.stroke();
-    c.strokeStyle='#e8833a';c.lineWidth=1;c.strokeRect(ox+.5,top+.5,sw-1,sh-1);
-  }else{
-    c.fillStyle='#fff';c.fillRect(ox,top,sw,sh);
-    c.save();c.beginPath();c.rect(ox,top,sw,sh);c.clip();const r=imgRect();c.drawImage(img.canvas,ox+r.left*s,top+r.top*s,r.dw*s,r.dh*s);
-    c.beginPath();shapesPath(c,s,ox,oy);c.strokeStyle='rgba(232,131,58,.85)';c.lineWidth=1;c.stroke();c.restore();
-  }
-}
-function shade(hex,p){const n=parseInt(hex.slice(1),16);let r=n>>16,g=n>>8&255,b=n&255;const f=v=>Math.max(0,Math.min(255,Math.round(v+(p/100)*255)));return `rgb(${f(r)},${f(g)},${f(b)})`}
-
-function bindStage(){
-  $('#viewMode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;mode=b.dataset.v;$$('#viewMode button').forEach(x=>x.classList.toggle('on',x===b));draw()});
-  $('#cSheet').oninput=draw;$('#cBack').oninput=draw;
-  $('#bFitView').onclick=fitView;
-  const pts=new Map();let last=null,pinch=null;
-  cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});cv.classList.add('drag');
-    if(pts.size===2){const [a,b]=[...pts.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y),z:view.z}}});
-  cv.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;const p0=pts.get(e.pointerId);const p1={x:e.clientX,y:e.clientY};pts.set(e.pointerId,p1);
-    if(pts.size===2&&pinch){const [a,b]=[...pts.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);const r=cv.getBoundingClientRect();zoomAt((a.x+b.x)/2-r.left,(a.y+b.y)/2-r.top,pinch.z*d/pinch.d/view.z)}
-    else if(pts.size===1){view.x+=p1.x-p0.x;view.y+=p1.y-p0.y;draw()}});
-  const up=e=>{pts.delete(e.pointerId);if(pts.size<2)pinch=null;if(!pts.size)cv.classList.remove('drag')};
-  cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
-  cv.addEventListener('wheel',e=>{e.preventDefault();const r=cv.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,Math.exp(-e.deltaY*0.0015))},{passive:false});
-  cv.addEventListener('dblclick',fitView);
-  $('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;$$('#tabs button').forEach(x=>x.classList.toggle('on',x===b));const t=b.dataset.t;
-    $('#pSet').classList.toggle('active',t==='set');$('#pRight').classList.toggle('active',t!=='set');
-    $$('#pRight [data-tab-part]').forEach(x=>x.classList.toggle('active',x.dataset.tabPart===t))});
-  // файлы
-  $('#bOpen').onclick=$('#bPick').onclick=$('#bReplace').onclick=()=>$('#file').click();
-  $('#file').onchange=e=>{const f=e.target.files[0];if(f)openFile(f);e.target.value=''};
-  $('#bSample').onclick=sample;
-  let dc=0;
-  window.addEventListener('dragenter',e=>{e.preventDefault();dc++;$('#app').classList.add('dropping')});
-  window.addEventListener('dragleave',e=>{dc--;if(dc<=0){dc=0;$('#app').classList.remove('dropping')}});
-  window.addEventListener('dragover',e=>e.preventDefault());
-  window.addEventListener('drop',e=>{e.preventDefault();dc=0;$('#app').classList.remove('dropping');const f=e.dataTransfer.files[0];if(f)openFile(f)});
-  $('#bZip').onclick=$('#bZip2').onclick=downloadZip;
-  $('#bSaveOrder').onclick=$('#bSaveOrder2').onclick=saveOrder;
-}
-function zoomAt(mx,my,f){const nz=Math.max(.2,Math.min(80,view.z*f));f=nz/view.z;const cx=W/2+view.x,cy=H/2+view.y;view.x+=(mx-cx)*(1-f);view.y+=(my-cy)*(1-f);view.z=nz;draw()}
-function fitView(){view={z:1,x:0,y:0};draw()}
-
-// ---------- Files ----------
-async function openFile(f){
-  const name=f.name||'file';const bytes=new Uint8Array(await f.arrayBuffer());
-  if(/\.(perfo|zip)$/i.test(name))return openOrder(bytes,name);
-  await setImage(new Blob([bytes],{type:f.type||mimeOf(name)}),name,bytes);
-}
-function mimeOf(n){const e=(n.split('.').pop()||'').toLowerCase();return {jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif',bmp:'image/bmp'}[e]||'application/octet-stream'}
-async function decodeImage(blob){
-  try{return await createImageBitmap(blob)}catch(e){}
-  return await new Promise((res,rej)=>{const u=URL.createObjectURL(blob);const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('формат не поддерживается'));i.src=u});
-}
-async function setImage(blob,name,bytes){
-  let bmp;try{bmp=await decodeImage(blob)}catch(e){toast('Не удалось открыть картинку: '+e.message,5000);return}
-  const w0=bmp.width,h0=bmp.height,k=Math.min(1,1600/Math.max(w0,h0));const w=Math.max(1,Math.round(w0*k)),h=Math.max(1,Math.round(h0*k));
-  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(bmp,0,0,w,h);
-  const data=x.getImageData(0,0,w,h).data;const [p,n]=put(data);ex.pc_set_image(p,w,h);ex.pc_free(p,n);
-  img={canvas:c,w,h,w0,h0,name,bytes,type:blob.type||mimeOf(name)};
-  $('#chip').hidden=false;$('#chipName').textContent=name;$('#chipSize').textContent=`${w0} × ${h0} px`;$('#thumb').src=c.toDataURL('image/jpeg',.7);
-  $('#bAspect').disabled=false;fitView();schedule();
-}
-async function sample(){
-  const c=document.createElement('canvas');c.width=1200;c.height=720;const x=c.getContext('2d');
-  const g=x.createLinearGradient(0,0,1200,0);g.addColorStop(0,'#f4f4f4');g.addColorStop(1,'#3a3a3a');x.fillStyle=g;x.fillRect(0,0,1200,720);
-  const r=x.createRadialGradient(380,360,20,380,360,300);r.addColorStop(0,'#000');r.addColorStop(.7,'#222');r.addColorStop(1,'rgba(40,40,40,0)');x.fillStyle=r;x.beginPath();x.arc(380,360,300,0,7);x.fill();
-  x.strokeStyle='#fff';x.lineWidth=46;x.beginPath();for(let i=0;i<=1200;i+=8){const y=560+70*Math.sin(i/120);i?x.lineTo(i,y):x.moveTo(i,y)}x.stroke();
-  const blob=await new Promise(res=>c.toBlob(res,'image/png'));const bytes=new Uint8Array(await blob.arrayBuffer());
-  await setImage(blob,'пример.png',bytes);
-}
-async function openOrder(bytes,name){
-  const rc=call(ex.pc_zip_list,bytes);if(rc!==0){toast('Файл заказа повреждён или сжат другой программой',5000);return}
-  const list=JSON.parse(dec.decode(out()));const get=n=>{const e=list.find(e=>e.name===n||e.name.endsWith('/'+n));return e&&e.method===0?bytes.slice(e.offset,e.offset+e.len):null};
-  const st=get('settings.json');if(!st){toast('В архиве нет settings.json',5000);return}
-  let obj;try{obj=JSON.parse(dec.decode(st))}catch(e){toast('settings.json не читается',5000);return}
-  P=Object.assign({},DEF,obj.params||obj);changed();
-  const src=list.find(e=>/^source\./.test(e.name)&&e.method===0);
-  if(src){const b=bytes.slice(src.offset,src.offset+src.len);await setImage(new Blob([b],{type:mimeOf(src.name)}),src.name.replace(/^source/,(obj.source_name||'source').replace(/\.[^.]+$/,'')),b)}
-  toast(`Заказ открыт: ${name}`);
-}
-
-// ---------- Export ----------
-const FORMATS=[
-  {id:'dxf',ext:'dxf',t:'DXF',n:'CypCut, AutoCAD · R12, окружности',on:true},
-  {id:'nc',ext:'nc',t:'G-code .nc',n:'NCStudio, Unicut',on:true},
-  {id:'cnc',ext:'cnc',t:'G-code .cnc',n:'Тот же код с расширением .cnc'},
-  {id:'svg',ext:'svg',t:'SVG',n:'Inkscape, LightBurn, веб',on:true},
-  {id:'pdf',ext:'pdf',t:'PDF',n:'Вектор для согласования и печати',on:true},
-  {id:'eps',ext:'eps',t:'EPS',n:'CorelDRAW, Illustrator'},
-  {id:'plt',ext:'plt',t:'PLT',n:'HPGL, плоттеры'},
-  {id:'png',ext:'png',t:'PNG',n:'Вид для клиента',on:true},
-  {id:'csv',ext:'csv',t:'CSV',n:'Сводка для Excel'},
-  {id:'report',ext:'txt',t:'Паспорт заказа',n:'Текст с расчётом',on:true},
-];
-function buildFormats(){
-  let sel={};try{sel=JSON.parse(localStorage.getItem('perfocut.fmts')||'null')||{}}catch(e){}
-  $('#fmtList').innerHTML=FORMATS.map(f=>`<div class="fmt"><input type="checkbox" id="f_${f.id}" ${(f.id in sel?sel[f.id]:f.on)?'checked':''}><label for="f_${f.id}"><b>${f.t}</b><span>${f.n}</span></label><button class="btn ghost icon" data-dl="${f.id}" title="Скачать ${f.t}"><svg class="i" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></button></div>`).join('');
-  $('#fmtList').addEventListener('change',()=>{const s={};FORMATS.forEach(f=>s[f.id]=$('#f_'+f.id).checked);try{localStorage.setItem('perfocut.fmts',JSON.stringify(s))}catch(e){}});
-  $('#fmtList').addEventListener('click',async e=>{const b=e.target.closest('[data-dl]');if(!b)return;if(!ready())return;const f=FORMATS.find(x=>x.id===b.dataset.dl);
-    try{save(`${baseName()}.${f.ext}`,await bytesOf(f),mimeFor(f.ext))}catch(err){toast('Ошибка экспорта: '+err.message,5000)}});
-}
-function ready(){if(!img){toast('Сначала загрузите картинку');return false}if(!stats||!stats.count){toast('Узор пустой: проверьте настройки');return false}return true}
-function baseName(){const s=v=>String(v||'').trim().replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_');return [s(P.name)||'perfocut',s(P.order_no)].filter(Boolean).join('_')}
-function mimeFor(e){return {dxf:'application/dxf',svg:'image/svg+xml',pdf:'application/pdf',png:'image/png',csv:'text/csv',txt:'text/plain',zip:'application/zip',perfo:'application/zip',eps:'application/postscript'}[e]||'application/octet-stream'}
-async function bytesOf(f){if(f.id==='png')return await renderPng();return exportFmt(f.id)}
-async function renderPng(maxSide=4000){
-  const k=Math.min(6,maxSide/Math.max(P.sheet_w,P.sheet_h));const w=Math.round(P.sheet_w*k),h=Math.round(P.sheet_h*k);
-  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');paintSheet(x,k,0,h,'metal');
-  const blob=await new Promise(res=>c.toBlob(res,'image/png'));return new Uint8Array(await blob.arrayBuffer());
-}
-async function downloadZip(){
-  if(!ready())return;const sel=FORMATS.filter(f=>$('#f_'+f.id).checked);if(!sel.length){toast('Отметьте хотя бы один формат');return}
-  toast('Собираю архив…',1500);await new Promise(r=>setTimeout(r,30));
-  try{const files=[];const b=baseName();for(const f of sel)files.push([`${b}.${f.ext}`,await bytesOf(f)]);save(`${b}.zip`,zipBuild(files),'application/zip')}catch(e){toast('Ошибка экспорта: '+e.message,5000)}
-}
-async function saveOrder(){
-  if(!img){toast('Сначала загрузите картинку');return}
-  try{
-    const ext=(img.name.split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,'')||'png';
-    const settings=JSON.parse(dec.decode(exportFmt('settings')));settings.source_name=img.name;settings.saved=new Date().toISOString();
-    const files=[['settings.json',enc.encode(JSON.stringify(settings,null,2))],[`source.${ext}`,img.bytes]];
-    if(stats&&stats.count){files.push(['preview.png',await renderPng(2400)],['report.txt',exportFmt('report')],['stats.json',exportFmt('stats')],['cut.dxf',exportFmt('dxf')])}
-    save(`${baseName()}.perfo`,zipBuild(files),'application/zip');
-  }catch(e){toast('Не удалось сохранить заказ: '+e.message,5000)}
-}
-function save(name,bytes,mime){
-  if(window.AndroidBridge&&AndroidBridge.saveFile){
-    let s='';const ch=0x8000;for(let i=0;i<bytes.length;i+=ch)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+ch));
-    const msg=AndroidBridge.saveFile(name,mime,btoa(s));toast(msg||('Сохранено: '+name),4000);return;
-  }
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([bytes],{type:mime}));a.download=name;document.body.appendChild(a);a.click();
-  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);toast('Скачано: '+name);
-}
-let tT=0;function toast(t,ms=2500){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>e.classList.remove('show'),ms)}
-window.PerfoCut={openFile};
-boot();
-</script>
+<script>/*I18N_JS*/</script>
+<script>/*APP_JS*/</script>
 </body>
 </html>
