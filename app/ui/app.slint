@@ -1,0 +1,817 @@
+// Главное окно: шапка, настройки, предпросмотр, итог и экспорт.
+// На широком экране всё в три колонки, на телефоне предпросмотр сверху и вкладки снизу.
+import "fonts/Inter-Regular.ttf";
+import "fonts/Inter-Medium.ttf";
+import "fonts/JetBrainsMono-Regular.ttf";
+import { AboutSlint } from "std-widgets.slint";
+import { Theme, Bridge, Kb } from "theme.slint";
+import { Store, Prefs, Par, KV, SizeRow, StatsUI, Fmt } from "store.slint";
+import { Btn, Seg, Check, Icon, Modal, Swatch, Hint, Caption, TextField } from "widgets.slint";
+import { SettingsPanel, SummaryPanel, ExportPanel } from "panels.slint";
+
+export { Theme, Bridge, Kb, Store, Prefs, Par, KV, SizeRow, StatsUI, Fmt }
+
+struct Preset { c: color, hex: string }
+
+component Logo inherits HorizontalLayout {
+    in property <bool> compact;
+    spacing: 10px;
+    alignment: start;
+    VerticalLayout {
+        alignment: center;
+        Image {
+            source: @image-url("icons/logo.svg");
+            width: 24px;
+            height: 24px;
+        }
+    }
+    Text {
+        text: "PerfoCut";
+        color: Theme.t1;
+        font-size: Theme.fs-h;
+        font-weight: 500;
+        vertical-alignment: center;
+    }
+    if !root.compact: Text {
+        text: Prefs.version;
+        color: Theme.t3;
+        font-family: Theme.mono;
+        font-size: Theme.fs-s;
+        vertical-alignment: center;
+    }
+}
+
+component Header inherits Rectangle {
+    in property <bool> wide;
+    callback settings();
+    background: Theme.bg;
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.line;
+    }
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: root.wide ? 12px : 8px;
+        spacing: 8px;
+        Logo {
+            compact: !root.wide;
+            horizontal-stretch: 1;
+        }
+        VerticalLayout {
+            alignment: center;
+            Btn {
+                text: root.wide ? @tr("Открыть") : "";
+                kind: root.wide ? 0 : 2;
+                has-icon: true;
+                icon: @image-url("icons/folder.svg");
+                clicked => {
+                    Store.open();
+                }
+            }
+        }
+        if root.wide: VerticalLayout {
+            alignment: center;
+            Btn {
+                text: @tr("Заказ .perfo");
+                has-icon: true;
+                icon: @image-url("icons/save.svg");
+                enabled: Store.has-image;
+                clicked => {
+                    Store.save-order();
+                }
+            }
+        }
+        if root.wide: VerticalLayout {
+            alignment: center;
+            Btn {
+                text: @tr("Экспорт");
+                kind: 1;
+                has-icon: true;
+                icon: @image-url("icons/download.svg");
+                enabled: Store.can-export;
+                clicked => {
+                    Store.export-zip();
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Btn {
+                kind: 2;
+                has-icon: true;
+                icon: @image-url("icons/gear.svg");
+                clicked => {
+                    root.settings();
+                }
+            }
+        }
+    }
+}
+
+// Подпись размера на размерной линии. Высота листа пишется в две строки: число и единица.
+// Поворот текста рисуют не все движки Slint одинаково, поэтому без него.
+component DimLabel inherits Rectangle {
+    in property <string> text;
+    width: t.preferred-width + 8px;
+    height: t.preferred-height + 4px;
+    border-radius: 4px;
+    background: Theme.bg0;
+    t := Text {
+        text: root.text;
+        color: Theme.t2;
+        font-family: Theme.mono;
+        font-size: Theme.fs-s;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component Stage inherits Rectangle {
+    in property <bool> compact;
+    // Подписи «Лист» и «Фон» только когда хватает места под переключатель вида
+    property <bool> roomy: !compact && self.width >= 560px;
+    callback pick-color(int);
+    out property <length> cw: canvas.width;
+    out property <length> ch: canvas.height;
+    background: Theme.bg0;
+    VerticalLayout {
+        Rectangle {
+            height: Theme.row + 16px;
+            background: Theme.bg;
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: Theme.line;
+            }
+            HorizontalLayout {
+                padding: 8px;
+                spacing: 8px;
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    min-width: 236px;
+                    max-width: 360px;
+                    Seg {
+                        items: [@tr("Металл"), @tr("Контуры"), @tr("Оригинал")];
+                        current: Store.view-mode;
+                        select(i) => {
+                            Store.view-mode = i;
+                            Store.view-changed();
+                        }
+                    }
+                }
+                Rectangle {
+                    horizontal-stretch: root.compact ? 0 : 1;
+                }
+                if root.roomy: Text {
+                    text: @tr("Лист");
+                    color: Theme.t3;
+                    font-size: Theme.fs-s;
+                    vertical-alignment: center;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Swatch {
+                        value: Store.sheet-color;
+                        clicked => {
+                            root.pick-color(0);
+                        }
+                    }
+                }
+                if root.roomy: Text {
+                    text: @tr("Фон");
+                    color: Theme.t3;
+                    font-size: Theme.fs-s;
+                    vertical-alignment: center;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Swatch {
+                        value: Store.back-color;
+                        clicked => {
+                            root.pick-color(1);
+                        }
+                    }
+                }
+                if !root.compact: VerticalLayout {
+                    alignment: center;
+                    Btn {
+                        kind: 2;
+                        has-icon: true;
+                        icon: @image-url("icons/fit.svg");
+                        clicked => {
+                            Store.fit-view();
+                        }
+                    }
+                }
+            }
+        }
+        canvas := Rectangle {
+            vertical-stretch: 1;
+            clip: true;
+            Image {
+                width: parent.width;
+                height: parent.height;
+                source: Store.preview;
+                image-fit: fill;
+            }
+            if Store.has-image && Store.dim-w != "": DimLabel {
+                text: Store.dim-w;
+                x: Store.sx + Store.sw / 2 - self.width / 2;
+                y: Store.sy + Store.sh + 20px - self.height / 2;
+            }
+            if Store.has-image && Store.dim-h != "": DimLabel {
+                text: Store.dim-h;
+                x: Store.sx - 20px - self.width / 2;
+                y: Store.sy + Store.sh / 2 - self.height / 2;
+            }
+            pinch := ScaleRotateGestureHandler {
+                enabled: Store.has-image;
+                started => {
+                    Store.pinch-start();
+                }
+                updated => {
+                    Store.pinch(self.scale, self.center.x, self.center.y);
+                }
+                ta := TouchArea {
+                    property <length> lx;
+                    property <length> ly;
+                    enabled: Store.has-image;
+                    mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
+                    pointer-event(e) => {
+                        if e.kind == PointerEventKind.down {
+                            self.lx = self.mouse-x;
+                            self.ly = self.mouse-y;
+                        }
+                    }
+                    moved => {
+                        if self.pressed && !pinch.active {
+                            Store.pan(self.mouse-x - self.lx, self.mouse-y - self.ly);
+                            self.lx = self.mouse-x;
+                            self.ly = self.mouse-y;
+                        }
+                    }
+                    scroll-event(e) => {
+                        Store.wheel(self.mouse-x, self.mouse-y, e.delta-y);
+                        accept
+                    }
+                    double-clicked => {
+                        Store.fit-view();
+                    }
+                }
+            }
+            if Store.has-image && Store.stats.hud != "" && !root.compact: Rectangle {
+                x: 12px;
+                y: parent.height - self.height - 12px;
+                width: hud.preferred-width + 16px;
+                height: hud.preferred-height + 10px;
+                border-radius: 8px;
+                background: Theme.bg.with-alpha(0.88);
+                border-width: 1px;
+                border-color: Theme.line;
+                hud := Text {
+                    text: Store.stats.hud;
+                    color: Theme.t2;
+                    font-family: Theme.mono;
+                    font-size: Theme.fs-s;
+                }
+            }
+            if Store.has-image && root.compact: Btn {
+                width: Theme.row;
+                height: Theme.row;
+                x: parent.width - self.width - 8px;
+                y: parent.height - self.height - 8px;
+                has-icon: true;
+                icon: @image-url("icons/fit.svg");
+                clicked => {
+                    Store.fit-view();
+                }
+            }
+            if !Store.has-image: Rectangle {
+                background: Theme.bg0;
+                TouchArea { }
+                VerticalLayout {
+                    alignment: center;
+                    padding: 24px;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 48px;
+                            height: 48px;
+                            border-radius: 12px;
+                            background: Theme.raised;
+                            border-width: 1px;
+                            border-color: Theme.line;
+                            Icon {
+                                source: @image-url("icons/image.svg");
+                                width: 24px;
+                                height: 24px;
+                                tint: Theme.t2;
+                            }
+                        }
+                    }
+                    Text {
+                        text: @tr("Картинка для перфорации");
+                        color: Theme.t1;
+                        font-size: Theme.fs-h + 2px;
+                        font-weight: 500;
+                        horizontal-alignment: center;
+                    }
+                    Text {
+                        text: Prefs.can-drop ? @tr("Перетащите файл в окно или выберите его") : @tr("Выберите файл или откройте пример");
+                        color: Theme.t2;
+                        font-size: Theme.fs;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+                    HorizontalLayout {
+                        alignment: center;
+                        spacing: 8px;
+                        padding-top: 4px;
+                        Btn {
+                            text: @tr("Выбрать файл");
+                            kind: 1;
+                            has-icon: true;
+                            icon: @image-url("icons/upload.svg");
+                            clicked => {
+                                Store.open();
+                            }
+                        }
+                        Btn {
+                            text: @tr("Пример");
+                            clicked => {
+                                Store.sample();
+                            }
+                        }
+                    }
+                    Text {
+                        text: "JPG, PNG, WebP, BMP, GIF, TIFF, .perfo";
+                        color: Theme.t3;
+                        font-family: Theme.mono;
+                        font-size: Theme.fs-s;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Строка «название — значение» в окне сведений
+component InfoRow inherits Rectangle {
+    in property <string> k;
+    in property <string> v;
+    in property <bool> link;
+    callback clicked();
+    min-height: Theme.row;
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.line;
+    }
+    HorizontalLayout {
+        spacing: 12px;
+        Text {
+            text: root.k;
+            color: Theme.t2;
+            font-size: Theme.fs;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        Text {
+            text: root.v;
+            color: root.link ? (ta.has-hover ? Theme.acc-hover : Theme.acc-text) : Theme.t1;
+            font-family: root.link ? Theme.sans : Theme.mono;
+            font-size: root.link ? Theme.fs : Theme.fs-m;
+            vertical-alignment: center;
+            ta := TouchArea {
+                enabled: root.link;
+                mouse-cursor: pointer;
+                clicked => {
+                    Bridge.haptic("click");
+                    root.clicked();
+                }
+            }
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "PerfoCut";
+    icon: @image-url("icons/app.png");
+    default-font-family: "Inter";
+    default-font-size: Theme.fs;
+    preferred-width: 1320px;
+    preferred-height: 820px;
+    min-width: 360px;
+    min-height: 520px;
+    background: Theme.bg;
+    forward-focus: fs;
+
+    in-out property <int> tab: 0;
+    in-out property <int> color-target: -1;
+    in-out property <bool> settings-open;
+    in-out property <bool> info-open;
+    out property <bool> wide: self.width >= 960px;
+    out property <length> cw: stage.cw;
+    out property <length> ch: stage.ch;
+    property <bool> modal-open: color-target >= 0 || settings-open || info-open;
+    property <bool> kb-open: self.virtual-keyboard-size.height > 1px;
+    property <length> inset-top: self.safe-area-insets.top;
+    property <length> inset-left: self.safe-area-insets.left;
+    property <length> inset-right: self.safe-area-insets.right;
+    property <length> area-w: self.width - inset-left - inset-right;
+    property <length> area-h: (kb-open ? Math.min(self.height - self.safe-area-insets.bottom, self.virtual-keyboard-position.y) : self.height - self.safe-area-insets.bottom) - inset-top;
+    property <length> head-h: wide ? 56px : (Theme.touch ? 56px : 48px);
+    property <length> left-w: Theme.touch ? 340px : 316px;
+    property <length> right-w: Theme.touch ? 320px : 300px;
+    property <length> stage-h: wide ? area-h - head-h : Math.round((area-h - head-h) * (kb-open ? 0.26 : 0.44) / 1px) * 1px;
+    property <[Preset]> sheet-a: [
+        { c: #9a9ea3, hex: "#9a9ea3" }, { c: #c4c8cc, hex: "#c4c8cc" }, { c: #6e737a, hex: "#6e737a" },
+        { c: #3a3c40, hex: "#3a3c40" }, { c: #e6e6e3, hex: "#e6e6e3" },
+    ];
+    property <[Preset]> sheet-b: [
+        { c: #8a4b2a, hex: "#8a4b2a" }, { c: #b5a642, hex: "#b5a642" }, { c: #b87333, hex: "#b87333" },
+        { c: #2f4a3a, hex: "#2f4a3a" }, { c: #1f2a44, hex: "#1f2a44" },
+    ];
+    property <[Preset]> back-a: [
+        { c: #f2c48d, hex: "#f2c48d" }, { c: #ffffff, hex: "#ffffff" }, { c: #f4f4f4, hex: "#f4f4f4" },
+        { c: #1a1a1a, hex: "#1a1a1a" }, { c: #000000, hex: "#000000" },
+    ];
+    property <[Preset]> back-b: [
+        { c: #e8833a, hex: "#e8833a" }, { c: #f5e6a8, hex: "#f5e6a8" }, { c: #9fd3f0, hex: "#9fd3f0" },
+        { c: #2b4c7e, hex: "#2b4c7e" }, { c: #3d7a4f, hex: "#3d7a4f" },
+    ];
+
+    changed cw => {
+        Store.canvas-size(self.cw, self.ch);
+    }
+    changed ch => {
+        Store.canvas-size(self.cw, self.ch);
+    }
+
+    function back() -> bool {
+        if root.color-target >= 0 {
+            root.color-target = -1;
+            return true;
+        }
+        if root.info-open {
+            root.info-open = false;
+            return true;
+        }
+        if root.settings-open {
+            root.settings-open = false;
+            return true;
+        }
+        false
+    }
+
+    fs := FocusScope {
+        capture-key-pressed(e) => {
+            if e.text == Key.Escape {
+                // Как в 0.2: сначала убираем фокус с поля, потом закрываем окно, потом сворачиваем
+                if Kb.text-focused {
+                    fs.focus();
+                    return accept;
+                }
+                if !root.back() {
+                    Prefs.minimize();
+                }
+                return accept;
+            }
+            if e.text == Key.Back {
+                // На Android клавиатуру уже закрыла система, второе нажатие ведёт назад
+                if Kb.text-focused {
+                    fs.focus();
+                }
+                if !root.back() {
+                    Prefs.minimize();
+                }
+                return accept;
+            }
+            reject
+        }
+
+        area := Rectangle {
+            x: root.inset-left;
+            y: root.inset-top;
+            width: root.area-w;
+            height: root.area-h;
+
+            Header {
+                x: 0;
+                y: 0;
+                width: parent.width;
+                height: root.head-h;
+                wide: root.wide;
+                settings => {
+                    root.settings-open = true;
+                }
+            }
+
+            stage := Stage {
+                x: root.wide ? root.left-w : 0px;
+                y: root.head-h;
+                width: root.wide ? parent.width - root.left-w - root.right-w : parent.width;
+                height: root.stage-h;
+                compact: !root.wide;
+                pick-color(i) => {
+                    root.color-target = i;
+                }
+            }
+
+            if root.wide: Rectangle {
+                x: 0;
+                y: root.head-h;
+                width: root.left-w;
+                height: parent.height - root.head-h;
+                background: Theme.bg;
+                left := Flickable {
+                    width: parent.width - 1px;
+                    height: parent.height;
+                    content-height: lp.preferred-height;
+                    content-width: self.width;
+                    lp := SettingsPanel {
+                        x: 0;
+                        width: left.width;
+                    }
+                }
+                Rectangle {
+                    x: parent.width - 1px;
+                    width: 1px;
+                    background: Theme.line;
+                }
+            }
+
+            if root.wide: Rectangle {
+                x: parent.width - root.right-w;
+                y: root.head-h;
+                width: root.right-w;
+                height: parent.height - root.head-h;
+                background: Theme.bg;
+                Rectangle {
+                    x: 0;
+                    width: 1px;
+                    background: Theme.line;
+                }
+                right := Flickable {
+                    x: 1px;
+                    width: parent.width - 1px;
+                    height: parent.height;
+                    content-height: rp.preferred-height;
+                    content-width: self.width;
+                    rp := VerticalLayout {
+                        x: 0;
+                        width: right.width;
+                        SummaryPanel { }
+                        Rectangle {
+                            height: 1px;
+                            background: Theme.line;
+                        }
+                        ExportPanel { }
+                    }
+                }
+            }
+
+            if !root.wide: Rectangle {
+                property <length> cy;
+                property <int> seq: Kb.seq;
+                property <length> kbh: root.virtual-keyboard-size.height;
+                function center() {
+                    if Kb.text-focused && !root.modal-open {
+                        flick.content-y = Math.max(Math.min(0px, flick.height - flick.content-height), Math.min(0px, -(self.cy - (flick.height - Kb.focus-h) / 2)));
+                    }
+                }
+                changed seq => {
+                    if Kb.focus-y >= flick.absolute-position.y && Kb.focus-y < flick.absolute-position.y + flick.height {
+                        self.cy = Kb.focus-y - flick.absolute-position.y - flick.content-y;
+                        self.center();
+                    }
+                }
+                changed kbh => {
+                    self.center();
+                }
+                x: 0;
+                y: root.head-h + root.stage-h;
+                width: parent.width;
+                height: parent.height - root.head-h - root.stage-h;
+                background: Theme.bg;
+                VerticalLayout {
+                    if !root.kb-open: Rectangle {
+                        height: Theme.row + 16px;
+                        Rectangle {
+                            y: 0;
+                            height: 1px;
+                            background: Theme.line;
+                        }
+                        Rectangle {
+                            y: parent.height - 1px;
+                            height: 1px;
+                            background: Theme.line;
+                        }
+                        HorizontalLayout {
+                            padding: 8px;
+                            Seg {
+                                items: [@tr("Настройки"), @tr("Итог"), @tr("Экспорт")];
+                                current: root.tab;
+                                select(i) => {
+                                    root.tab = i;
+                                    flick.content-y = 0;
+                                }
+                            }
+                        }
+                    }
+                    flick := Flickable {
+                        vertical-stretch: 1;
+                        content-height: mp.preferred-height;
+                        content-width: self.width;
+                        mp := VerticalLayout {
+                            x: 0;
+                            width: flick.width;
+                            if root.tab == 0: SettingsPanel { }
+                            if root.tab == 1: SummaryPanel { }
+                            if root.tab == 2: ExportPanel { }
+                            Rectangle {
+                                height: root.kb-open ? 240px : 24px;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Окно выбора цвета листа или фона
+            Modal {
+                width: parent.width;
+                height: parent.height;
+                title: root.color-target == 0 ? @tr("Цвет листа") : @tr("Цвет фона");
+                shown: root.color-target >= 0;
+                max-w: 380px;
+                close => {
+                    root.color-target = -1;
+                }
+                VerticalLayout {
+                    spacing: 8px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        for c in root.color-target == 0 ? root.sheet-a : root.back-a: Swatch {
+                            value: c.c;
+                            selected: (root.color-target == 0 ? Store.sheet-hex : Store.back-hex) == c.hex;
+                            clicked => {
+                                Store.set-color(root.color-target, c.hex);
+                            }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        for c in root.color-target == 0 ? root.sheet-b : root.back-b: Swatch {
+                            value: c.c;
+                            selected: (root.color-target == 0 ? Store.sheet-hex : Store.back-hex) == c.hex;
+                            clicked => {
+                                Store.set-color(root.color-target, c.hex);
+                            }
+                        }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 4px;
+                    Caption {
+                        text: @tr("Свой цвет");
+                    }
+                    TextField {
+                        value: root.color-target == 0 ? Store.sheet-hex : Store.back-hex;
+                        placeholder: "#9a9ea3";
+                        mono: true;
+                        edited(t) => {
+                            Store.set-color(root.color-target, t);
+                        }
+                    }
+                }
+            }
+
+            // Настройки программы
+            Modal {
+                width: parent.width;
+                height: parent.height;
+                title: @tr("Настройки");
+                shown: root.settings-open;
+                info-btn: true;
+                close => {
+                    root.settings-open = false;
+                }
+                info => {
+                    root.info-open = true;
+                }
+                VerticalLayout {
+                    spacing: 4px;
+                    Caption {
+                        text: @tr("Тема");
+                    }
+                    Seg {
+                        columns: 2;
+                        items: [@tr("Основная"), @tr("Светлая"), @tr("Как в системе"), "AMOLED"];
+                        current: Prefs.theme;
+                        select(i) => {
+                            Prefs.theme = i;
+                            Theme.mode = i;
+                            Prefs.changed();
+                        }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 4px;
+                    Caption {
+                        text: @tr("Язык");
+                    }
+                    Seg {
+                        items: ["Русский", "English"];
+                        current: Prefs.lang;
+                        select(i) => {
+                            Prefs.lang = i;
+                            Prefs.changed();
+                        }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 2px;
+                    Check {
+                        text: @tr("Вибрация при нажатиях");
+                        checked: Prefs.vibro;
+                        enabled: Prefs.is-phone;
+                        toggled(v) => {
+                            Prefs.vibro = v;
+                            Prefs.changed();
+                        }
+                    }
+                    if !Prefs.is-phone: Hint {
+                        text: @tr("Работает на телефоне");
+                    }
+                }
+            }
+
+            // О программе
+            Modal {
+                width: parent.width;
+                height: parent.height;
+                title: @tr("О программе");
+                shown: root.info-open;
+                close => {
+                    root.info-open = false;
+                }
+                Text {
+                    text: @tr("PerfoCut превращает картинку в перфорацию для лазерной резки металла: считает отверстия, длину реза и стоимость, выгружает DXF, G-code и другие форматы");
+                    color: Theme.t2;
+                    font-size: Theme.fs;
+                    wrap: word-wrap;
+                }
+                VerticalLayout {
+                    InfoRow {
+                        k: @tr("Версия");
+                        v: Prefs.version;
+                    }
+                    InfoRow {
+                        k: @tr("Автор");
+                        v: "@Frikks";
+                        link: true;
+                        clicked => {
+                            Prefs.open-url("https://t.me/Frikks");
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    alignment: center;
+                    AboutSlint {
+                        max-height: 140px;
+                    }
+                }
+            }
+
+            // Короткое сообщение внизу
+            Rectangle {
+                visible: self.opacity > 0.01;
+                opacity: Store.toast-shown ? 1 : 0;
+                animate opacity { duration: 160ms; }
+                width: Math.min(parent.width - 32px, tt.preferred-width + 32px);
+                height: tt.preferred-height + 20px;
+                x: (parent.width - self.width) / 2;
+                y: parent.height - self.height - (root.wide ? 24px : 16px);
+                border-radius: 10px;
+                background: Theme.toast;
+                tt := Text {
+                    x: 16px;
+                    width: parent.width - 32px;
+                    text: Store.toast;
+                    color: Theme.toast-text;
+                    font-size: Theme.fs-m;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}

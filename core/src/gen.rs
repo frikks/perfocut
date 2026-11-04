@@ -3,6 +3,9 @@ use crate::params::Params;
 use serde::Serialize;
 use std::f64::consts::PI;
 
+/// Отрезок между двумя точками: (начало, конец)
+type Segment = ((f64, f64), (f64, f64));
+
 #[derive(Clone, Debug)]
 pub enum Shape {
     Circle { x: f64, y: f64, d: f64 },
@@ -207,8 +210,8 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
             let inside = |x: f64, y: f64| x >= b && x <= w - b && y >= b && y <= h - b;
             for j in -m..=m {
                 let v0 = j as f64 * lp + p.offset_y;
-                let mut runs: Vec<Vec<((f64, f64), (f64, f64))>> = Vec::new();
-                let mut cur: Vec<((f64, f64), (f64, f64))> = Vec::new();
+                let mut runs: Vec<Vec<Segment>> = Vec::new();
+                let mut cur: Vec<Segment> = Vec::new();
                 for s in 0..=n_steps {
                     let u = -reach + s as f64 * p.step + p.offset_x;
                     let (lv, dv) = if p.wave {
@@ -438,9 +441,11 @@ fn finish(
 ) -> GenResult {
     let (w, h) = (p.sheet_w, p.sheet_h);
     // Статистика
-    let mut st = Stats::default();
-    st.count = shapes.len();
-    st.removed_edge = removed_edge;
+    let mut st = Stats {
+        count: shapes.len(),
+        removed_edge,
+        ..Stats::default()
+    };
     st.min_allowed = round2(min_allowed);
     st.max_allowed = round2(max_allowed.max(0.0));
     let mut area = 0.0;
