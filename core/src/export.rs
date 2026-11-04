@@ -336,7 +336,7 @@ pub fn pdf(r: &GenResult) -> Vec<u8> {
     let k = 72.0 / 25.4;
     let (w, h) = (p.sheet_w, p.sheet_h);
     let mut c = String::with_capacity(r.shapes.len() * 160 + 200);
-    let _ = write!(c, "{} 0 0 {} 0 0 cm 0.1 w 0 0 0 RG\n", n4(k), n4(k));
+    let _ = writeln!(c, "{} 0 0 {} 0 0 cm 0.1 w 0 0 0 RG", n4(k), n4(k));
     let kk = 0.552_284_75;
     let f = |v: f64| num(v, 3);
     for s in &r.shapes {
@@ -344,9 +344,9 @@ pub fn pdf(r: &GenResult) -> Vec<u8> {
             Shape::Circle { x, y, d } => {
                 let rr = d / 2.0;
                 let m = rr * kk;
-                let _ = write!(
+                let _ = writeln!(
                     c,
-                    "{} {} m {} {} {} {} {} {} c {} {} {} {} {} {} c {} {} {} {} {} {} c {} {} {} {} {} {} c h S\n",
+                    "{} {} m {} {} {} {} {} {} c {} {} {} {} {} {} c {} {} {} {} {} {} c {} {} {} {} {} {} c h S",
                     f(x + rr), f(*y),
                     f(x + rr), f(y + m), f(x + m), f(y + rr), f(*x), f(y + rr),
                     f(x - m), f(y + rr), f(x - rr), f(y + m), f(x - rr), f(*y),
@@ -364,12 +364,12 @@ pub fn pdf(r: &GenResult) -> Vec<u8> {
         }
     }
     if p.outline {
-        let _ = write!(c, "0 0 {} {} re S\n", f(w), f(h));
+        let _ = writeln!(c, "0 0 {} {} re S", f(w), f(h));
     }
     let mut out: Vec<u8> = Vec::with_capacity(c.len() + 1000);
     let mut offs = Vec::new();
     out.extend_from_slice(b"%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
-    let objs = vec![
+    let objs = [
         "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
         format!(
