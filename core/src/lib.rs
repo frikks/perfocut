@@ -1,62 +1,16 @@
+//! Ядро PerfoCut: генерация перфорации, проверки под лазер, расчёт стоимости и экспорт.
+//! Без интерфейса: одинаково работает в Windows, Android и браузере.
+
 pub mod export;
 pub mod gen;
 pub mod image;
 pub mod params;
 pub mod zip;
 
-use gen::{GenResult, Shape};
-use params::Params;
-use std::sync::Mutex;
+use gen::GenResult;
 
-struct State {
-    img: Option<image::Gray>,
-    res: Option<GenResult>,
-    out: Vec<u8>,
-    zip: Option<zip::ZipWriter>,
-}
-
-static STATE: Mutex<Option<State>> = Mutex::new(None);
-
-fn with<R>(f: impl FnOnce(&mut State) -> R) -> R {
-    let mut g = STATE.lock().unwrap_or_else(|e| e.into_inner());
-    if g.is_none() {
-        *g = Some(State { img: None, res: None, out: Vec::new(), zip: None });
-    }
-    f(g.as_mut().unwrap())
-}
-
-unsafe fn slice<'a>(ptr: *const u8, len: usize) -> &'a [u8] {
-    if len == 0 || ptr.is_null() {
-        &[]
-    } else {
-        std::slice::from_raw_parts(ptr, len)
-    }
-}
-
-/// Бинарное представление геометрии для предпросмотра: f32 LE.
-/// [kind, ...] где круг: 0, x, y, d; многоугольник: 1, n, x0, y0, ...
-pub fn geometry_bytes(r: &GenResult) -> Vec<u8> {
-    let mut v: Vec<f32> = Vec::with_capacity(r.shapes.len() * 4);
-    for s in &r.shapes {
-        match s {
-            Shape::Circle { x, y, d } => v.extend_from_slice(&[0.0, *x as f32, *y as f32, *d as f32]),
-            Shape::Poly { pts, .. } => {
-                v.push(1.0);
-                v.push(pts.len() as f32);
-                for q in pts {
-                    v.push(q.0 as f32);
-                    v.push(q.1 as f32);
-                }
-            }
-        }
-    }
-    let mut b = Vec::with_capacity(v.len() * 4);
-    for x in v {
-        b.extend_from_slice(&x.to_le_bytes());
-    }
-    b
-}
-
+/// Выгружает результат в формат по его коду (`dxf`, `nc`, `svg`, `pdf`…).
+/// Возвращает `None` для неизвестного кода.
 pub fn export_format(r: &GenResult, fmt: &str) -> Option<Vec<u8>> {
     Some(match fmt {
         "dxf" => export::dxf(r).into_bytes(),
@@ -76,137 +30,11 @@ pub fn export_format(r: &GenResult, fmt: &str) -> Option<Vec<u8>> {
     })
 }
 
-// ---------------- WASM / C ABI ----------------
-
-#[no_mangle]
-pub extern "C" fn pc_alloc(n: usize) -> *mut u8 {
-    let mut v = Vec::<u8>::with_capacity(n.max(1));
-    let p = v.as_mut_ptr();
-    std::mem::forget(v);
-    p
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pc_free(p: *mut u8, n: usize) {
-    if !p.is_null() {
-        drop(Vec::from_raw_parts(p, 0, n.max(1)));
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn pc_out_ptr() -> *const u8 {
-    with(|s| s.out.as_ptr())
-}
-
-#[no_mangle]
-pub extern "C" fn pc_out_len() -> usize {
-    with(|s| s.out.len())
-}
-
-#[no_mangle]
-pub extern "C" fn pc_defaults() -> usize {
-    with(|s| {
-        s.out = serde_json::to_vec(&Params::default()).unwrap_or_default();
-        s.out.len()
-    })
-}
-
-#[no_mangle]
-pub extern "C" fn pc_version() -> u32 {
-    params::ALGO_VERSION
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pc_set_image(ptr: *const u8, w: u32, h: u32) {
-    let d = slice(ptr, (w as usize) * (h as usize) * 4);
-    let g = if w > 0 && h > 0 { Some(image::Gray::from_rgba(d, w as usize, h as usize)) } else { None };
-    with(|s| s.img = g);
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pc_generate(ptr: *const u8, len: usize) -> i32 {
-    let d = slice(ptr, len);
-    let parsed: Result<Params, _> = serde_json::from_slice(d);
-    with(|s| match parsed {
-        Ok(p) => {
-            let r = gen::generate(s.img.as_ref(), &p);
-            s.out = serde_json::to_vec(&r.stats).unwrap_or_default();
-            s.res = Some(r);
-            0
-        }
-        Err(e) => {
-            s.out = format!("Ошибка параметров / parameter error: {e}").into_bytes();
-            1
-        }
-    })
-}
-
-#[no_mangle]
-pub extern "C" fn pc_geometry() -> usize {
-    with(|s| {
-        s.out = s.res.as_ref().map(geometry_bytes).unwrap_or_default();
-        s.out.len()
-    })
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pc_export(ptr: *const u8, len: usize) -> i32 {
-    let fmt = String::from_utf8_lossy(slice(ptr, len)).to_string();
-    with(|s| match s.res.as_ref().and_then(|r| export_format(r, &fmt)) {
-        Some(b) => {
-            s.out = b;
-            0
-        }
-        None => {
-            s.out.clear();
-            1
-        }
-    })
-}
-
-#[no_mangle]
-pub extern "C" fn pc_zip_new() {
-    with(|s| s.zip = Some(zip::ZipWriter::default()));
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pc_zip_add(np: *const u8, nl: usize, dp: *const u8, dl: usize) {
-    let name = String::from_utf8_lossy(slice(np, nl)).to_string();
-    let data = slice(dp, dl);
-    with(|s| {
-        if let Some(z) = s.zip.as_mut() {
-            z.add(&name, data);
-        }
-    });
-}
-
-#[no_mangle]
-pub extern "C" fn pc_zip_finish() -> usize {
-    with(|s| {
-        s.out = s.zip.take().map(|z| z.finish()).unwrap_or_default();
-        s.out.len()
-    })
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn pc_zip_list(ptr: *const u8, len: usize) -> i32 {
-    let d = slice(ptr, len);
-    let l = zip::list(d);
-    with(|s| match l {
-        Some(v) => {
-            s.out = serde_json::to_vec(&v).unwrap_or_default();
-            0
-        }
-        None => {
-            s.out.clear();
-            1
-        }
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gen::Shape;
+    use params::Params;
 
     fn gradient(w: usize, h: usize) -> image::Gray {
         let mut d = vec![0u8; w * h * 4];
@@ -226,12 +54,14 @@ mod tests {
     #[test]
     fn prop_mode_like_svg_tracing() {
         let g = gradient(200, 120);
-        let mut p = Params::default();
-        p.grid = "square".into();
-        p.size_mode = "prop".into();
-        p.tone_cut = 0.0;
-        p.quant = 0.0;
-        p.d_max = 10.0;
+        let p = Params {
+            grid: "square".into(),
+            size_mode: "prop".into(),
+            tone_cut: 0.0,
+            quant: 0.0,
+            d_max: 10.0,
+            ..Params::default()
+        };
         let r = gen::generate(Some(&g), &p);
         assert!(r.stats.count > 100);
         let dmin = p.d_min.max(p.thickness * p.min_k);
@@ -242,8 +72,7 @@ mod tests {
         let mut c: Vec<(f64, f64)> = r.shapes.iter().filter_map(|s| if let Shape::Circle { x, d, .. } = s { Some((*x, *d)) } else { None }).collect();
         c.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         assert!(c.first().unwrap().1 > c.last().unwrap().1);
-        p.lang = "en".into();
-        p.d_min = 0.1;
+        let p = Params { lang: "en".into(), d_min: 0.1, ..p };
         let r2 = gen::generate(Some(&g), &p);
         assert!(r2.stats.warnings.iter().any(|w| w.starts_with("Min size raised")));
         let mut lp = p.clone();
@@ -257,11 +86,13 @@ mod tests {
         let g = gradient(200, 120);
         for grid in ["square", "tri", "tri90"] {
             for shape in ["circle", "square", "diamond"] {
-                let mut p = Params::default();
-                p.grid = grid.into();
-                p.shape = shape.into();
-                p.angle = 15.0;
-                p.d_max = 50.0;
+                let p = Params {
+                    grid: grid.into(),
+                    shape: shape.into(),
+                    angle: 15.0,
+                    d_max: 50.0,
+                    ..Params::default()
+                };
                 let r = gen::generate(Some(&g), &p);
                 assert!(r.stats.count > 100, "{grid} {shape}: {}", r.stats.count);
                 for s in &r.shapes {
@@ -303,9 +134,11 @@ mod tests {
     #[test]
     fn lines_and_exports() {
         let g = gradient(200, 120);
-        let mut p = Params::default();
-        p.pattern = "lines".into();
-        p.wave = true;
+        let p = Params {
+            pattern: "lines".into(),
+            wave: true,
+            ..Params::default()
+        };
         let r = gen::generate(Some(&g), &p);
         assert!(r.stats.count > 10);
         for f in ["dxf", "svg", "nc", "plt", "eps", "pdf", "csv", "report", "stats", "settings"] {

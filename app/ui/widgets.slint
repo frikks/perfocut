@@ -1,0 +1,591 @@
+// Свои элементы интерфейса: одинаково выглядят в Windows, Android и браузере.
+import { Theme, Bridge, Kb } from "theme.slint";
+
+export component Icon inherits Image {
+    in property <color> tint: Theme.t2;
+    width: Theme.icon;
+    height: Theme.icon;
+    colorize: tint;
+    image-fit: contain;
+}
+
+// Кнопка: 0 обычная, 1 главная, 2 без фона
+export component Btn inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> has-icon: false;
+    in property <int> kind: 0;
+    in property <bool> enabled: true;
+    in property <bool> stretch: false;
+    in property <string> tip;
+    callback clicked;
+    min-height: Theme.row;
+    min-width: Theme.row;
+    horizontal-stretch: stretch ? 1 : 0;
+    border-radius: 8px;
+    opacity: enabled ? 1 : 0.45;
+    background: kind == 1 ? (ta.pressed ? Theme.acc.darker(10%) : ta.has-hover ? Theme.acc-hover : Theme.acc)
+        : kind == 2 ? (ta.pressed ? Theme.raised2 : ta.has-hover ? Theme.raised : transparent)
+        : (ta.pressed || ta.has-hover ? Theme.raised2 : Theme.raised);
+    border-width: kind == 0 ? 1px : 0px;
+    border-color: Theme.line2;
+    animate background { duration: 120ms; }
+    HorizontalLayout {
+        padding-left: root.text == "" ? 0px : 12px;
+        padding-right: root.text == "" ? 0px : 14px;
+        spacing: 8px;
+        alignment: center;
+        if root.has-icon: VerticalLayout {
+            alignment: center;
+            Icon {
+                source: root.icon;
+                tint: root.kind == 1 ? Theme.acc-ink : Theme.t1;
+            }
+        }
+        if root.text != "": Text {
+            text: root.text;
+            color: root.kind == 1 ? Theme.acc-ink : Theme.t1;
+            font-size: Theme.fs;
+            font-weight: 500;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            Bridge.haptic("click");
+            root.clicked();
+        }
+    }
+}
+
+// Переключатель из нескольких вариантов; columns = 2 раскладывает их сеткой 2×N
+export component Seg inherits Rectangle {
+    in property <[string]> items;
+    in property <int> current;
+    in property <int> columns: 0;
+    callback select(int);
+    property <int> cols: columns > 0 ? columns : items.length;
+    property <int> rows: Math.ceil(items.length / Math.max(1, cols));
+    property <length> cell-h: Theme.row - 4px;
+    border-radius: 10px;
+    background: Theme.card;
+    border-width: 1px;
+    border-color: Theme.line;
+    height: rows * cell-h + (rows - 1) * 2px + 6px;
+    for it[i] in root.items: Rectangle {
+        property <int> c: Math.mod(i, root.cols);
+        property <int> r: Math.floor(i / root.cols);
+        x: 3px + c * (parent.width - 6px + 2px) / root.cols;
+        y: 3px + r * (root.cell-h + 2px);
+        width: (parent.width - 6px + 2px) / root.cols - 2px;
+        height: root.cell-h;
+        border-radius: 7px;
+        background: i == root.current ? Theme.seg-on : ta.has-hover ? Theme.raised : transparent;
+        border-width: i == root.current && !Theme.dark ? 1px : 0px;
+        border-color: Theme.line2;
+        animate background { duration: 120ms; }
+        Text {
+            x: 6px;
+            width: parent.width - 12px;
+            text: it;
+            color: i == root.current ? Theme.t1 : Theme.t2;
+            font-size: Theme.fs-s + 1px;
+            font-weight: i == root.current ? 500 : 400;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        ta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                if i != root.current {
+                    Bridge.haptic("tick");
+                    root.select(i);
+                }
+            }
+        }
+    }
+}
+
+export component Check inherits Rectangle {
+    in property <string> text;
+    in property <bool> checked;
+    in property <bool> enabled: true;
+    callback toggled(bool);
+    min-height: Theme.row;
+    opacity: enabled ? 1 : 0.45;
+    HorizontalLayout {
+        spacing: 10px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: Theme.touch ? 22px : 16px;
+                height: self.width;
+                border-radius: 4px;
+                background: root.checked ? Theme.acc : Theme.raised;
+                border-width: root.checked ? 0px : 1px;
+                border-color: ta.has-hover ? Theme.field-hover : Theme.field-line;
+                animate background { duration: 120ms; }
+                if root.checked: Image {
+                    width: parent.width - 2px;
+                    height: self.width;
+                    source: @image-url("icons/check.svg");
+                    colorize: Theme.acc-ink;
+                }
+            }
+        }
+        Text {
+            text: root.text;
+            color: Theme.t1;
+            font-size: Theme.fs;
+            vertical-alignment: center;
+            wrap: word-wrap;
+        }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            Bridge.haptic("tick");
+            root.toggled(!root.checked);
+        }
+    }
+}
+
+// Рамка поля ввода: чёткая линия, при наведении ярче, в фокусе кольцо акцентного цвета
+component FieldBox inherits Rectangle {
+    in property <bool> focused;
+    in property <bool> hover;
+    border-radius: 8px;
+    background: Theme.raised;
+    border-width: 1px;
+    border-color: focused ? Theme.acc : hover ? Theme.field-hover : Theme.field-line;
+    animate border-color { duration: 120ms; }
+    if focused: Rectangle {
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        border-radius: 11px;
+        border-width: 3px;
+        border-color: Theme.acc.with-alpha(0.22);
+    }
+}
+
+// Числовое поле: показывает value * scale, отдаёт введённое значение / scale
+export component NumField inherits Rectangle {
+    in property <float> value;
+    in property <float> scale: 1;
+    in property <int> decimals: 2;
+    in property <string> unit;
+    in property <bool> integer: false;
+    in property <bool> enabled: true;
+    callback edited(float);
+    property <string> shown: Bridge.fmt(value * scale, integer ? 0 : decimals);
+    min-height: Theme.row;
+    horizontal-stretch: 1;
+    min-width: 64px;
+    opacity: enabled ? 1 : 0.45;
+    changed shown => {
+        if !ti.has-focus {
+            ti.text = shown;
+        }
+    }
+    box := FieldBox {
+        focused: ti.has-focus;
+        hover: ta.has-hover;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: text;
+        clicked => {
+            ti.focus();
+        }
+    }
+    ti := TextInput {
+        x: 10px;
+        width: parent.width - 20px - (root.unit == "" ? 0px : unit-t.width + 6px);
+        height: parent.height;
+        enabled: root.enabled;
+        text: root.shown;
+        font-family: Theme.mono;
+        font-size: Theme.fs-m;
+        color: Theme.t1;
+        selection-background-color: Theme.acc.with-alpha(0.35);
+        selection-foreground-color: Theme.t1;
+        vertical-alignment: center;
+        single-line: true;
+        input-type: root.integer ? InputType.number : InputType.decimal;
+        edited => {
+            if Bridge.num-ok(self.text) {
+                root.edited(Bridge.num(self.text) / root.scale);
+            }
+        }
+        accepted => {
+            self.text = root.shown;
+            self.clear-focus();
+        }
+        changed has-focus => {
+            Kb.text-focused = self.has-focus;
+            if self.has-focus {
+                Kb.focus-y = root.absolute-position.y;
+                Kb.focus-h = root.height;
+                Kb.seq += 1;
+                self.select-all();
+            } else {
+                self.text = root.shown;
+            }
+        }
+    }
+    unit-t := Text {
+        x: parent.width - self.width - 10px;
+        height: parent.height;
+        text: root.unit;
+        color: Theme.t3;
+        font-family: Theme.mono;
+        font-size: Theme.fs-s;
+        vertical-alignment: center;
+    }
+}
+
+// Текстовое поле; multi = несколько строк
+export component TextField inherits Rectangle {
+    in property <string> value;
+    in property <string> placeholder;
+    in property <bool> multi: false;
+    in property <bool> mono: false;
+    in property <InputType> kind: InputType.text;
+    callback edited(string);
+    min-height: multi ? Math.max(Theme.row * 2, ti.preferred-height + 16px) : Theme.row;
+    horizontal-stretch: 1;
+    changed value => {
+        if !ti.has-focus {
+            ti.text = value;
+        }
+    }
+    FieldBox {
+        focused: ti.has-focus;
+        hover: ta.has-hover;
+    }
+    ta := TouchArea {
+        mouse-cursor: text;
+        clicked => {
+            ti.focus();
+        }
+    }
+    if ti.text == "": Text {
+        x: 10px;
+        y: root.multi ? 8px : 0px;
+        width: parent.width - 20px;
+        height: root.multi ? self.preferred-height : parent.height;
+        text: root.placeholder;
+        color: Theme.t3;
+        font-size: Theme.fs;
+        font-family: root.mono ? Theme.mono : Theme.sans;
+        vertical-alignment: root.multi ? top : center;
+    }
+    ti := TextInput {
+        x: 10px;
+        y: root.multi ? 8px : 0px;
+        width: parent.width - 20px;
+        height: root.multi ? parent.height - 16px : parent.height;
+        text: root.value;
+        font-size: root.mono ? Theme.fs-m : Theme.fs;
+        font-family: root.mono ? Theme.mono : Theme.sans;
+        color: Theme.t1;
+        selection-background-color: Theme.acc.with-alpha(0.35);
+        selection-foreground-color: Theme.t1;
+        vertical-alignment: root.multi ? top : center;
+        single-line: !root.multi;
+        wrap: root.multi ? word-wrap : no-wrap;
+        input-type: root.kind;
+        edited => {
+            root.edited(self.text);
+        }
+        accepted => {
+            self.clear-focus();
+        }
+        changed has-focus => {
+            Kb.text-focused = self.has-focus;
+            if self.has-focus {
+                Kb.focus-y = root.absolute-position.y;
+                Kb.focus-h = root.height;
+                Kb.seq += 1;
+            }
+        }
+    }
+}
+
+// Строка «подпись — поле»
+export component FieldRow inherits Rectangle {
+    in property <string> label;
+    in property <length> field-w: Theme.touch ? 156px : 116px;
+    min-height: Theme.row;
+    HorizontalLayout {
+        spacing: 12px;
+        Text {
+            text: root.label;
+            color: Theme.t2;
+            font-size: Theme.fs;
+            vertical-alignment: center;
+            wrap: word-wrap;
+            horizontal-stretch: 1;
+        }
+        HorizontalLayout {
+            width: root.field-w;
+            spacing: 8px;
+            @children
+        }
+    }
+}
+
+// Ползунок с подписью и значением справа
+export component Slide inherits Rectangle {
+    in property <string> label;
+    in property <float> value;
+    in property <float> minv: 0;
+    in property <float> maxv: 1;
+    in property <float> step: 0.01;
+    in property <string> shown;
+    callback edited(float);
+    property <float> frac: Math.clamp((value - minv) / (maxv - minv), 0, 1);
+    property <length> knob: Theme.touch ? 22px : 16px;
+    min-height: lay.preferred-height;
+    function set-from(px: length) {
+        let f = Math.clamp((px - knob / 2) / Math.max(1px, track.width - knob), 0, 1);
+        let v = Math.round((minv + f * (maxv - minv)) / step) * step;
+        if Math.abs(v - value) > step / 4 {
+            root.edited(v);
+        }
+    }
+    lay := VerticalLayout {
+        spacing: 2px;
+        HorizontalLayout {
+            Text {
+                text: root.label;
+                color: Theme.t2;
+                font-size: Theme.fs;
+                horizontal-stretch: 1;
+                overflow: elide;
+            }
+            Text {
+                text: root.shown;
+                color: Theme.t3;
+                font-family: Theme.mono;
+                font-size: Theme.fs-s;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+            }
+        }
+        track := Rectangle {
+            height: Theme.touch ? 36px : 24px;
+            Rectangle {
+                x: root.knob / 2;
+                width: parent.width - root.knob;
+                y: (parent.height - 4px) / 2;
+                height: 4px;
+                border-radius: 2px;
+                background: Theme.bar;
+            }
+            Rectangle {
+                x: root.knob / 2;
+                width: (parent.width - root.knob) * root.frac;
+                y: (parent.height - 4px) / 2;
+                height: 4px;
+                border-radius: 2px;
+                background: Theme.acc;
+            }
+            Rectangle {
+                x: (parent.width - root.knob) * root.frac;
+                y: (parent.height - root.knob) / 2;
+                width: root.knob;
+                height: root.knob;
+                border-radius: root.knob / 2;
+                background: Theme.acc;
+                border-width: 2px;
+                border-color: ta.pressed ? Theme.t1 : Theme.acc;
+            }
+            ta := TouchArea {
+                mouse-cursor: pointer;
+                pointer-event(e) => {
+                    if e.kind == PointerEventKind.down {
+                        Bridge.haptic("tick");
+                        root.set-from(self.mouse-x);
+                    }
+                }
+                moved => {
+                    root.set-from(self.mouse-x);
+                }
+            }
+        }
+    }
+}
+
+// Сворачиваемый раздел панели
+export component Section inherits Rectangle {
+    in property <string> title;
+    in property <string> meta;
+    in-out property <bool> open: true;
+    min-height: lay.preferred-height;
+    lay := VerticalLayout {
+        Rectangle {
+            height: Theme.touch ? 56px : 44px;
+            HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                spacing: 8px;
+                VerticalLayout {
+                    alignment: center;
+                    Icon {
+                        source: @image-url("icons/chevron.svg");
+                        tint: Theme.t3;
+                        transform-rotation: root.open ? 90deg : 0deg;
+                        animate transform-rotation { duration: 140ms; }
+                    }
+                }
+                Text {
+                    text: root.title;
+                    color: Theme.t1;
+                    font-size: Theme.fs-h;
+                    font-weight: 500;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                Text {
+                    text: root.meta;
+                    color: Theme.t3;
+                    font-family: Theme.mono;
+                    font-size: Theme.fs-s;
+                    vertical-alignment: center;
+                }
+            }
+            TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    Bridge.haptic("tick");
+                    root.open = !root.open;
+                }
+            }
+        }
+        Rectangle {
+            height: root.open ? body.preferred-height : 0px;
+            clip: true;
+            body := VerticalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                padding-bottom: 16px;
+                spacing: Theme.touch ? 10px : 8px;
+                @children
+            }
+        }
+        Rectangle {
+            height: 1px;
+            background: Theme.line;
+        }
+    }
+}
+
+// Подпись группы внутри раздела
+export component Caption inherits Text {
+    color: Theme.t3;
+    font-size: Theme.fs-s;
+    vertical-alignment: bottom;
+    min-height: Theme.touch ? 28px : 22px;
+}
+
+export component Hint inherits Text {
+    color: Theme.t3;
+    font-size: Theme.fs-s;
+    wrap: word-wrap;
+}
+
+// Окно поверх затемнённого фона; тап по фону закрывает
+export component Modal inherits Rectangle {
+    in property <string> title;
+    in property <bool> shown;
+    in property <bool> info-btn: false;
+    in property <length> max-w: 420px;
+    callback close();
+    callback info();
+    visible: self.opacity > 0.01;
+    opacity: shown ? 1 : 0;
+    animate opacity { duration: 140ms; }
+    background: Theme.scrim;
+    TouchArea {
+        enabled: root.shown;
+        clicked => {
+            Bridge.haptic("click");
+            root.close();
+        }
+    }
+    card := Rectangle {
+        width: Math.min(parent.width - 32px, root.max-w);
+        height: Math.min(parent.height - 48px, lay.preferred-height);
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2 + (root.shown ? 0px : 8px);
+        animate y { duration: 140ms; }
+        background: Theme.card;
+        border-radius: 16px;
+        border-width: 1px;
+        border-color: Theme.line2;
+        clip: true;
+        TouchArea { }
+        lay := VerticalLayout {
+            padding: 20px;
+            padding-top: 16px;
+            spacing: 16px;
+            HorizontalLayout {
+                spacing: 4px;
+                Text {
+                    text: root.title;
+                    color: Theme.t1;
+                    font-size: Theme.fs-h + 2px;
+                    font-weight: 500;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                if root.info-btn: Btn {
+                    kind: 2;
+                    has-icon: true;
+                    icon: @image-url("icons/info.svg");
+                    clicked => {
+                        root.info();
+                    }
+                }
+                Btn {
+                    kind: 2;
+                    has-icon: true;
+                    icon: @image-url("icons/x.svg");
+                    clicked => {
+                        root.close();
+                    }
+                }
+            }
+            @children
+        }
+    }
+}
+
+// Кружок цвета
+export component Swatch inherits Rectangle {
+    in property <color> value;
+    in property <bool> selected;
+    callback clicked;
+    width: Theme.touch ? 36px : 28px;
+    height: self.width;
+    border-radius: 8px;
+    background: value;
+    border-width: selected ? 2px : 1px;
+    border-color: selected ? Theme.acc : Theme.line2;
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            Bridge.haptic("tick");
+            root.clicked();
+        }
+    }
+}
