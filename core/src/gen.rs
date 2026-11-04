@@ -149,6 +149,8 @@ fn round2(v: f64) -> f64 {
 
 pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
     let p = params.sanitized();
+    let en = p.lang == "en";
+    let prop = p.size_mode == "prop";
     let mut warnings = Vec::new();
     let mut removed_edge = 0usize;
     let min_allowed = (p.min_k * p.thickness).max(0.0);
@@ -160,11 +162,11 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
 
     if p.pattern != "lines" && p.pattern != "dots" {
         max_allowed = 0.0;
-        warnings.push("Неизвестный тип узора".into());
+        warnings.push(tr(en, "Неизвестный тип узора", "Unknown pattern type"));
         return finish(shapes, warnings, removed_edge, min_allowed, max_allowed, p);
     }
     if img.is_none() {
-        warnings.push("Загрузите изображение, чтобы получить узор".into());
+        warnings.push(tr(en, "Загрузите изображение, чтобы получить узор", "Load an image to get a pattern"));
     }
 
     if p.pattern == "lines" {
@@ -176,24 +178,25 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         let wmin = p.w_min.max(min_allowed);
         let mut wmax = p.w_max;
         if wmax > cap {
-            warnings.push(format!(
-                "Макс. ширина ограничена до {:.2} мм, чтобы перемычка была не меньше {:.2} мм",
-                cap.max(0.0),
-                p.bridge
-            ));
+            warnings.push(if en {
+                format!("Max width limited to {:.2} mm to keep the bridge at least {:.2} mm", cap.max(0.0), p.bridge)
+            } else {
+                format!("Макс. ширина ограничена до {:.2} мм, чтобы перемычка была не меньше {:.2} мм", cap.max(0.0), p.bridge)
+            });
             wmax = cap;
         }
         if p.w_min < min_allowed {
-            warnings.push(format!(
-                "Мин. ширина поднята до {:.2} мм: для металла {:.2} мм прорезь не может быть уже",
-                min_allowed, p.thickness
-            ));
+            warnings.push(if en {
+                format!("Min width raised to {:.2} mm: a slot in {:.2} mm metal cannot be narrower", min_allowed, p.thickness)
+            } else {
+                format!("Мин. ширина поднята до {:.2} мм: для металла {:.2} мм прорезь не может быть уже", min_allowed, p.thickness)
+            });
         }
         let est = (w * h) / (lp * p.step);
         if est > MAX_SHAPES * 4.0 {
-            warnings.push("Слишком мелкий шаг линий или выборки для такого листа".into());
+            warnings.push(tr(en, "Слишком мелкий шаг линий или выборки для такого листа", "Line pitch or sampling step is too small for this sheet"));
         } else if wmax < wmin {
-            warnings.push("Шаг линий слишком мал для заданной перемычки и мин. ширины".into());
+            warnings.push(tr(en, "Шаг линий слишком мал для заданной перемычки и мин. ширины", "Line pitch is too small for this bridge and min width"));
         } else if img.is_some() {
             let (cx, cy) = (w / 2.0, h / 2.0);
             let rad = p.line_angle.to_radians();
@@ -224,10 +227,10 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                         if let Some(t) = sampler.tone(x, y, lp / 2.0) {
                             if t >= p.tone_cut {
                                 let tt = ((t - p.tone_cut) / (1.0 - p.tone_cut)).clamp(0.0, 1.0);
-                                let ww = wmin + (wmax - wmin) * tt;
+                                let ww = if prop { wmax * t } else { wmin + (wmax - wmin) * tt };
                                 let l = (x + nx * ww / 2.0, y + ny * ww / 2.0);
                                 let r = (x - nx * ww / 2.0, y - ny * ww / 2.0);
-                                if inside(l.0, l.1) && inside(r.0, r.1) {
+                                if ww >= wmin - 1e-9 && inside(l.0, l.1) && inside(r.0, r.1) {
                                     ok = Some((l, r));
                                 }
                             }
@@ -278,39 +281,41 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         max_allowed = cap;
         let mut dmax = p.d_max;
         if dmax > cap {
-            warnings.push(format!(
-                "Макс. размер ограничен до {:.2} мм, чтобы перемычка была не меньше {:.2} мм",
-                cap.max(0.0),
-                p.bridge
-            ));
+            warnings.push(if en {
+                format!("Max size limited to {:.2} mm to keep the bridge at least {:.2} mm", cap.max(0.0), p.bridge)
+            } else {
+                format!("Макс. размер ограничен до {:.2} мм, чтобы перемычка была не меньше {:.2} мм", cap.max(0.0), p.bridge)
+            });
             dmax = cap;
         }
         let dmin = p.d_min.max(min_allowed);
         if p.d_min < min_allowed {
-            warnings.push(format!(
-                "Мин. размер поднят до {:.2} мм: для металла {:.2} мм отверстие не может быть меньше",
-                min_allowed, p.thickness
-            ));
+            warnings.push(if en {
+                format!("Min size raised to {:.2} mm: a hole in {:.2} mm metal cannot be smaller", min_allowed, p.thickness)
+            } else {
+                format!("Мин. размер поднят до {:.2} мм: для металла {:.2} мм отверстие не может быть меньше", min_allowed, p.thickness)
+            });
         }
         let mut fixed = if p.fixed { p.fixed_list() } else { vec![] };
         if p.fixed {
             let before = fixed.len();
             fixed.retain(|d| *d >= dmin - 1e-9 && *d <= dmax + 1e-9);
             if fixed.len() < before {
-                warnings.push("Часть заданных размеров вне допустимого диапазона и не используется".into());
+                warnings.push(tr(en, "Часть заданных размеров вне допустимого диапазона и не используется", "Some fixed sizes are out of the allowed range and are not used"));
             }
             if fixed.is_empty() {
-                warnings.push("Нет ни одного допустимого заданного размера".into());
+                warnings.push(tr(en, "Нет ни одного допустимого заданного размера", "None of the fixed sizes is allowed"));
             }
         }
         let est = (w * h) / (pch * pch);
         if est > MAX_SHAPES {
-            warnings.push(format!(
-                "Слишком мелкий шаг: около {} отверстий. Увеличьте шаг",
-                est.round() as u64
-            ));
+            warnings.push(if en {
+                format!("Pitch is too small: about {} holes. Increase the pitch", est.round() as u64)
+            } else {
+                format!("Слишком мелкий шаг: около {} отверстий. Увеличьте шаг", est.round() as u64)
+            });
         } else if dmax < dmin {
-            warnings.push("Шаг слишком мал для заданной перемычки и мин. размера".into());
+            warnings.push(tr(en, "Шаг слишком мал для заданной перемычки и мин. размера", "Pitch is too small for this bridge and min size"));
         } else if img.is_some() && !(p.fixed && fixed.is_empty()) {
             let (cx, cy) = (w / 2.0, h / 2.0);
             let rad = p.angle.to_radians();
@@ -365,7 +370,16 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                         continue;
                     }
                     let tt = ((t - p.tone_cut) / (1.0 - p.tone_cut)).clamp(0.0, 1.0);
-                    let mut d = dmin + (dmax - dmin) * tt;
+                    let mut d = if prop {
+                        // как SVG tracing: диаметр от нуля пропорционален тону; меньше минимума не режем
+                        let dp = dmax * t;
+                        if dp < dmin - 1e-9 {
+                            continue;
+                        }
+                        dp
+                    } else {
+                        dmin + (dmax - dmin) * tt
+                    };
                     if fixed.is_empty() && p.quant > 0.0 {
                         // квантование: округляем вниз до шага, но не ниже минимума
                         d = ((d / p.quant + 1e-9).floor() * p.quant).max(dmin);
@@ -479,4 +493,8 @@ fn finish(
     st.weight_kg = (w * h - area) * p.thickness * p.density * 1e-6;
     st.warnings = warnings;
     GenResult { shapes, stats: st, params: p }
+}
+
+fn tr(en: bool, ru: &str, eng: &str) -> String {
+    if en { eng.to_string() } else { ru.to_string() }
 }

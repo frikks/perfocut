@@ -404,21 +404,26 @@ pub fn pdf(r: &GenResult) -> Vec<u8> {
 pub fn csv(r: &GenResult) -> String {
     let st = &r.stats;
     let p = &r.params;
+    let en = p.lang == "en";
+    let t = |ru: &'static str, e: &'static str| if en { e } else { ru };
     let mut o = String::from("\u{FEFF}");
-    let d = |v: f64, n: usize| format!("{:.*}", n, v).replace('.', ",");
-    let _ = write!(o, "Параметр;Значение{NL}");
-    let _ = write!(o, "Лист, мм;{} x {}{NL}", d(p.sheet_w, 1), d(p.sheet_h, 1));
-    let _ = write!(o, "Толщина, мм;{}{NL}", d(p.thickness, 2));
-    let _ = write!(o, "Контуров;{}{NL}", st.count);
-    let _ = write!(o, "Врезок;{}{NL}", st.pierces);
-    let _ = write!(o, "Длина реза, м;{}{NL}", d(st.cut_len_m, 2));
-    let _ = write!(o, "Холостой ход, м;{}{NL}", d(st.travel_m, 2));
-    let _ = write!(o, "Время, мин;{}{NL}", d(st.time_min, 1));
-    let _ = write!(o, "Перфорация, %;{}{NL}", d(st.open_area_pct, 2));
-    let _ = write!(o, "Масса листа, кг;{}{NL}", d(st.weight_kg, 2));
-    let _ = write!(o, "Стоимость, {};{}{NL}", p.currency, d(st.cost, 2));
+    let d = |v: f64, n: usize| {
+        let s = format!("{:.*}", n, v);
+        if en { s } else { s.replace('.', ",") }
+    };
+    let _ = write!(o, "{};{}{NL}", t("Параметр", "Parameter"), t("Значение", "Value"));
+    let _ = write!(o, "{};{} x {}{NL}", t("Лист, мм", "Sheet, mm"), d(p.sheet_w, 1), d(p.sheet_h, 1));
+    let _ = write!(o, "{};{}{NL}", t("Толщина, мм", "Thickness, mm"), d(p.thickness, 2));
+    let _ = write!(o, "{};{}{NL}", t("Контуров", "Contours"), st.count);
+    let _ = write!(o, "{};{}{NL}", t("Врезок", "Pierces"), st.pierces);
+    let _ = write!(o, "{};{}{NL}", t("Длина реза, м", "Cut length, m"), d(st.cut_len_m, 2));
+    let _ = write!(o, "{};{}{NL}", t("Холостой ход, м", "Rapid travel, m"), d(st.travel_m, 2));
+    let _ = write!(o, "{};{}{NL}", t("Время, мин", "Time, min"), d(st.time_min, 1));
+    let _ = write!(o, "{};{}{NL}", t("Перфорация, %", "Open area, %"), d(st.open_area_pct, 2));
+    let _ = write!(o, "{};{}{NL}", t("Масса листа, кг", "Sheet weight, kg"), d(st.weight_kg, 2));
+    let _ = write!(o, "{}, {};{}{NL}", t("Стоимость", "Cost"), p.currency, d(st.cost, 2));
     if !st.by_size.is_empty() {
-        let _ = write!(o, "{NL}Размер, мм;Количество{NL}");
+        let _ = write!(o, "{NL}{};{}{NL}", t("Размер, мм", "Size, mm"), t("Количество", "Count"));
         for b in &st.by_size {
             let _ = write!(o, "{};{}{NL}", d(b.size, 2), b.count);
         }
@@ -429,61 +434,68 @@ pub fn csv(r: &GenResult) -> String {
 pub fn report(r: &GenResult) -> String {
     let st = &r.stats;
     let p = &r.params;
+    let en = p.lang == "en";
+    let t = |ru: &'static str, e: &'static str| if en { e } else { ru };
+    let (mm, m, min, kg, pcs) = if en { ("mm", "m", "min", "kg", "pcs") } else { ("мм", "м", "мин", "кг", "шт") };
     let mut o = String::new();
-    let _ = write!(o, "PerfoCut — паспорт заказа{NL}{NL}");
+    let _ = write!(o, "{}{NL}{NL}", t("PerfoCut — паспорт заказа", "PerfoCut — order sheet"));
     let kv = |o: &mut String, k: &str, v: &str| {
         if !v.trim().is_empty() {
             let _ = write!(o, "{:<22}{}{NL}", k, v);
         }
     };
-    kv(&mut o, "Изделие:", &p.name);
-    kv(&mut o, "Номер заказа:", &p.order_no);
-    kv(&mut o, "Клиент:", &p.client);
-    kv(&mut o, "Телефон:", &p.phone);
+    kv(&mut o, t("Изделие:", "Product:"), &p.name);
+    kv(&mut o, t("Номер заказа:", "Order no.:"), &p.order_no);
+    kv(&mut o, t("Клиент:", "Client:"), &p.client);
+    kv(&mut o, t("Телефон:", "Phone:"), &p.phone);
     kv(&mut o, "E-mail:", &p.email);
-    kv(&mut o, "Комментарий:", &p.comment);
+    kv(&mut o, t("Комментарий:", "Comment:"), &p.comment);
     let _ = write!(o, "{NL}");
-    kv(&mut o, "Лист:", &format!("{} x {} мм, толщина {} мм", num(p.sheet_w, 1), num(p.sheet_h, 1), num(p.thickness, 2)));
+    kv(
+        &mut o,
+        t("Лист:", "Sheet:"),
+        &format!("{} x {} {mm}, {} {} {mm}", num(p.sheet_w, 1), num(p.sheet_h, 1), t("толщина", "thickness"), num(p.thickness, 2)),
+    );
     let pat = if p.pattern == "lines" {
-        format!("линии, шаг {} мм", num(p.line_pitch, 2))
+        format!("{} {} {mm}", t("линии, шаг", "lines, pitch"), num(p.line_pitch, 2))
     } else {
         let g = match p.grid.as_str() {
-            "square" => "квадратная",
-            "tri90" => "треугольная 2",
-            _ => "треугольная",
+            "square" => t("квадратная", "square"),
+            "tri90" => t("треугольная 2", "triangular 2"),
+            _ => t("треугольная", "triangular"),
         };
         let s = match p.shape.as_str() {
-            "square" => "квадрат",
-            "diamond" => "ромб",
-            _ => "круг",
+            "square" => t("квадрат", "square"),
+            "diamond" => t("ромб", "diamond"),
+            _ => t("круг", "circle"),
         };
-        format!("{}, сетка {}, шаг {} мм", s, g, num(p.pitch, 2))
+        format!("{}, {} {}, {} {} {mm}", s, t("сетка", "grid"), g, t("шаг", "pitch"), num(p.pitch, 2))
     };
-    kv(&mut o, "Узор:", &pat);
-    kv(&mut o, "Контуров:", &st.count.to_string());
-    kv(&mut o, "Врезок:", &st.pierces.to_string());
-    kv(&mut o, "Длина реза:", &format!("{:.2} м", st.cut_len_m));
-    kv(&mut o, "Время резки:", &format!("≈ {:.1} мин", st.time_min));
-    kv(&mut o, "Перфорация:", &format!("{:.2} %", st.open_area_pct));
-    kv(&mut o, "Масса листа:", &format!("{:.2} кг", st.weight_kg));
-    let _ = write!(o, "{NL}Стоимость{NL}");
-    kv(&mut o, "  резка:", &format!("{:.2} {}", st.cost_cut, p.currency));
-    kv(&mut o, "  врезки:", &format!("{:.2} {}", st.cost_pierce, p.currency));
+    kv(&mut o, t("Узор:", "Pattern:"), &pat);
+    kv(&mut o, t("Контуров:", "Contours:"), &st.count.to_string());
+    kv(&mut o, t("Врезок:", "Pierces:"), &st.pierces.to_string());
+    kv(&mut o, t("Длина реза:", "Cut length:"), &format!("{:.2} {m}", st.cut_len_m));
+    kv(&mut o, t("Время резки:", "Cutting time:"), &format!("≈ {:.1} {min}", st.time_min));
+    kv(&mut o, t("Перфорация:", "Open area:"), &format!("{:.2} %", st.open_area_pct));
+    kv(&mut o, t("Масса листа:", "Sheet weight:"), &format!("{:.2} {kg}", st.weight_kg));
+    let _ = write!(o, "{NL}{}{NL}", t("Стоимость", "Cost"));
+    kv(&mut o, t("  резка:", "  cutting:"), &format!("{:.2} {}", st.cost_cut, p.currency));
+    kv(&mut o, t("  врезки:", "  pierces:"), &format!("{:.2} {}", st.cost_pierce, p.currency));
     if st.cost_material > 0.0 {
-        kv(&mut o, "  металл:", &format!("{:.2} {}", st.cost_material, p.currency));
+        kv(&mut o, t("  металл:", "  metal:"), &format!("{:.2} {}", st.cost_material, p.currency));
     }
     if st.cost_fixed > 0.0 {
-        kv(&mut o, "  подготовка:", &format!("{:.2} {}", st.cost_fixed, p.currency));
+        kv(&mut o, t("  подготовка:", "  setup:"), &format!("{:.2} {}", st.cost_fixed, p.currency));
     }
-    kv(&mut o, "  итого:", &format!("{:.2} {}", st.cost, p.currency));
+    kv(&mut o, t("  итого:", "  total:"), &format!("{:.2} {}", st.cost, p.currency));
     if !st.by_size.is_empty() {
-        let _ = write!(o, "{NL}Отверстия по размерам{NL}");
+        let _ = write!(o, "{NL}{}{NL}", t("Отверстия по размерам", "Holes by size"));
         for b in &st.by_size {
-            let _ = write!(o, "  {:>8} мм  {:>8} шт{NL}", num(b.size, 2), b.count);
+            let _ = write!(o, "  {:>8} {mm}  {:>8} {pcs}{NL}", num(b.size, 2), b.count);
         }
     }
     if !st.warnings.is_empty() {
-        let _ = write!(o, "{NL}Замечания{NL}");
+        let _ = write!(o, "{NL}{}{NL}", t("Замечания", "Notes"));
         for w in &st.warnings {
             let _ = write!(o, "  - {}{NL}", w);
         }

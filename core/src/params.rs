@@ -30,6 +30,7 @@ pub struct Params {
     pub shape: String, // circle | square | diamond
     pub d_min: f64,
     pub d_max: f64,
+    pub size_mode: String, // range | prop (как SVG tracing: размер пропорционален тону)
     pub fixed: bool,
     pub fixed_sizes: String,
     pub quant: f64,
@@ -73,6 +74,8 @@ pub struct Params {
     pub phone: String,
     pub email: String,
     pub comment: String,
+    // Язык отчётов и предупреждений: ru | en
+    pub lang: String,
 }
 
 impl Default for Params {
@@ -100,6 +103,7 @@ impl Default for Params {
             shape: "circle".into(),
             d_min: 2.0,
             d_max: 10.0,
+            size_mode: "range".into(),
             fixed: false,
             fixed_sizes: "3, 5, 7, 9".into(),
             quant: 0.5,
@@ -138,6 +142,7 @@ impl Default for Params {
             phone: String::new(),
             email: String::new(),
             comment: String::new(),
+            lang: "ru".into(),
         }
     }
 }

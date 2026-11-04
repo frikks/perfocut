@@ -135,7 +135,7 @@ pub unsafe extern "C" fn pc_generate(ptr: *const u8, len: usize) -> i32 {
             0
         }
         Err(e) => {
-            s.out = format!("Ошибка параметров: {e}").into_bytes();
+            s.out = format!("Ошибка параметров / parameter error: {e}").into_bytes();
             1
         }
     })
@@ -221,6 +221,35 @@ mod tests {
             }
         }
         image::Gray::from_rgba(&d, w, h)
+    }
+
+    #[test]
+    fn prop_mode_like_svg_tracing() {
+        let g = gradient(200, 120);
+        let mut p = Params::default();
+        p.grid = "square".into();
+        p.size_mode = "prop".into();
+        p.tone_cut = 0.0;
+        p.quant = 0.0;
+        p.d_max = 10.0;
+        let r = gen::generate(Some(&g), &p);
+        assert!(r.stats.count > 100);
+        let dmin = p.d_min.max(p.thickness * p.min_k);
+        for s in &r.shapes {
+            assert!(s.size() >= dmin - 1e-6 && s.size() <= 10.0 + 1e-6);
+        }
+        // размер пропорционален тону: левый край (чёрный) около макс., правее меньше
+        let mut c: Vec<(f64, f64)> = r.shapes.iter().filter_map(|s| if let Shape::Circle { x, d, .. } = s { Some((*x, *d)) } else { None }).collect();
+        c.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        assert!(c.first().unwrap().1 > c.last().unwrap().1);
+        p.lang = "en".into();
+        p.d_min = 0.1;
+        let r2 = gen::generate(Some(&g), &p);
+        assert!(r2.stats.warnings.iter().any(|w| w.starts_with("Min size raised")));
+        let mut lp = p.clone();
+        lp.pattern = "lines".into();
+        let r3 = gen::generate(Some(&g), &lp);
+        assert!(r3.stats.count > 5);
     }
 
     #[test]
