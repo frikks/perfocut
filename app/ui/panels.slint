@@ -1,0 +1,1126 @@
+import { Theme, Bridge } from "theme.slint";
+import { Store, Prefs, Par } from "store.slint";
+import { Btn, Seg, Check, NumField, TextField, FieldRow, Slide, Section, Caption, Hint, Icon } from "widgets.slint";
+
+export component SettingsPanel inherits VerticalLayout {
+    Section {
+        title: @tr("Изображение");
+        if Store.has-image: Rectangle {
+            height: Theme.touch ? 72px : 60px;
+            border-radius: 10px;
+            background: Theme.raised;
+            border-width: 1px;
+            border-color: Theme.line;
+            HorizontalLayout {
+                padding: 8px;
+                padding-right: 4px;
+                spacing: 12px;
+                Rectangle {
+                    width: self.height;
+                    border-radius: 6px;
+                    clip: true;
+                    background: #ffffff;
+                    Image {
+                        width: parent.width;
+                        height: parent.height;
+                        source: Store.thumb;
+                        image-fit: cover;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+                    Text {
+                        text: Store.img-name;
+                        color: Theme.t1;
+                        font-size: Theme.fs;
+                        font-weight: 500;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: Store.img-size;
+                        color: Theme.t3;
+                        font-family: Theme.mono;
+                        font-size: Theme.fs-s;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Btn {
+                        kind: 2;
+                        has-icon: true;
+                        icon: @image-url("icons/upload.svg");
+                        clicked => {
+                            Store.open();
+                        }
+                    }
+                }
+            }
+        }
+        if !Store.has-image: HorizontalLayout {
+            spacing: 8px;
+            Btn {
+                text: @tr("Выбрать файл");
+                stretch: true;
+                has-icon: true;
+                icon: @image-url("icons/folder.svg");
+                clicked => {
+                    Store.open();
+                }
+            }
+            Btn {
+                text: @tr("Пример");
+                clicked => {
+                    Store.sample();
+                }
+            }
+        }
+        Seg {
+            items: [@tr("Заполнить"), @tr("Вписать"), @tr("Растянуть")];
+            current: Store.p.fit == "contain" ? 1 : Store.p.fit == "stretch" ? 2 : 0;
+            select(i) => {
+                Store.p.fit = i == 1 ? "contain" : i == 2 ? "stretch" : "cover";
+                Store.changed();
+            }
+        }
+        FieldRow {
+            label: @tr("Масштаб");
+            NumField {
+                value: Store.p.img-scale;
+                scale: 100;
+                decimals: 0;
+                unit: "%";
+                edited(v) => {
+                    Store.p.img-scale = v;
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
+            label: @tr("Сдвиг X / Y");
+            field-w: Theme.touch ? 220px : 172px;
+            NumField {
+                value: Store.p.img-dx;
+                decimals: 1;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.p.img-dx = v;
+                    Store.changed();
+                }
+            }
+            NumField {
+                value: Store.p.img-dy;
+                decimals: 1;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.p.img-dy = v;
+                    Store.changed();
+                }
+            }
+        }
+        Caption {
+            text: @tr("Тон");
+        }
+        Slide {
+            label: @tr("Яркость");
+            value: Store.p.brightness;
+            minv: -1;
+            maxv: 1;
+            shown: (Store.p.brightness > 0.004 ? "+" : "") + Bridge.fmt(Store.p.brightness * 100, 0);
+            edited(v) => {
+                Store.p.brightness = v;
+                Store.changed();
+            }
+        }
+        Slide {
+            label: @tr("Контраст");
+            value: Store.p.contrast;
+            minv: -1;
+            maxv: 2;
+            shown: (Store.p.contrast > 0.004 ? "+" : "") + Bridge.fmt(Store.p.contrast * 100, 0);
+            edited(v) => {
+                Store.p.contrast = v;
+                Store.changed();
+            }
+        }
+        Slide {
+            label: @tr("Гамма");
+            value: Store.p.gamma;
+            minv: 0.2;
+            maxv: 3;
+            shown: Store.p.gamma.to-fixed(2);
+            edited(v) => {
+                Store.p.gamma = v;
+                Store.changed();
+            }
+        }
+        Slide {
+            label: @tr("Порог: светлее — без отверстий");
+            value: Store.p.tone-cut;
+            minv: 0;
+            maxv: 0.9;
+            shown: Bridge.fmt(Store.p.tone-cut * 100, 0) + "%";
+            edited(v) => {
+                Store.p.tone-cut = v;
+                Store.changed();
+            }
+        }
+        Caption {
+            text: @tr("Крупные отверстия");
+        }
+        Seg {
+            items: [@tr("В тёмных местах"), @tr("В светлых")];
+            current: Store.p.negative ? 1 : 0;
+            select(i) => {
+                Store.p.negative = i == 1;
+                Store.changed();
+            }
+        }
+    }
+
+    Section {
+        title: @tr("Лист");
+        meta: Store.sheet-meta;
+        FieldRow {
+            label: @tr("Ширина");
+            NumField {
+                value: Store.p.sheet-w;
+                decimals: 1;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.p.sheet-w = v;
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
+            label: @tr("Высота");
+            NumField {
+                value: Store.p.sheet-h;
+                decimals: 1;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.p.sheet-h = v;
+                    Store.changed();
+                }
+            }
+        }
+        Check {
+            text: @tr("Сохранять пропорции");
+            checked: Store.lock-ratio;
+            toggled(b) => {
+                Store.lock-ratio = b;
+                Store.changed();
+            }
+        }
+        FieldRow {
+            label: @tr("Поле без отверстий");
+            NumField {
+                value: Store.p.border;
+                decimals: 1;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.p.border = v;
+                    Store.changed();
+                }
+            }
+        }
+        Check {
+            text: @tr("Резать наружный контур листа");
+            checked: Store.p.outline;
+            toggled(b) => {
+                Store.p.outline = b;
+                Store.changed();
+            }
+        }
+        Btn {
+            text: @tr("Высота по пропорциям картинки");
+            enabled: Store.has-image;
+            clicked => {
+                Store.aspect();
+            }
+        }
+    }
+
+    Section {
+        title: @tr("Узор");
+        Seg {
+            items: [@tr("Отверстия"), @tr("Линии")];
+            current: Store.p.pattern == "lines" ? 1 : 0;
+            select(i) => {
+                Store.p.pattern = i == 1 ? "lines" : "dots";
+                Store.changed();
+            }
+        }
+        if Store.p.pattern != "lines": VerticalLayout {
+            spacing: Theme.touch ? 10px : 8px;
+            Caption {
+                text: @tr("Сетка");
+            }
+            Seg {
+                items: [@tr("Квадратная"), @tr("Треуг."), @tr("Треуг. 2")];
+                current: Store.p.grid == "square" ? 0 : Store.p.grid == "tri90" ? 2 : 1;
+                select(i) => {
+                    Store.p.grid = i == 0 ? "square" : i == 2 ? "tri90" : "tri";
+                    Store.changed();
+                }
+            }
+            Caption {
+                text: @tr("Форма");
+            }
+            Seg {
+                items: [@tr("Круг"), @tr("Квадрат"), @tr("Ромб")];
+                current: Store.p.shape == "square" ? 1 : Store.p.shape == "diamond" ? 2 : 0;
+                select(i) => {
+                    Store.p.shape = i == 1 ? "square" : i == 2 ? "diamond" : "circle";
+                    Store.changed();
+                }
+            }
+            FieldRow {
+                label: @tr("Шаг сетки");
+                NumField {
+                    value: Store.p.pitch;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.pitch = v;
+                        Store.changed();
+                    }
+                }
+            }
+            FieldRow {
+                label: @tr("Отверстий по длине");
+                NumField {
+                    value: Store.holes-n;
+                    integer: true;
+                    unit: @tr("шт");
+                    edited(v) => {
+                        Store.set-holes(v);
+                    }
+                }
+            }
+            FieldRow {
+                label: @tr("Поворот");
+                NumField {
+                    value: Store.p.angle;
+                    decimals: 1;
+                    unit: "°";
+                    edited(v) => {
+                        Store.p.angle = v;
+                        Store.changed();
+                    }
+                }
+            }
+            FieldRow {
+                label: @tr("Сдвиг X / Y");
+                field-w: Theme.touch ? 220px : 172px;
+                NumField {
+                    value: Store.p.offset-x;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.offset-x = v;
+                        Store.changed();
+                    }
+                }
+                NumField {
+                    value: Store.p.offset-y;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.offset-y = v;
+                        Store.changed();
+                    }
+                }
+            }
+            FieldRow {
+                label: @tr("Мин. размер");
+                NumField {
+                    value: Store.p.d-min;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.d-min = v;
+                        Store.changed();
+                    }
+                }
+            }
+            FieldRow {
+                label: @tr("Макс. размер");
+                NumField {
+                    value: Store.p.d-max;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.d-max = v;
+                        Store.changed();
+                    }
+                }
+            }
+            Btn {
+                text: @tr("Макс. размер по шагу и перемычке");
+                clicked => {
+                    Store.fit-dmax();
+                }
+            }
+            Caption {
+                text: @tr("Размер от тона");
+            }
+            Seg {
+                items: [@tr("От мин. до макс."), @tr("Пропорционально")];
+                current: Store.p.size-mode == "prop" ? 1 : 0;
+                select(i) => {
+                    Store.p.size-mode = i == 1 ? "prop" : "range";
+                    Store.changed();
+                }
+            }
+            if Store.p.size-mode == "prop": Hint {
+                text: @tr("Диаметр растёт от нуля вместе с темнотой, как в SVG tracing. Отверстия меньше мин. размера не режутся.");
+            }
+            Btn {
+                text: @tr("Как в SVG tracing");
+                clicked => {
+                    Store.trace();
+                }
+            }
+            FieldRow {
+                label: @tr("Шаг размеров");
+                NumField {
+                    value: Store.p.quant;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.quant = v;
+                        Store.changed();
+                    }
+                }
+            }
+            Check {
+                text: @tr("Только заданные размеры");
+                checked: Store.p.fixed;
+                toggled(b) => {
+                    Store.p.fixed = b;
+                    Store.changed();
+                }
+            }
+            if Store.p.fixed: TextField {
+                value: Store.p.fixed-sizes;
+                placeholder: "3, 5, 7, 9";
+                mono: true;
+                edited(t) => {
+                    Store.p.fixed-sizes = t;
+                    Store.changed();
+                }
+            }
+        }
+        if Store.p.pattern == "lines": VerticalLayout {
+            spacing: Theme.touch ? 10px : 8px;
+            FieldRow {
+                label: @tr("Шаг линий");
+                NumField {
+                    value: Store.p.line-pitch;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.line-pitch = v;
+                        Store.changed();
+                    }
+                }
+            }
+            FieldRow {
+                label: @tr("Поворот");
+                NumField {
+                    value: Store.p.line-angle;
+                    decimals: 1;
+                    unit: "°";
+                    edited(v) => {
+                        Store.p.line-angle = v;
+                        Store.changed();
+                    }
+                }
+            }
+            FieldRow {
+                label: @tr("Мин. ширина");
+                NumField {
+                    value: Store.p.w-min;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.w-min = v;
+                        Store.changed();
+                    }
+                }
+            }
+            FieldRow {
+                label: @tr("Макс. ширина");
+                NumField {
+                    value: Store.p.w-max;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.w-max = v;
+                        Store.changed();
+                    }
+                }
+            }
+            Caption {
+                text: @tr("Ширина от тона");
+            }
+            Seg {
+                items: [@tr("От мин. до макс."), @tr("Пропорционально")];
+                current: Store.p.size-mode == "prop" ? 1 : 0;
+                select(i) => {
+                    Store.p.size-mode = i == 1 ? "prop" : "range";
+                    Store.changed();
+                }
+            }
+            Check {
+                text: @tr("Синусоида");
+                checked: Store.p.wave;
+                toggled(b) => {
+                    Store.p.wave = b;
+                    Store.changed();
+                }
+            }
+            if Store.p.wave: FieldRow {
+                label: @tr("Длина волны");
+                NumField {
+                    value: Store.p.wave-len;
+                    decimals: 1;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.wave-len = v;
+                        Store.changed();
+                    }
+                }
+            }
+            if Store.p.wave: FieldRow {
+                label: @tr("Амплитуда");
+                NumField {
+                    value: Store.p.wave-amp;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.wave-amp = v;
+                        Store.changed();
+                    }
+                }
+            }
+            FieldRow {
+                label: @tr("Шаг выборки");
+                NumField {
+                    value: Store.p.step;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.step = v;
+                        Store.changed();
+                    }
+                }
+            }
+        }
+    }
+
+    Section {
+        title: @tr("Металл и лазер");
+        meta: Store.metal-meta;
+        open: false;
+        FieldRow {
+            label: @tr("Толщина металла");
+            NumField {
+                value: Store.p.thickness;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.p.thickness = v;
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
+            label: @tr("Мин. отверстие, × толщины");
+            NumField {
+                value: Store.p.min-k;
+                unit: "×";
+                edited(v) => {
+                    Store.p.min-k = v;
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
+            label: @tr("Мин. перемычка");
+            NumField {
+                value: Store.p.bridge;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.p.bridge = v;
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
+            label: @tr("Плотность");
+            NumField {
+                value: Store.p.density;
+                unit: @tr("г/см³");
+                edited(v) => {
+                    Store.p.density = v;
+                    Store.changed();
+                }
+            }
+        }
+        Caption {
+            text: @tr("Режим резки");
+        }
+        FieldRow {
+            label: @tr("Скорость резки");
+            NumField {
+                value: Store.p.cut-speed;
+                decimals: 0;
+                unit: @tr("мм/мин");
+                edited(v) => {
+                    Store.p.cut-speed = v;
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
+            label: @tr("Холостой ход");
+            NumField {
+                value: Store.p.rapid-speed;
+                decimals: 0;
+                unit: @tr("мм/мин");
+                edited(v) => {
+                    Store.p.rapid-speed = v;
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
+            label: @tr("Время врезки");
+            NumField {
+                value: Store.p.pierce-time;
+                unit: @tr("с");
+                edited(v) => {
+                    Store.p.pierce-time = v;
+                    Store.changed();
+                }
+            }
+        }
+    }
+
+    Section {
+        title: @tr("Стоимость");
+        open: false;
+        FieldRow {
+            label: @tr("Метр реза");
+            NumField {
+                value: Store.p.price-m;
+                unit: Store.p.currency;
+                edited(v) => {
+                    Store.p.price-m = v;
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
+            label: @tr("Одна врезка");
+            NumField {
+                value: Store.p.price-pierce;
+                unit: Store.p.currency;
+                edited(v) => {
+                    Store.p.price-pierce = v;
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
+            label: @tr("Металл, за м²");
+            NumField {
+                value: Store.p.price-m2;
+                unit: Store.p.currency;
+                edited(v) => {
+                    Store.p.price-m2 = v;
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
+            label: @tr("Подготовка заказа");
+            NumField {
+                value: Store.p.price-fixed;
+                unit: Store.p.currency;
+                edited(v) => {
+                    Store.p.price-fixed = v;
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
+            label: @tr("Валюта");
+            TextField {
+                value: Store.p.currency;
+                edited(t) => {
+                    Store.p.currency = t;
+                    Store.changed();
+                }
+            }
+        }
+    }
+
+    Section {
+        title: "G-code";
+        open: false;
+        Caption {
+            text: @tr("Команды лазера");
+        }
+        Seg {
+            items: ["M07 / M08", "M03 / M05", @tr("Свои")];
+            current: Store.p.gc-on == "M07" && Store.p.gc-off == "M08" ? 0 : Store.p.gc-on == "M03" && Store.p.gc-off == "M05" ? 1 : 2;
+            select(i) => {
+                if i == 0 {
+                    Store.p.gc-on = "M07";
+                    Store.p.gc-off = "M08";
+                    Store.changed();
+                } else if i == 1 {
+                    Store.p.gc-on = "M03";
+                    Store.p.gc-off = "M05";
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
+            label: @tr("Включить");
+            TextField {
+                value: Store.p.gc-on;
+                mono: true;
+                edited(t) => {
+                    Store.p.gc-on = t;
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
+            label: @tr("Выключить");
+            TextField {
+                value: Store.p.gc-off;
+                mono: true;
+                edited(t) => {
+                    Store.p.gc-off = t;
+                    Store.changed();
+                }
+            }
+        }
+        Caption {
+            text: @tr("Начало программы");
+        }
+        TextField {
+            multi: true;
+            mono: true;
+            value: Store.p.gc-header;
+            edited(t) => {
+                Store.p.gc-header = t;
+                Store.changed();
+            }
+        }
+        Caption {
+            text: @tr("Конец программы");
+        }
+        TextField {
+            multi: true;
+            mono: true;
+            value: Store.p.gc-footer;
+            edited(t) => {
+                Store.p.gc-footer = t;
+                Store.changed();
+            }
+        }
+        Caption {
+            text: @tr("Ноль координат");
+        }
+        Seg {
+            items: [@tr("Левый низ"), @tr("Центр"), @tr("Левый верх")];
+            current: Store.p.origin == "center" ? 1 : Store.p.origin == "tl" ? 2 : 0;
+            select(i) => {
+                Store.p.origin = i == 1 ? "center" : i == 2 ? "tl" : "bl";
+                Store.changed();
+            }
+        }
+        Check {
+            text: @tr("Окружности дугами G02");
+            checked: Store.p.gc-arcs;
+            toggled(b) => {
+                Store.p.gc-arcs = b;
+                Store.changed();
+            }
+        }
+        Check {
+            text: @tr("Номера строк N");
+            checked: Store.p.gc-numbers;
+            toggled(b) => {
+                Store.p.gc-numbers = b;
+                Store.changed();
+            }
+        }
+        FieldRow {
+            label: @tr("Знаков после точки");
+            NumField {
+                value: Store.p.gc-decimals;
+                integer: true;
+                edited(v) => {
+                    Store.p.gc-decimals = Math.clamp(Math.round(v), 1, 6);
+                    Store.changed();
+                }
+            }
+        }
+        Check {
+            text: @tr("DXF: слой на каждый размер");
+            checked: Store.p.dxf-layers;
+            toggled(b) => {
+                Store.p.dxf-layers = b;
+                Store.changed();
+            }
+        }
+    }
+
+    Section {
+        title: @tr("Заказ");
+        open: false;
+        TextField {
+            value: Store.p.name;
+            placeholder: @tr("Изделие");
+            edited(t) => {
+                Store.p.name = t;
+                Store.changed();
+            }
+        }
+        TextField {
+            value: Store.p.order-no;
+            placeholder: @tr("Номер заказа");
+            edited(t) => {
+                Store.p.order-no = t;
+                Store.changed();
+            }
+        }
+        TextField {
+            value: Store.p.client;
+            placeholder: @tr("Клиент");
+            edited(t) => {
+                Store.p.client = t;
+                Store.changed();
+            }
+        }
+        TextField {
+            value: Store.p.phone;
+            placeholder: @tr("Телефон");
+            kind: InputType.text;
+            edited(t) => {
+                Store.p.phone = t;
+                Store.changed();
+            }
+        }
+        TextField {
+            value: Store.p.email;
+            placeholder: "E-mail";
+            edited(t) => {
+                Store.p.email = t;
+                Store.changed();
+            }
+        }
+        TextField {
+            multi: true;
+            value: Store.p.comment;
+            placeholder: @tr("Комментарий");
+            edited(t) => {
+                Store.p.comment = t;
+                Store.changed();
+            }
+        }
+        Btn {
+            text: @tr("Сбросить настройки");
+            kind: 2;
+            clicked => {
+                Store.reset();
+            }
+        }
+    }
+}
+
+component Stat inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    border-radius: 12px;
+    background: Theme.card;
+    border-width: 1px;
+    border-color: Theme.line;
+    min-height: lay.preferred-height;
+    horizontal-stretch: 1;
+    lay := VerticalLayout {
+        padding: 12px;
+        spacing: 4px;
+        Text {
+            text: root.label;
+            color: Theme.t3;
+            font-size: Theme.fs-s;
+            overflow: elide;
+        }
+        Text {
+            text: root.value;
+            color: Theme.t1;
+            font-family: Theme.mono;
+            font-size: Theme.fs-h + 1px;
+            overflow: elide;
+        }
+    }
+}
+
+component Head inherits Text {
+    color: Theme.t2;
+    font-size: Theme.fs-s + 1px;
+    font-weight: 500;
+}
+
+export component SummaryPanel inherits VerticalLayout {
+    padding: 16px;
+    spacing: 16px;
+    VerticalLayout {
+        spacing: 4px;
+        Head {
+            text: @tr("Стоимость резки");
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            Text {
+                text: Store.stats.has ? Store.stats.cost : "—";
+                color: Theme.t1;
+                font-family: Theme.mono;
+                font-size: Theme.fs-xl;
+            }
+            if Store.stats.has: VerticalLayout {
+                alignment: end;
+                padding-bottom: 4px;
+                Text {
+                    text: Store.stats.currency;
+                    color: Theme.t3;
+                    font-size: Theme.fs;
+                }
+            }
+        }
+        for kv in Store.stats.rows: HorizontalLayout {
+            Text {
+                text: kv.k;
+                color: Theme.t2;
+                font-size: Theme.fs-s + 1px;
+                horizontal-stretch: 1;
+            }
+            Text {
+                text: kv.v;
+                color: Theme.t1;
+                font-family: Theme.mono;
+                font-size: Theme.fs-s;
+            }
+        }
+    }
+    GridLayout {
+        spacing: 8px;
+        Row {
+            Stat {
+                label: @tr("Контуров");
+                value: Store.stats.has ? Store.stats.count : "—";
+            }
+            Stat {
+                label: @tr("Врезок");
+                value: Store.stats.has ? Store.stats.pierces : "—";
+            }
+        }
+        Row {
+            Stat {
+                label: @tr("Длина реза");
+                value: Store.stats.has ? Store.stats.cut : "—";
+            }
+            Stat {
+                label: @tr("Время");
+                value: Store.stats.has ? Store.stats.time : "—";
+            }
+        }
+        Row {
+            Stat {
+                label: @tr("Перфорация");
+                value: Store.stats.has ? Store.stats.open : "—";
+            }
+            Stat {
+                label: @tr("Масса листа");
+                value: Store.stats.has ? Store.stats.mass : "—";
+            }
+        }
+    }
+    if Store.stats.sizes.length > 0: VerticalLayout {
+        spacing: 6px;
+        Head {
+            text: @tr("Отверстия по размерам");
+        }
+        for s in Store.stats.sizes: HorizontalLayout {
+            spacing: 10px;
+            height: Theme.touch ? 24px : 20px;
+            Text {
+                width: Theme.touch ? 64px : 56px;
+                text: s.label;
+                color: Theme.t2;
+                font-family: Theme.mono;
+                font-size: Theme.fs-s;
+                vertical-alignment: center;
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+                Rectangle {
+                    x: 0;
+                    width: Math.max(2px, parent.width * s.frac);
+                    height: 4px;
+                    border-radius: 2px;
+                    background: Theme.bar;
+                }
+            }
+            Text {
+                width: 48px;
+                text: s.n;
+                color: Theme.t1;
+                font-family: Theme.mono;
+                font-size: Theme.fs-s;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+            }
+        }
+        if Store.stats.sizes-note != "": Hint {
+            text: Store.stats.sizes-note;
+        }
+    }
+    VerticalLayout {
+        spacing: 8px;
+        Head {
+            text: @tr("Проверка под лазер");
+        }
+        if Store.stats.warnings.length == 0: HorizontalLayout {
+            spacing: 8px;
+            VerticalLayout {
+                alignment: start;
+                padding-top: 6px;
+                Rectangle {
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 3px;
+                    background: Theme.ok;
+                }
+            }
+            Text {
+                text: Store.stats.ok-line;
+                color: Theme.t2;
+                font-size: Theme.fs-s + 1px;
+                wrap: word-wrap;
+            }
+        }
+        for w in Store.stats.warnings: HorizontalLayout {
+            spacing: 8px;
+            VerticalLayout {
+                alignment: start;
+                padding-top: 6px;
+                Rectangle {
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 3px;
+                    background: Theme.warn;
+                }
+            }
+            Text {
+                text: w;
+                color: Theme.t1;
+                font-size: Theme.fs-s + 1px;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
+export component ExportPanel inherits VerticalLayout {
+    padding: 16px;
+    spacing: 8px;
+    Head {
+        text: @tr("Форматы");
+    }
+    for f[i] in Store.formats: Rectangle {
+        min-height: Theme.touch ? 60px : 48px;
+        border-radius: 10px;
+        background: ta.has-hover ? Theme.raised : Theme.card;
+        border-width: 1px;
+        border-color: Theme.line;
+        ta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                Bridge.haptic("tick");
+                Store.format-toggled(i, !f.on);
+            }
+        }
+        HorizontalLayout {
+            padding-left: 12px;
+            padding-right: 4px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: Theme.touch ? 22px : 16px;
+                    height: self.width;
+                    border-radius: 4px;
+                    background: f.on ? Theme.acc : Theme.raised;
+                    border-width: f.on ? 0px : 1px;
+                    border-color: Theme.field-line;
+                    if f.on: Image {
+                        width: parent.width - 2px;
+                        height: self.width;
+                        source: @image-url("icons/check.svg");
+                        colorize: Theme.acc-ink;
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                spacing: 1px;
+                Text {
+                    text: f.title;
+                    color: Theme.t1;
+                    font-size: Theme.fs;
+                    font-weight: 500;
+                }
+                Text {
+                    text: f.note;
+                    color: Theme.t3;
+                    font-size: Theme.fs-s;
+                    overflow: elide;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                Btn {
+                    kind: 2;
+                    has-icon: true;
+                    icon: @image-url("icons/download.svg");
+                    enabled: Store.can-export;
+                    clicked => {
+                        Store.export-one(i);
+                    }
+                }
+            }
+        }
+    }
+    Rectangle {
+        height: 8px;
+    }
+    Btn {
+        kind: 1;
+        text: @tr("Скачать выбранные, ZIP");
+        has-icon: true;
+        icon: @image-url("icons/download.svg");
+        enabled: Store.can-export;
+        clicked => {
+            Store.export-zip();
+        }
+    }
+    Btn {
+        text: @tr("Сохранить заказ .perfo");
+        has-icon: true;
+        icon: @image-url("icons/save.svg");
+        enabled: Store.has-image;
+        clicked => {
+            Store.save-order();
+        }
+    }
+}
