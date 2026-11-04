@@ -3,6 +3,7 @@
     package="com.perfocut.app" android:versionCode="1" android:versionName="0.1">
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
     <application android:label="PerfoCut" android:icon="@drawable/ic_launcher"
         android:theme="@style/AppTheme" android:hardwareAccelerated="true" android:allowBackup="true">
         <activity android:name=".MainActivity" android:exported="true"
