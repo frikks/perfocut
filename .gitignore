@@ -1,0 +1,5 @@
+/target
+/dist
+/android/build
+/android/assets
+*.keystore
