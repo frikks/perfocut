@@ -1,86 +1,11 @@
 name: Release
 
-# Релиз собирается сам, когда в main приходит новая версия из Cargo.toml.
-# Если релиз с такой версией уже есть, сборка просто проверяет код.
+# Временно: идёт перенос на версию 0.3, сборка запускается только вручную.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  build:
+  noop:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Версия
-        id: v
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          V=$(sed -n 's/^version *= *"\([^"]*\)".*/\1/p' Cargo.toml | head -1)
-          echo "version=$V" >> "$GITHUB_OUTPUT"
-          if gh release view "v$V" >/dev/null 2>&1; then echo "new=false" >> "$GITHUB_OUTPUT"; else echo "new=true" >> "$GITHUB_OUTPUT"; fi
-          echo "Версия $V"
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown, x86_64-pc-windows-gnu
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Тесты ядра
-        run: cargo test -p perfo_core --release
-
-      - name: HTML (ядро в WebAssembly)
-        run: |
-          cargo build --release -p perfo_core --target wasm32-unknown-unknown
-          python3 build_web.py
-
-      - name: Windows .exe
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq gcc-mingw-w64-x86-64 >/dev/null
-          cargo build --release -p perfocut --target x86_64-pc-windows-gnu
-          cp target/x86_64-pc-windows-gnu/release/perfocut.exe dist/PerfoCut.exe
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Android .apk
-        env:
-          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
-          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0" >/dev/null
-          [ -n "$ANDROID_KEYSTORE_PASS" ] || unset ANDROID_KEYSTORE_PASS
-          [ -n "$ANDROID_KEY_ALIAS" ] || unset ANDROID_KEY_ALIAS
-          bash android/build.sh
-
-      - name: Файлы сборки
-        uses: actions/upload-artifact@v4
-        with:
-          name: PerfoCut-${{ steps.v.outputs.version }}
-          path: dist/*
-
-      - name: Релиз на GitHub
-        if: steps.v.outputs.new == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.v.outputs.version }}
-          name: PerfoCut ${{ steps.v.outputs.version }}
-          target_commitish: ${{ github.sha }}
-          generate_release_notes: true
-          body: |
-            - **PerfoCut.html**: открыть в Chrome или Edge, работает без интернета.
-            - **PerfoCut.exe**: Windows x64, без установки. Окно консоли не закрывать, пока работаете.
-            - **PerfoCut.apk**: Android 7+. Разрешите установку из неизвестных источников.
-          files: |
-            dist/PerfoCut.html
-            dist/PerfoCut.exe
-            dist/PerfoCut.apk
+      - run: echo "Перенос на 0.3"
