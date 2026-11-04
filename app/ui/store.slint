@@ -1,0 +1,96 @@
+// Данные, которые интерфейс показывает и меняет. Программа на Rust читает и заполняет их.
+
+export struct Par {
+    sheet-w: float, sheet-h: float, border: float, outline: bool,
+    fit: string, img-scale: float, img-dx: float, img-dy: float,
+    brightness: float, contrast: float, gamma: float, negative: bool, tone-cut: float,
+    pattern: string, grid: string, pitch: float, angle: float, offset-x: float, offset-y: float,
+    shape: string, d-min: float, d-max: float, size-mode: string, fixed: bool, fixed-sizes: string, quant: float,
+    line-pitch: float, line-angle: float, w-min: float, w-max: float, wave: bool, wave-len: float, wave-amp: float, step: float,
+    thickness: float, min-k: float, bridge: float, density: float,
+    cut-speed: float, rapid-speed: float, pierce-time: float,
+    price-m: float, price-pierce: float, price-m2: float, price-fixed: float, currency: string,
+    gc-on: string, gc-off: string, gc-header: string, gc-footer: string, gc-arcs: bool, gc-numbers: bool, gc-decimals: int,
+    origin: string, dxf-layers: bool,
+    name: string, order-no: string, client: string, phone: string, email: string, comment: string,
+}
+
+export struct KV { k: string, v: string }
+export struct SizeRow { label: string, frac: float, n: string }
+export struct StatsUI {
+    has: bool, cost: string, currency: string, rows: [KV],
+    count: string, pierces: string, cut: string, time: string, open: string, mass: string,
+    sizes: [SizeRow], sizes-note: string, warnings: [string], ok-line: string, hud: string,
+}
+export struct Fmt { title: string, note: string, on: bool }
+
+export global Store {
+    in-out property <Par> p;
+    // Любое изменение p
+    callback changed();
+    in-out property <bool> lock-ratio;
+    in property <int> holes-n;
+    callback set-holes(float);
+    in property <string> sheet-meta;
+    in property <string> metal-meta;
+
+    // Картинка
+    in property <bool> has-image;
+    in property <string> img-name;
+    in property <string> img-size;
+    in property <image> thumb;
+    callback open();
+    callback sample();
+    callback aspect();
+    callback fit-dmax();
+    callback trace();
+    callback reset();
+
+    // Предпросмотр
+    in-out property <int> view-mode;
+    in property <image> preview;
+    in property <length> sx;
+    in property <length> sy;
+    in property <length> sw;
+    in property <length> sh;
+    in property <string> dim-w;
+    in property <string> dim-h;
+    in-out property <color> sheet-color: #9a9ea3;
+    in-out property <color> back-color: #f2c48d;
+    in property <string> sheet-hex: "#9a9ea3";
+    in property <string> back-hex: "#f2c48d";
+    callback view-changed();
+    callback canvas-size(length, length);
+    callback pan(length, length);
+    callback wheel(length, length, length);
+    callback pinch-start();
+    callback pinch(float, length, length);
+    callback fit-view();
+    callback set-color(int, string);
+
+    // Итог и экспорт
+    in property <StatsUI> stats;
+    in property <[Fmt]> formats;
+    in property <bool> can-export;
+    callback format-toggled(int, bool);
+    callback export-one(int);
+    callback export-zip();
+    callback save-order();
+
+    in property <string> toast;
+    in property <bool> toast-shown;
+}
+
+export global Prefs {
+    in-out property <int> theme;
+    in-out property <int> lang;
+    in-out property <bool> vibro: true;
+    in property <bool> is-phone;
+    in property <bool> can-minimize: true;
+    // Файл можно перетащить в окно
+    in property <bool> can-drop;
+    in property <string> version;
+    callback changed();
+    callback open-url(string);
+    callback minimize();
+}

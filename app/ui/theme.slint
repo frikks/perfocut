@@ -1,0 +1,68 @@
+// Цвета, размеры и шрифты интерфейса. Все компоненты берут значения только отсюда.
+import { Palette } from "std-widgets.slint";
+
+export global Theme {
+    // 0 основная (графит), 1 светлая, 2 как в системе, 3 AMOLED
+    in-out property <int> mode: 0;
+    // Сенсорный экран: крупнее строки и шрифт
+    in-out property <bool> touch: false;
+    // Системный масштаб шрифта Android
+    in-out property <float> font-scale: 1.0;
+
+    out property <bool> dark: mode == 2 ? Palette.color-scheme != ColorScheme.light : mode != 1;
+    out property <bool> amoled: mode == 3;
+
+    out property <color> bg0: !dark ? #ffffff : amoled ? #000000 : #0f0f10;
+    out property <color> bg: !dark ? #f3f3f2 : amoled ? #000000 : #141415;
+    out property <color> card: !dark ? #f7f7f6 : amoled ? #0b0b0c : #19191b;
+    out property <color> raised: !dark ? #ffffff : amoled ? #141415 : #232325;
+    out property <color> raised2: !dark ? #efefed : amoled ? #1d1d1f : #2c2c2f;
+    out property <color> line: dark ? #ededed14 : #18181b1a;
+    out property <color> line2: dark ? #ededed24 : #18181b2e;
+    out property <color> field-line: dark ? (amoled ? #ededed4d : #ededed42) : #18181b57;
+    out property <color> field-hover: dark ? #ededed6b : #18181b85;
+    out property <color> t1: dark ? #ededed : #18181b;
+    out property <color> t2: dark ? #a1a1a6 : #52525a;
+    out property <color> t3: dark ? #85858b : #71717a;
+    out property <color> acc: #e8833a;
+    out property <color> acc-hover: dark ? #ef9150 : #dc7429;
+    out property <color> acc-ink: #1b1209;
+    out property <color> acc-text: dark ? #f0a36b : #b45a17;
+    out property <color> seg-on: !dark ? #ffffff : amoled ? #2a2a2d : #38383c;
+    out property <color> bar: !dark ? #c7c7cc : amoled ? #3d3d42 : #4a4a4f;
+    out property <color> toast: !dark ? #18181b : amoled ? #1d1d1f : #2c2c2f;
+    out property <color> toast-text: !dark ? #fafafa : #ededed;
+    out property <color> dim: dark ? #ededed47 : #18181b59;
+    out property <color> scrim: !dark ? #18181b6b : amoled ? #000000b8 : #00000099;
+    out property <color> warn: dark ? #d9a441 : #b7791f;
+    out property <color> ok: dark ? #4cc38a : #2f9e6b;
+
+    out property <length> row: touch ? Math.max(48px, fs * 2.75) : 32px;
+    out property <length> fs: (touch ? 16px : 14px) * font-scale;
+    out property <length> fs-s: (touch ? 14px : 12px) * font-scale;
+    out property <length> fs-m: (touch ? 15px : 13px) * font-scale;
+    out property <length> fs-h: (touch ? 17px : 15px) * font-scale;
+    out property <length> fs-xl: (touch ? 30px : 28px) * font-scale;
+    out property <length> icon: touch ? 20px : 16px;
+    out property <length> pad: touch ? 16px : 16px;
+    out property <string> sans: "Inter";
+    out property <string> mono: "JetBrains Mono";
+}
+
+// Общение интерфейса с программой на Rust
+export global Bridge {
+    // Отклик вибрацией: "click" для кнопок, "tick" для переключателей
+    callback haptic(string);
+    // Число для поля ввода: без лишних нулей, точка как разделитель
+    pure callback fmt(float, int) -> string;
+    pure callback num-ok(string) -> bool;
+    pure callback num(string) -> float;
+}
+
+// Поле ввода в фокусе: где оно, чтобы поставить его по центру над клавиатурой
+export global Kb {
+    in-out property <bool> text-focused;
+    in-out property <length> focus-y;
+    in-out property <length> focus-h;
+    in-out property <int> seq;
+}
