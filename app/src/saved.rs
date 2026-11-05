@@ -18,6 +18,10 @@ pub struct Saved {
     pub back_color: String,
     pub view_mode: i32,
     pub params: Option<Params>,
+    /// Кисть для рисования: диаметр в мм, мягкость и тон 0..1
+    pub brush_size: f64,
+    pub brush_soft: f64,
+    pub brush_tone: f64,
 }
 
 impl Default for Saved {
@@ -33,6 +37,9 @@ impl Default for Saved {
             back_color: "#f2c48d".into(),
             view_mode: 0,
             params: None,
+            brush_size: 8.0,
+            brush_soft: 0.25,
+            brush_tone: 1.0,
         }
     }
 }

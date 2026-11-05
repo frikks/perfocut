@@ -5,6 +5,7 @@ pub mod export;
 pub mod gen;
 pub mod image;
 pub mod params;
+pub mod sketch;
 pub mod zip;
 
 use gen::GenResult;
@@ -152,5 +153,22 @@ mod tests {
         let l = zip::list(&zb).unwrap();
         assert_eq!(l.len(), 2);
         assert_eq!(&zb[l[0].offset..l[0].offset + l[0].len], b"hello");
+    }
+
+    #[test]
+    fn warnings_use_locale_decimals() {
+        let g = gradient(200, 120);
+        let p = Params {
+            pattern: "lines".into(),
+            line_pitch: 9.05,
+            w_max: 20.0,
+            bridge: 1.5,
+            ..Params::default()
+        };
+        let r = gen::generate(Some(&g), &p);
+        let w = r.stats.warnings.iter().find(|w| w.starts_with("Макс. ширина")).expect("warning");
+        assert!(w.contains("до 7,55 мм") && w.contains("не меньше 1,5 мм"), "{w}");
+        let r = gen::generate(Some(&g), &Params { lang: "en".into(), ..p });
+        assert!(r.stats.warnings.iter().any(|w| w.contains("to 7.55 mm")), "{:?}", r.stats.warnings);
     }
 }

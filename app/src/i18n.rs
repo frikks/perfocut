@@ -111,6 +111,21 @@ pub fn fmt_n(v: f64, decimals: usize) -> String {
     out
 }
 
+/// Как `fmt_n`, но без лишних нулей после запятой: «8», «2,5».
+pub fn fmt_short(v: f64, decimals: usize) -> String {
+    let mut s = fmt_n(v, decimals);
+    let point = if is_en() { '.' } else { ',' };
+    if s.contains(point) {
+        while s.ends_with('0') {
+            s.pop();
+        }
+        if s.ends_with(point) {
+            s.pop();
+        }
+    }
+    s
+}
+
 /// Время резки: «8,5 мин» или «2 ч 15 мин».
 pub fn fmt_time(min: f64) -> String {
     if min < 60.0 {

@@ -182,17 +182,17 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         let mut wmax = p.w_max;
         if wmax > cap {
             warnings.push(if en {
-                format!("Max width limited to {:.2} mm to keep the bridge at least {:.2} mm", cap.max(0.0), p.bridge)
+                format!("Max width limited to {} mm to keep the bridge at least {} mm", dec(cap.max(0.0), en), dec(p.bridge, en))
             } else {
-                format!("Макс. ширина ограничена до {:.2} мм, чтобы перемычка была не меньше {:.2} мм", cap.max(0.0), p.bridge)
+                format!("Макс. ширина ограничена до {} мм, чтобы перемычка была не меньше {} мм", dec(cap.max(0.0), en), dec(p.bridge, en))
             });
             wmax = cap;
         }
         if p.w_min < min_allowed {
             warnings.push(if en {
-                format!("Min width raised to {:.2} mm: a slot in {:.2} mm metal cannot be narrower", min_allowed, p.thickness)
+                format!("Min width raised to {} mm: a slot in {} mm metal cannot be narrower", dec(min_allowed, en), dec(p.thickness, en))
             } else {
-                format!("Мин. ширина поднята до {:.2} мм: для металла {:.2} мм прорезь не может быть уже", min_allowed, p.thickness)
+                format!("Мин. ширина поднята до {} мм: для металла {} мм прорезь не может быть уже", dec(min_allowed, en), dec(p.thickness, en))
             });
         }
         let est = (w * h) / (lp * p.step);
@@ -285,18 +285,18 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         let mut dmax = p.d_max;
         if dmax > cap {
             warnings.push(if en {
-                format!("Max size limited to {:.2} mm to keep the bridge at least {:.2} mm", cap.max(0.0), p.bridge)
+                format!("Max size limited to {} mm to keep the bridge at least {} mm", dec(cap.max(0.0), en), dec(p.bridge, en))
             } else {
-                format!("Макс. размер ограничен до {:.2} мм, чтобы перемычка была не меньше {:.2} мм", cap.max(0.0), p.bridge)
+                format!("Макс. размер ограничен до {} мм, чтобы перемычка была не меньше {} мм", dec(cap.max(0.0), en), dec(p.bridge, en))
             });
             dmax = cap;
         }
         let dmin = p.d_min.max(min_allowed);
         if p.d_min < min_allowed {
             warnings.push(if en {
-                format!("Min size raised to {:.2} mm: a hole in {:.2} mm metal cannot be smaller", min_allowed, p.thickness)
+                format!("Min size raised to {} mm: a hole in {} mm metal cannot be smaller", dec(min_allowed, en), dec(p.thickness, en))
             } else {
-                format!("Мин. размер поднят до {:.2} мм: для металла {:.2} мм отверстие не может быть меньше", min_allowed, p.thickness)
+                format!("Мин. размер поднят до {} мм: для металла {} мм отверстие не может быть меньше", dec(min_allowed, en), dec(p.thickness, en))
             });
         }
         let mut fixed = if p.fixed { p.fixed_list() } else { vec![] };
@@ -313,9 +313,9 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         let est = (w * h) / (pch * pch);
         if est > MAX_SHAPES {
             warnings.push(if en {
-                format!("Pitch is too small: about {} holes. Increase the pitch", est.round() as u64)
+                format!("Pitch is too small: about {} holes. Increase the pitch", count(est, en))
             } else {
-                format!("Слишком мелкий шаг: около {} отверстий. Увеличьте шаг", est.round() as u64)
+                format!("Слишком мелкий шаг: около {} отверстий. Увеличьте шаг", count(est, en))
             });
         } else if dmax < dmin {
             warnings.push(tr(en, "Шаг слишком мал для заданной перемычки и мин. размера", "Pitch is too small for this bridge and min size"));
@@ -498,6 +498,30 @@ fn finish(
     st.weight_kg = (w * h - area) * p.thickness * p.density * 1e-6;
     st.warnings = warnings;
     GenResult { shapes, stats: st, params: p }
+}
+
+/// Дробное число для сообщений: до двух знаков, в русском через запятую, как в остальном интерфейсе.
+fn dec(v: f64, en: bool) -> String {
+    let s = crate::export::num(v, 2);
+    if en {
+        s
+    } else {
+        s.replace('.', ",")
+    }
+}
+
+/// Целое с разделением разрядов: 1 234 567 или 1,234,567.
+fn count(v: f64, en: bool) -> String {
+    let digits = (v.round().max(0.0) as u64).to_string();
+    let sep = if en { ',' } else { '\u{a0}' };
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i) % 3 == 0 {
+            out.push(sep);
+        }
+        out.push(c);
+    }
+    out
 }
 
 fn tr(en: bool, ru: &str, eng: &str) -> String {
