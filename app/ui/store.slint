@@ -68,6 +68,39 @@ export global Store {
     callback fit-view();
     callback set-color(int, string);
 
+    // Рисование от руки: штрихи хранятся вектором и считаются как картинка
+    in-out property <bool> drawing;
+    in property <bool> has-sketch;
+    in property <bool> can-undo;
+    in property <bool> can-redo;
+    in property <int> strokes-n;
+    // 0 кисть, 1 ластик
+    in-out property <int> brush-tool;
+    // Диаметр кисти в мм холста, мягкость края и темнота краски 0..1
+    in-out property <float> brush-size: 8;
+    in-out property <float> brush-soft: 0.25;
+    in-out property <float> brush-tone: 1;
+    in property <float> brush-min: 0.5;
+    in property <float> brush-max: 250;
+    // Общий множитель толщины штрихов
+    in-out property <float> width-k: 1;
+    // Сколько точек экрана в миллиметре холста: для кружка кисти
+    in property <length> mm-px: 1px;
+    // Слой текущего штриха поверх предпросмотра
+    in property <image> ink;
+    in property <float> ink-alpha: 1;
+    callback draw-open();
+    callback draw-close();
+    callback stroke-begin(length, length);
+    callback stroke-move(length, length);
+    callback stroke-end();
+    callback stroke-cancel();
+    callback draw-undo();
+    callback draw-redo();
+    callback draw-clear();
+    callback width-changed();
+    callback sketch-svg();
+
     // Итог и экспорт
     in property <StatsUI> stats;
     in property <[Fmt]> formats;

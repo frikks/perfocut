@@ -1,12 +1,12 @@
 import { Theme, Bridge } from "theme.slint";
 import { Store, Prefs, Par } from "store.slint";
-import { Btn, Seg, Check, NumField, TextField, FieldRow, Slide, Section, Caption, Hint, Icon } from "widgets.slint";
+import { Btn, Seg, Check, NumField, TextField, FieldRow, Slide, Section, Caption, Hint, Icon, Bullet } from "widgets.slint";
 
 export component SettingsPanel inherits VerticalLayout {
     Section {
         title: @tr("Изображение");
         if Store.has-image: Rectangle {
-            height: Theme.touch ? 72px : 60px;
+            height: (Theme.touch ? 72px : 60px) + (Store.strokes-n > 0 ? 14px : 0px);
             border-radius: 10px;
             background: Theme.raised;
             border-width: 1px;
@@ -30,6 +30,7 @@ export component SettingsPanel inherits VerticalLayout {
                 VerticalLayout {
                     alignment: center;
                     spacing: 2px;
+                    horizontal-stretch: 1;
                     Text {
                         text: Store.img-name;
                         color: Theme.t1;
@@ -42,6 +43,14 @@ export component SettingsPanel inherits VerticalLayout {
                         color: Theme.t3;
                         font-family: Theme.mono;
                         font-size: Theme.fs-s;
+                        overflow: elide;
+                    }
+                    if Store.strokes-n > 0: Text {
+                        text: @tr("штрихов: {}", Store.strokes-n);
+                        color: Theme.t3;
+                        font-family: Theme.mono;
+                        font-size: Theme.fs-s;
+                        overflow: elide;
                     }
                 }
                 VerticalLayout {
@@ -73,6 +82,51 @@ export component SettingsPanel inherits VerticalLayout {
                 clicked => {
                     Store.sample();
                 }
+            }
+        }
+        // Рисунок от руки: на чистом холсте или поверх картинки
+        if !Store.has-image: Btn {
+            text: @tr("Нарисовать");
+            has-icon: true;
+            icon: @image-url("icons/brush.svg");
+            clicked => {
+                Store.draw-open();
+            }
+        }
+        if Store.has-image: HorizontalLayout {
+            spacing: 8px;
+            Btn {
+                text: Store.drawing ? @tr("Готово") : Store.has-sketch ? @tr("Дорисовать") : @tr("Рисовать поверх");
+                stretch: true;
+                has-icon: true;
+                icon: Store.drawing ? @image-url("icons/check.svg") : @image-url("icons/brush.svg");
+                clicked => {
+                    if Store.drawing {
+                        Store.draw-close();
+                    } else {
+                        Store.draw-open();
+                    }
+                }
+            }
+            if Store.has-sketch: Btn {
+                text: "SVG";
+                has-icon: true;
+                icon: @image-url("icons/download.svg");
+                clicked => {
+                    Store.sketch-svg();
+                }
+            }
+        }
+        if Store.has-sketch: Slide {
+            label: @tr("Толщина штрихов");
+            value: Store.width-k;
+            minv: 0.25;
+            maxv: 3;
+            step: 0.05;
+            shown: "× " + Bridge.fmt-n(Store.width-k, 2);
+            edited(v) => {
+                Store.width-k = v;
+                Store.width-changed();
             }
         }
         Seg {
@@ -989,43 +1043,14 @@ export component SummaryPanel inherits VerticalLayout {
         Head {
             text: @tr("Проверка под лазер");
         }
-        if Store.stats.warnings.length == 0: HorizontalLayout {
-            spacing: 8px;
-            VerticalLayout {
-                alignment: start;
-                padding-top: 6px;
-                Rectangle {
-                    width: 6px;
-                    height: 6px;
-                    border-radius: 3px;
-                    background: Theme.ok;
-                }
-            }
-            Text {
-                text: Store.stats.ok-line;
-                color: Theme.t2;
-                font-size: Theme.fs-s + 1px;
-                wrap: word-wrap;
-            }
+        if Store.stats.warnings.length == 0: Bullet {
+            text: Store.stats.ok-line;
+            dot: Theme.ok;
+            ink: Theme.t2;
         }
-        for w in Store.stats.warnings: HorizontalLayout {
-            spacing: 8px;
-            VerticalLayout {
-                alignment: start;
-                padding-top: 6px;
-                Rectangle {
-                    width: 6px;
-                    height: 6px;
-                    border-radius: 3px;
-                    background: Theme.warn;
-                }
-            }
-            Text {
-                text: w;
-                color: Theme.t1;
-                font-size: Theme.fs-s + 1px;
-                wrap: word-wrap;
-            }
+        for w in Store.stats.warnings: Bullet {
+            text: w;
+            dot: Theme.warn;
         }
     }
 }

@@ -1,0 +1,116 @@
+// Панели режима рисования: инструмент, отмена и повтор, размер, мягкость и тон кисти.
+import { Theme, Bridge } from "theme.slint";
+import { Store } from "store.slint";
+import { Btn, Seg, Slide } from "widgets.slint";
+
+// Верхняя строка над холстом вместо переключателя вида
+export component DrawTools inherits HorizontalLayout {
+    in property <bool> compact;
+    padding: 8px;
+    spacing: root.compact ? 4px : 8px;
+    VerticalLayout {
+        alignment: center;
+        width: root.compact ? 140px : 200px;
+        Seg {
+            items: [@tr("Кисть"), @tr("Ластик")];
+            current: Store.brush-tool;
+            select(i) => {
+                Store.brush-tool = i;
+            }
+        }
+    }
+    VerticalLayout {
+        alignment: center;
+        Btn {
+            kind: 2;
+            has-icon: true;
+            icon: @image-url("icons/undo.svg");
+            enabled: Store.can-undo;
+            clicked => {
+                Store.draw-undo();
+            }
+        }
+    }
+    VerticalLayout {
+        alignment: center;
+        Btn {
+            kind: 2;
+            has-icon: true;
+            icon: @image-url("icons/redo.svg");
+            enabled: Store.can-redo;
+            clicked => {
+                Store.draw-redo();
+            }
+        }
+    }
+    VerticalLayout {
+        alignment: center;
+        Btn {
+            kind: 2;
+            has-icon: true;
+            icon: @image-url("icons/trash.svg");
+            enabled: Store.strokes-n > 0;
+            clicked => {
+                Store.draw-clear();
+            }
+        }
+    }
+    Rectangle {
+        horizontal-stretch: 1;
+    }
+    VerticalLayout {
+        alignment: center;
+        Btn {
+            kind: 1;
+            text: root.compact ? "" : @tr("Готово");
+            has-icon: true;
+            icon: @image-url("icons/check.svg");
+            clicked => {
+                Store.draw-close();
+            }
+        }
+    }
+}
+
+// Строка с настройками кисти под верхней строкой
+export component BrushBar inherits HorizontalLayout {
+    property <float> lo: Store.brush-min;
+    property <float> hi: Math.max(Store.brush-max, Store.brush-min * 4);
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 2px;
+    padding-bottom: 6px;
+    spacing: 16px;
+    Slide {
+        label: @tr("Размер");
+        // Шкала логарифмическая: и тонкая линия, и широкая заливка в одно движение
+        value: Math.log(Math.max(Store.brush-size, root.lo) / root.lo, root.hi / root.lo);
+        minv: 0;
+        maxv: 1;
+        step: 0.005;
+        shown: Bridge.fmt-n(Store.brush-size, Store.brush-size < 10 ? 1 : 0) + " " + @tr("мм");
+        edited(v) => {
+            Store.brush-size = Math.round(root.lo * Math.pow(root.hi / root.lo, v) * 10) / 10;
+        }
+    }
+    Slide {
+        label: @tr("Мягкость");
+        value: Store.brush-soft;
+        minv: 0;
+        maxv: 1;
+        shown: Bridge.fmt-n(Store.brush-soft * 100, 0) + " %";
+        edited(v) => {
+            Store.brush-soft = v;
+        }
+    }
+    if Store.brush-tool == 0: Slide {
+        label: @tr("Тон");
+        value: Store.brush-tone;
+        minv: 0.05;
+        maxv: 1;
+        shown: Bridge.fmt-n(Store.brush-tone * 100, 0) + " %";
+        edited(v) => {
+            Store.brush-tone = v;
+        }
+    }
+}

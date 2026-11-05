@@ -55,6 +55,8 @@ export global Bridge {
     callback haptic(string);
     // Число для поля ввода: без лишних нулей, точка как разделитель
     pure callback fmt(float, int) -> string;
+    // Число для подписи: запятая по-русски, без лишних нулей
+    pure callback fmt-n(float, int) -> string;
     pure callback num-ok(string) -> bool;
     pure callback num(string) -> float;
 }
