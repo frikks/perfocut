@@ -4,8 +4,12 @@ resolver = "2"
 
 # Единая версия программы. Поменяйте её и отправьте в main: GitHub соберёт релиз vX.Y.Z.
 [workspace.package]
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
+
+# prerelease = true: GitHub выпустит версию как предварительную (Pre-release)
+[workspace.metadata.release]
+prerelease = true
 
 [profile.release]
 opt-level = 3
