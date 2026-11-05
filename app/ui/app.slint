@@ -8,6 +8,7 @@ import { Theme, Bridge, Kb } from "theme.slint";
 import { Store, Prefs, Par, KV, SizeRow, StatsUI, Fmt } from "store.slint";
 import { Btn, Seg, Check, Icon, Modal, Swatch, Hint, Caption, TextField } from "widgets.slint";
 import { SettingsPanel, SummaryPanel, ExportPanel } from "panels.slint";
+import { DrawTools, BrushBar } from "draw.slint";
 
 export { Theme, Bridge, Kb, Store, Prefs, Par, KV, SizeRow, StatsUI, Fmt }
 
@@ -144,7 +145,10 @@ component Stage inherits Rectangle {
                 height: 1px;
                 background: Theme.line;
             }
-            HorizontalLayout {
+            if Store.drawing: DrawTools {
+                compact: root.compact;
+            }
+            if !Store.drawing: HorizontalLayout {
                 padding: 8px;
                 spacing: 8px;
                 VerticalLayout {
@@ -207,6 +211,16 @@ component Stage inherits Rectangle {
                 }
             }
         }
+        if Store.drawing: Rectangle {
+            height: bb.preferred-height;
+            background: Theme.bg;
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: Theme.line;
+            }
+            bb := BrushBar { }
+        }
         canvas := Rectangle {
             vertical-stretch: 1;
             clip: true;
@@ -215,6 +229,14 @@ component Stage inherits Rectangle {
                 height: parent.height;
                 source: Store.preview;
                 image-fit: fill;
+            }
+            // Текущий штрих, пока палец или кнопка мыши не отпущены
+            if Store.drawing: Image {
+                width: parent.width;
+                height: parent.height;
+                source: Store.ink;
+                image-fit: fill;
+                opacity: Store.ink-alpha;
             }
             if Store.has-image && Store.dim-w != "": DimLabel {
                 text: Store.dim-w;
@@ -227,26 +249,57 @@ component Stage inherits Rectangle {
                 y: Store.sy + Store.sh / 2 - self.height / 2;
             }
             pinch := ScaleRotateGestureHandler {
+                property <length> pcx;
+                property <length> pcy;
                 enabled: Store.has-image;
                 started => {
+                    // Второй палец: это масштаб, а не штрих
+                    if ta.stroking {
+                        ta.stroking = false;
+                        Store.stroke-cancel();
+                    }
+                    self.pcx = self.center.x;
+                    self.pcy = self.center.y;
                     Store.pinch-start();
                 }
                 updated => {
+                    // Два пальца двигают лист и меняют масштаб
+                    Store.pan(self.center.x - self.pcx, self.center.y - self.pcy);
+                    self.pcx = self.center.x;
+                    self.pcy = self.center.y;
                     Store.pinch(self.scale, self.center.x, self.center.y);
                 }
                 ta := TouchArea {
                     property <length> lx;
                     property <length> ly;
+                    property <bool> stroking;
                     enabled: Store.has-image;
-                    mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
+                    mouse-cursor: Store.drawing ? MouseCursor.crosshair : self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
                     pointer-event(e) => {
                         if e.kind == PointerEventKind.down {
                             self.lx = self.mouse-x;
                             self.ly = self.mouse-y;
+                            // В режиме рисования левая кнопка рисует, правая и средняя двигают лист
+                            if Store.drawing && e.button == PointerEventButton.left && !pinch.active {
+                                self.stroking = true;
+                                Store.stroke-begin(self.mouse-x, self.mouse-y);
+                            }
+                        } else if e.kind == PointerEventKind.up {
+                            if self.stroking {
+                                self.stroking = false;
+                                Store.stroke-end();
+                            }
+                        } else if e.kind == PointerEventKind.cancel {
+                            if self.stroking {
+                                self.stroking = false;
+                                Store.stroke-cancel();
+                            }
                         }
                     }
                     moved => {
-                        if self.pressed && !pinch.active {
+                        if self.stroking {
+                            Store.stroke-move(self.mouse-x, self.mouse-y);
+                        } else if self.pressed && !pinch.active {
                             Store.pan(self.mouse-x - self.lx, self.mouse-y - self.ly);
                             self.lx = self.mouse-x;
                             self.ly = self.mouse-y;
@@ -257,8 +310,50 @@ component Stage inherits Rectangle {
                         accept
                     }
                     double-clicked => {
-                        Store.fit-view();
+                        if !Store.drawing {
+                            Store.fit-view();
+                        }
                     }
+                }
+            }
+            // Кружок размера кисти под указателем мыши
+            if Store.drawing && ta.has-hover && !Theme.touch: Rectangle {
+                property <length> d: Math.max(4px, Store.brush-size * Store.width-k * Store.mm-px);
+                x: ta.mouse-x - self.d / 2;
+                y: ta.mouse-y - self.d / 2;
+                width: self.d;
+                height: self.d;
+                border-radius: self.d / 2;
+                border-width: 1px;
+                border-color: #000000a0;
+                Rectangle {
+                    x: 1px;
+                    y: 1px;
+                    width: parent.width - 2px;
+                    height: parent.height - 2px;
+                    border-radius: self.width / 2;
+                    border-width: 1px;
+                    border-color: #ffffffb0;
+                }
+            }
+            if Store.drawing && Store.strokes-n == 0: Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: 12px;
+                width: Math.min(parent.width - 24px, hint-t.preferred-width + 24px);
+                height: hint-t.preferred-height + 12px;
+                border-radius: 8px;
+                background: Theme.bg.with-alpha(0.9);
+                border-width: 1px;
+                border-color: Theme.line;
+                hint-t := Text {
+                    x: 12px;
+                    width: parent.width - 24px;
+                    text: Theme.touch ? @tr("Рисуйте пальцем. Двумя пальцами — масштаб и сдвиг") : @tr("Рисуйте мышью. Колесо — масштаб, правая кнопка — сдвиг");
+                    color: Theme.t2;
+                    font-size: Theme.fs-s;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
                 }
             }
             if Store.has-image && Store.stats.hud != "" && !root.compact: Rectangle {
@@ -326,23 +421,53 @@ component Stage inherits Rectangle {
                         horizontal-alignment: center;
                         wrap: word-wrap;
                     }
-                    HorizontalLayout {
-                        alignment: center;
+                    // На узком экране три кнопки в ряд не помещаются: главная сверху, две под ней
+                    VerticalLayout {
                         spacing: 8px;
                         padding-top: 4px;
-                        Btn {
-                            text: @tr("Выбрать файл");
-                            kind: 1;
-                            has-icon: true;
-                            icon: @image-url("icons/upload.svg");
-                            clicked => {
-                                Store.open();
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 8px;
+                            Btn {
+                                text: @tr("Выбрать файл");
+                                kind: 1;
+                                has-icon: true;
+                                icon: @image-url("icons/upload.svg");
+                                clicked => {
+                                    Store.open();
+                                }
+                            }
+                            if !root.compact: Btn {
+                                text: @tr("Пример");
+                                clicked => {
+                                    Store.sample();
+                                }
+                            }
+                            if !root.compact: Btn {
+                                text: @tr("Нарисовать");
+                                has-icon: true;
+                                icon: @image-url("icons/brush.svg");
+                                clicked => {
+                                    Store.draw-open();
+                                }
                             }
                         }
-                        Btn {
-                            text: @tr("Пример");
-                            clicked => {
-                                Store.sample();
+                        if root.compact: HorizontalLayout {
+                            alignment: center;
+                            spacing: 8px;
+                            Btn {
+                                text: @tr("Пример");
+                                clicked => {
+                                    Store.sample();
+                                }
+                            }
+                            Btn {
+                                text: @tr("Нарисовать");
+                                has-icon: true;
+                                icon: @image-url("icons/brush.svg");
+                                clicked => {
+                                    Store.draw-open();
+                                }
                             }
                         }
                     }
@@ -428,7 +553,7 @@ export component AppWindow inherits Window {
     property <length> head-h: wide ? 56px : (Theme.touch ? 56px : 48px);
     property <length> left-w: Theme.touch ? 340px : 316px;
     property <length> right-w: Theme.touch ? 320px : 300px;
-    property <length> stage-h: wide ? area-h - head-h : Math.round((area-h - head-h) * (kb-open ? 0.26 : 0.44) / 1px) * 1px;
+    property <length> stage-h: wide ? area-h - head-h : Math.round((area-h - head-h) * (kb-open ? 0.26 : Store.drawing ? 0.74 : 0.44) / 1px) * 1px;
     property <[Preset]> sheet-a: [
         { c: #9a9ea3, hex: "#9a9ea3" }, { c: #c4c8cc, hex: "#c4c8cc" }, { c: #6e737a, hex: "#6e737a" },
         { c: #3a3c40, hex: "#3a3c40" }, { c: #e6e6e3, hex: "#e6e6e3" },
@@ -466,6 +591,10 @@ export component AppWindow inherits Window {
             root.settings-open = false;
             return true;
         }
+        if Store.drawing {
+            Store.draw-close();
+            return true;
+        }
         false
     }
 
@@ -481,6 +610,21 @@ export component AppWindow inherits Window {
                     Prefs.minimize();
                 }
                 return accept;
+            }
+            // Отмена и повтор штрихов: Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y (и в русской раскладке)
+            if Store.drawing && e.modifiers.control && !Kb.text-focused {
+                if e.text == "z" || e.text == "Z" || e.text == "я" || e.text == "Я" {
+                    if e.modifiers.shift {
+                        Store.draw-redo();
+                    } else {
+                        Store.draw-undo();
+                    }
+                    return accept;
+                }
+                if e.text == "y" || e.text == "Y" || e.text == "н" || e.text == "Н" {
+                    Store.draw-redo();
+                    return accept;
+                }
             }
             if e.text == Key.Back {
                 // На Android клавиатуру уже закрыла система, второе нажатие ведёт назад

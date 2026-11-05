@@ -5,6 +5,7 @@ use crate::render::{self, Look};
 use perfo_core::gen::GenResult;
 use perfo_core::image::Gray;
 use perfo_core::params::Params;
+use perfo_core::sketch::Sketch;
 use perfo_core::zip;
 use std::io::Cursor;
 use tiny_skia::{IntSize, Pixmap};
@@ -15,7 +16,6 @@ pub struct Decoded {
     pub gray: Gray,
     pub w0: u32,
     pub h0: u32,
-    pub thumb: (Vec<u8>, u32, u32),
 }
 
 const MAX_SIDE: f64 = 1600.0;
@@ -46,15 +46,12 @@ pub fn decode(bytes: &[u8]) -> Result<Decoded, String> {
     let w = ((f64::from(w0) * k).round() as u32).max(1);
     let h = ((f64::from(h0) * k).round() as u32).max(1);
     let small = if k < 1.0 { img.resize_exact(w, h, image::imageops::FilterType::Triangle) } else { img };
-    let mut thumb = small.thumbnail(160, 160).to_rgba8();
-    flatten_white(thumb.as_mut());
-    let (tw, th) = (thumb.width(), thumb.height());
     let mut rgba = small.into_rgba8();
     flatten_white(rgba.as_mut());
     let gray = Gray::from_rgba(rgba.as_raw(), w as usize, h as usize);
     let size = IntSize::from_wh(w, h).ok_or_else(|| t("пустая картинка"))?;
     let pix = Pixmap::from_vec(rgba.into_raw(), size).ok_or_else(|| t("пустая картинка"))?;
-    Ok(Decoded { pix, gray, w0, h0, thumb: (thumb.into_raw(), tw, th) })
+    Ok(Decoded { pix, gray, w0, h0 })
 }
 
 /// PNG из готовых пикселей (без прозрачности, поэтому умножение на альфу не мешает).
@@ -143,8 +140,16 @@ pub fn zip_formats(sel: &[&Format], r: &GenResult, look: &Look) -> Result<Vec<u8
     Ok(z.finish())
 }
 
-/// Файл заказа: настройки, исходная картинка и, если узор готов, просмотр, паспорт и DXF.
-pub fn order_bytes(r: &GenResult, src_name: &str, src: &[u8], look: &Look, saved_at: &str) -> Result<Vec<u8>, String> {
+/// Файл заказа: настройки, исходная картинка, рисунок от руки (вектор штрихов) и, если узор
+/// готов, просмотр, паспорт и DXF. `sketch` — рисунок и признак чистого холста.
+pub fn order_bytes(
+    r: &GenResult,
+    src_name: &str,
+    src: &[u8],
+    sketch: Option<(&Sketch, bool)>,
+    look: &Look,
+    saved_at: &str,
+) -> Result<Vec<u8>, String> {
     let ext: String = src_name.rsplit('.').next().unwrap_or("png").to_lowercase().chars().filter(|c| c.is_ascii_alphanumeric()).collect();
     let ext = if ext.is_empty() || ext.len() > 5 { "png".to_owned() } else { ext };
     let mut settings = serde_json::json!({
@@ -154,9 +159,15 @@ pub fn order_bytes(r: &GenResult, src_name: &str, src: &[u8], look: &Look, saved
     });
     settings["source_name"] = src_name.into();
     settings["saved"] = saved_at.into();
+    if let Some((sk, blank)) = sketch {
+        settings["drawing"] = serde_json::json!({ "base": if blank { "blank" } else { "source" }, "strokes": sk.strokes.len() });
+    }
     let mut z = zip::ZipWriter::default();
     z.add("settings.json", &serde_json::to_vec_pretty(&settings).map_err(|e| e.to_string())?);
     z.add(&format!("source.{ext}"), src);
+    if let Some((sk, _)) = sketch {
+        z.add("drawing.json", &serde_json::to_vec(sk).map_err(|e| e.to_string())?);
+    }
     if r.stats.count > 0 {
         let pm = render::metal_pixmap(&r.params, &r.shapes, look, 2400.0).ok_or_else(|| t("пустая картинка"))?;
         z.add("preview.png", &encode_png(&pm)?);
@@ -169,10 +180,13 @@ pub fn order_bytes(r: &GenResult, src_name: &str, src: &[u8], look: &Look, saved
     Ok(z.finish())
 }
 
-/// Содержимое файла заказа: настройки и, если есть, исходная картинка.
+/// Содержимое файла заказа: настройки, исходная картинка и рисунок от руки, если они есть.
 pub struct Order {
     pub params: Params,
     pub source: Option<(String, Vec<u8>)>,
+    pub sketch: Option<Sketch>,
+    /// Рисунок на чистом холсте: `source` тогда только его плоская копия
+    pub blank: bool,
 }
 
 pub fn read_order(bytes: &[u8]) -> Result<Order, String> {
@@ -196,7 +210,9 @@ pub fn read_order(bytes: &[u8]) -> Result<Order, String> {
             .unwrap_or_else(|| "source".to_owned());
         Some((format!("{stem}{ext}"), data))
     });
-    Ok(Order { params, source })
+    let sketch = get("drawing.json").and_then(|b| serde_json::from_slice::<Sketch>(b).ok());
+    let blank = obj.get("drawing").and_then(|d| d.get("base")).and_then(|v| v.as_str()) == Some("blank");
+    Ok(Order { params, source, sketch, blank })
 }
 
 #[cfg(test)]
@@ -222,7 +238,7 @@ mod tests {
         };
         let r = perfo_core::gen::generate(Some(&dec.gray), &p);
         assert!(r.stats.count > 100);
-        let bytes = order_bytes(&r, "фото.png", &png, &look(), "2026-01-01T00:00:00Z").expect("order");
+        let bytes = order_bytes(&r, "фото.png", &png, None, &look(), "2026-01-01T00:00:00Z").expect("order");
         let o = read_order(&bytes).expect("read");
         assert_eq!(o.params.pitch, 15.0);
         assert_eq!(o.params.name, "Фасад 1");
@@ -230,6 +246,26 @@ mod tests {
         assert_eq!(name, "фото.png");
         assert_eq!(data, png);
         assert_eq!(base_name(&p), "Фасад_1_A_7");
+        assert!(o.sketch.is_none() && !o.blank);
+    }
+
+    #[test]
+    fn order_keeps_drawing_vector() {
+        use perfo_core::sketch::Stroke;
+        let mut sk = Sketch::new(1000.0, 600.0);
+        sk.strokes.push(Stroke { erase: false, size: 40.0, soft: 0.2, tone: 1.0, pts: vec![[100.0, 300.0], [900.0, 300.0]] });
+        let (w, h) = sk.raster_size(400);
+        let px = sk.render(&vec![255u8; w * h * 4], w, h);
+        let gray = Gray::from_rgba(&px, w, h);
+        let r = perfo_core::gen::generate(Some(&gray), &Params::default());
+        assert!(r.stats.count > 20);
+        let pm = Pixmap::from_vec(px, IntSize::from_wh(w as u32, h as u32).unwrap()).unwrap();
+        let flat = encode_png(&pm).unwrap();
+        let bytes = order_bytes(&r, "Рисунок.png", &flat, Some((&sk, true)), &look(), "2026-01-01T00:00:00Z").expect("order");
+        let o = read_order(&bytes).expect("read");
+        assert!(o.blank);
+        assert_eq!(o.sketch.as_ref(), Some(&sk));
+        assert_eq!(o.source.map(|s| s.1), Some(flat));
     }
 
     #[test]
