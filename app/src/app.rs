@@ -1,5 +1,7 @@
 //! Связка интерфейса и ядра: состояние программы, обработчики кнопок, расчёт и предпросмотр.
 
+mod draw;
+
 use crate::convert;
 use crate::files::{self, Format, FORMATS};
 use crate::i18n::{self, fmt_n, fmt_time, t, tf};
@@ -10,6 +12,7 @@ use crate::{AppWindow, Bridge, Fmt, Prefs, SizeRow, StatsUI, Store, Theme, KV};
 use perfo_core::gen::{self, GenResult};
 use perfo_core::image::Gray;
 use perfo_core::params::Params;
+use perfo_core::sketch::Sketch;
 use slint::{ComponentHandle, Image, Model, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, Timer, TimerMode, VecModel, Weak};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -22,11 +25,15 @@ const BACK_DEFAULT: Rgb = Rgb(0xf2, 0xc4, 0x8d);
 /// Загруженная картинка: исходные байты нужны для файла заказа.
 struct Pic {
     name: String,
+    /// Исходный файл; у чистого холста пусто
     bytes: Vec<u8>,
     w0: u32,
     h0: u32,
+    /// Что видно и по чему считается узор: картинка вместе со штрихами
     pix: tiny_skia::Pixmap,
     gray: Arc<Gray>,
+    /// Рисунок от руки поверх картинки или на чистом холсте
+    sk: Option<draw::Sk>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -50,6 +57,9 @@ struct State {
     gen_timer: Timer,
     draw_timer: Timer,
     toast_timer: Timer,
+    ink_timer: Timer,
+    width_timer: Timer,
+    live: Option<draw::Live>,
     last_haptic: f64,
     formats: Rc<VecModel<Fmt>>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -136,6 +146,9 @@ pub fn run() -> Result<(), slint::PlatformError> {
     store.set_sheet_hex(sheet.hex().into());
     store.set_back_hex(back.hex().into());
     store.set_view_mode(saved.view_mode);
+    store.set_brush_size(saved.brush_size as f32);
+    store.set_brush_soft(saved.brush_soft as f32);
+    store.set_brush_tone(saved.brush_tone as f32);
     let formats = Rc::new(VecModel::from(format_rows(&saved)));
     store.set_formats(ModelRc::from(formats.clone()));
 
@@ -153,6 +166,9 @@ pub fn run() -> Result<(), slint::PlatformError> {
         gen_timer: Timer::default(),
         draw_timer: Timer::default(),
         toast_timer: Timer::default(),
+        ink_timer: Timer::default(),
+        width_timer: Timer::default(),
+        live: None,
         last_haptic: 0.0,
         formats,
         #[cfg(not(target_arch = "wasm32"))]
@@ -193,6 +209,7 @@ fn start_worker() -> std::sync::mpsc::Sender<Job> {
 fn bind(ui: &AppWindow) {
     let b = ui.global::<Bridge>();
     b.on_fmt(|v, d| i18n::fmt_field(f64::from(v), d.clamp(0, 6) as usize).into());
+    b.on_fmt_n(|v, d| i18n::fmt_short(f64::from(v), d.clamp(0, 6) as usize).into());
     b.on_num_ok(|s| i18n::parse_num(&s).is_some());
     b.on_num(|s| i18n::parse_num(&s).unwrap_or(0.0) as f32);
     b.on_haptic(|kind| {
@@ -299,6 +316,7 @@ fn bind(ui: &AppWindow) {
         }
     });
     s.on_save_order(save_order);
+    draw::bind(ui);
 
     let pr = ui.global::<Prefs>();
     pr.on_changed(|| {
@@ -386,6 +404,8 @@ fn show_meta(st: &State, ui: &AppWindow) {
     let long = long_side(p);
     let n = if p.pitch > 0.0 && long > 0.0 { (long / p.pitch).round() } else { 0.0 };
     store.set_holes_n(n.min(1e6) as i32);
+    // Самая широкая кисть — треть длинной стороны листа
+    store.set_brush_max((p.sheet_w.max(p.sheet_h) / 3.0).clamp(20.0, 5000.0) as f32);
 }
 
 fn set_holes(st: &mut State, ui: &AppWindow, v: f64) {
@@ -499,6 +519,11 @@ pub fn open_bytes(name: String, bytes: Vec<u8>) {
 }
 
 fn set_picture(name: String, bytes: Vec<u8>) -> bool {
+    set_picture_with(name, bytes, None)
+}
+
+/// Картинка из файла; `sketch` — рисунок поверх неё из файла заказа.
+fn set_picture_with(name: String, bytes: Vec<u8>, sketch: Option<Sketch>) -> bool {
     let d = match files::decode(&bytes) {
         Ok(d) => d,
         Err(e) => {
@@ -507,24 +532,32 @@ fn set_picture(name: String, bytes: Vec<u8>) -> bool {
         }
     };
     with(move |st, ui| {
-        let store = ui.global::<Store>();
-        let (tb, tw, th) = &d.thumb;
-        store.set_thumb(Image::from_rgba8(SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(tb, *tw, *th)));
-        store.set_img_name(name.as_str().into());
-        store.set_img_size(format!("{} × {} px", d.w0, d.h0).into());
-        store.set_has_image(true);
-        if st.saved.lock_ratio {
-            st.saved.ratio = st.p.sheet_w / st.p.sheet_h;
+        let mut pic = Pic { name, bytes, w0: d.w0, h0: d.h0, pix: d.pix, gray: Arc::new(d.gray), sk: None };
+        if let Some(sk) = sketch {
+            draw::attach(&mut pic, sk);
         }
-        st.pic = Some(Pic { name, bytes, w0: d.w0, h0: d.h0, pix: d.pix, gray: Arc::new(d.gray) });
-        st.view = View::default();
-        st.res = None;
-        st.p_ver += 1;
-        show_stats(st, ui);
-        st.gen_timer.stop();
-        run_gen(st, ui);
+        install(st, ui, pic);
     })
     .is_some()
+}
+
+/// Новая картинка или холст вместо прежних: сброс вида и пересчёт узора.
+fn install(st: &mut State, ui: &AppWindow, pic: Pic) {
+    let store = ui.global::<Store>();
+    store.set_drawing(false);
+    store.set_ink(Image::default());
+    st.live = None;
+    if st.saved.lock_ratio {
+        st.saved.ratio = st.p.sheet_w / st.p.sheet_h;
+    }
+    st.pic = Some(pic);
+    st.view = View::default();
+    st.res = None;
+    st.p_ver += 1;
+    draw::show_pic(st, ui);
+    show_stats(st, ui);
+    st.gen_timer.stop();
+    run_gen(st, ui);
 }
 
 fn open_order(name: &str, bytes: &[u8]) {
@@ -543,8 +576,13 @@ fn open_order(name: &str, bytes: &[u8]) {
         }
         set_params(st, ui, p, true);
     });
-    if let Some((src_name, data)) = order.source {
-        if !set_picture(src_name, data) {
+    let (source, sketch) = (order.source, order.sketch);
+    if order.blank && sketch.is_some() {
+        // Рисунок на чистом холсте: картинка в заказе — только его копия для старых версий
+        let Some(pic) = sketch.and_then(draw::blank_pic) else { return };
+        with(|st, ui| install(st, ui, pic));
+    } else if let Some((src_name, data)) = source {
+        if !set_picture_with(src_name, data, sketch) {
             return;
         }
     }
@@ -730,7 +768,10 @@ fn draw_now(st: &mut State, ui: &AppWindow) {
     let lk = look(st, ui);
     let ts = tiny_skia::Transform::from_scale(sf as f32, sf as f32);
     let shapes = st.res.as_ref().map(|r| r.shapes.as_slice()).unwrap_or(&[]);
-    render::paint_sheet(&mut pm, ts, &tf, (cw, ch), p, shapes, store.get_view_mode(), &lk, Some(&pic.pix));
+    // Во время рисования виден сам рисунок и контуры отверстий поверх него
+    let drawing = store.get_drawing();
+    let mode = if drawing { 2 } else { store.get_view_mode() };
+    render::paint_sheet(&mut pm, ts, &tf, (cw, ch), p, shapes, mode, &lk, Some(&pic.pix));
     render::paint_dims(&mut pm, ts, &tf, p, lk.dim);
     let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(pm.data(), pw.max(1), ph.max(1));
     store.set_preview(Image::from_rgba8_premultiplied(buf));
@@ -742,6 +783,11 @@ fn draw_now(st: &mut State, ui: &AppWindow) {
     let num = |v: f64| fmt_n(v, if (v - v.round()).abs() > 1e-9 { 1 } else { 0 });
     store.set_dim_w(format!("{} {}", num(p.sheet_w), t("мм")).into());
     store.set_dim_h(format!("{}\n{}", num(p.sheet_h), t("мм")).into());
+    if drawing {
+        if let Some(m) = draw::map(st, ui) {
+            store.set_mm_px(m.px_per_mm() as f32);
+        }
+    }
 }
 
 // ---------- Экспорт ----------
@@ -818,7 +864,16 @@ fn save_order() {
         }
         let r = fresh(st, ui)?;
         let pic = st.pic.as_ref()?;
-        match files::order_bytes(&r, &pic.name, &pic.bytes, &look(st, ui), &platform::now_iso()) {
+        let sketch = pic.sk.as_ref().map(|s| (&s.sketch, s.blank));
+        // У чистого холста исходного файла нет: кладём готовую картинку, её откроют и старые версии
+        let flat;
+        let (src_name, src) = if pic.sk.as_ref().is_some_and(|s| s.blank) {
+            flat = files::encode_png(&pic.pix).unwrap_or_default();
+            (format!("{}.png", t("Рисунок")), flat.as_slice())
+        } else {
+            (pic.name.clone(), pic.bytes.as_slice())
+        };
+        match files::order_bytes(&r, &src_name, src, sketch, &look(st, ui), &platform::now_iso()) {
             Ok(b) => Some((format!("{}.perfo", files::base_name(&r.params)), b)),
             Err(e) => {
                 toast(st, ui, &format!("{}{e}", t("Не удалось сохранить заказ: ")), 5000);
