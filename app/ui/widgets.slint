@@ -589,3 +589,31 @@ export component Swatch inherits Rectangle {
         }
     }
 }
+
+// Строка с цветной точкой: замечание или итог проверки.
+// Без HorizontalLayout: в нём Slint считает высоту переносимого текста по ширине всего ряда,
+// и длинная строка из двух-трёх строк наезжала на следующий блок.
+export component Bullet inherits Rectangle {
+    in property <string> text;
+    in property <color> dot: Theme.t3;
+    in property <color> ink: Theme.t1;
+    height: bt.preferred-height;
+    Rectangle {
+        x: 0;
+        y: 6px;
+        width: 6px;
+        height: 6px;
+        border-radius: 3px;
+        background: root.dot;
+    }
+    bt := Text {
+        x: 14px;
+        y: 0;
+        width: parent.width - 14px;
+        height: parent.height;
+        text: root.text;
+        color: root.ink;
+        font-size: Theme.fs-s + 1px;
+        wrap: word-wrap;
+    }
+}

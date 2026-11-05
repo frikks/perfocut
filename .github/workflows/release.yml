@@ -24,6 +24,8 @@ jobs:
           V=$(sed -n 's/^version *= *"\([^"]*\)".*/\1/p' Cargo.toml | head -1)
           echo "version=$V" >> "$GITHUB_OUTPUT"
           if gh release view "v$V" >/dev/null 2>&1; then echo "new=false" >> "$GITHUB_OUTPUT"; else echo "new=true" >> "$GITHUB_OUTPUT"; fi
+          # prerelease = true в [workspace.metadata.release] выпускает предварительную версию
+          if grep -Eq '^prerelease *= *true' Cargo.toml; then echo "pre=true" >> "$GITHUB_OUTPUT"; else echo "pre=false" >> "$GITHUB_OUTPUT"; fi
           echo "Версия $V"
 
       - uses: dtolnay/rust-toolchain@stable
@@ -75,6 +77,21 @@ jobs:
           name: PerfoCut-${{ steps.v.outputs.version }}
           path: dist/*
 
+      # Скриншоты снимаются с готовой HTML-версии в Chrome без окна и попадают в docs/screenshots
+      - name: Скриншоты
+        if: steps.v.outputs.new == 'true' || github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        run: |
+          npm install --silent --no-save --no-package-lock --prefix /tmp/pw playwright-core@1
+          SHOTS_SLOW=1.5 NODE_PATH=/tmp/pw/node_modules CHROME=$(command -v google-chrome || command -v chromium) node web/shots.js dist/PerfoCut.html docs/screenshots
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots
+          if ! git diff --cached --quiet; then
+            git commit -q -m "Скриншоты ${{ steps.v.outputs.version }} [skip ci]"
+            git pull -q --rebase origin main && git push -q origin HEAD:main
+          fi
+
       - name: Релиз на GitHub
         if: steps.v.outputs.new == 'true'
         uses: softprops/action-gh-release@v2
@@ -82,13 +99,9 @@ jobs:
           tag_name: v${{ steps.v.outputs.version }}
           name: PerfoCut ${{ steps.v.outputs.version }}
           target_commitish: ${{ github.sha }}
+          prerelease: ${{ steps.v.outputs.pre == 'true' }}
           generate_release_notes: true
-          body: |
-            Вся программа на Rust, интерфейс на Slint. Без WebView и окна Edge.
-
-            - **PerfoCut.exe**: Windows 10/11 x64, без установки.
-            - **PerfoCut.apk**: Android 7+ (arm64). Разрешите установку из неизвестных источников.
-            - **PerfoCut.html**: та же программа в браузере (WebAssembly). Свежий Chrome, Edge, Firefox или Safari, работает без интернета.
+          body_path: docs/release-notes.md
           files: |
             dist/PerfoCut.exe
             dist/PerfoCut.apk

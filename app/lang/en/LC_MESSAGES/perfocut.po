@@ -587,3 +587,48 @@ msgstr "All files"
 
 msgid "Не удалось открыть ссылку:"
 msgstr "Could not open the link:"
+
+msgid "Нарисовать"
+msgstr "Draw"
+
+msgid "Рисовать поверх"
+msgstr "Draw over"
+
+msgid "Дорисовать"
+msgstr "Keep drawing"
+
+msgid "Готово"
+msgstr "Done"
+
+msgid "Кисть"
+msgstr "Brush"
+
+msgid "Ластик"
+msgstr "Eraser"
+
+msgid "Размер"
+msgstr "Size"
+
+msgid "Мягкость"
+msgstr "Softness"
+
+msgid "Толщина штрихов"
+msgstr "Stroke width"
+
+msgid "Рисуйте мышью. Колесо — масштаб, правая кнопка — сдвиг"
+msgstr "Draw with the mouse. Wheel zooms, right button pans"
+
+msgid "Рисуйте пальцем. Двумя пальцами — масштаб и сдвиг"
+msgstr "Draw with a finger. Two fingers zoom and pan"
+
+msgid "Рисунок"
+msgstr "Drawing"
+
+msgid "рисунок"
+msgstr "drawing"
+
+msgid "штрихов: {}"
+msgstr "strokes: {}"
+
+msgid "Сначала нарисуйте что-нибудь"
+msgstr "Draw something first"
