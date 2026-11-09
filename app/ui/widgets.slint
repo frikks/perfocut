@@ -381,8 +381,33 @@ export component Slide inherits Rectangle {
                 vertical-alignment: center;
             }
         }
-        track := Rectangle {
-            height: Theme.touch ? 36px : 24px;
+        HorizontalLayout {
+            spacing: 6px;
+            // Кнопка уменьшения на шаг (-)
+            Rectangle {
+                width: Theme.touch ? 36px : 24px;
+                height: Theme.touch ? 36px : 24px;
+                background: ta-minus.pressed ? Theme.t3 : Theme.bar;
+                border-radius: 4px;
+                Text {
+                    text: "-";
+                    color: Theme.t1;
+                    font-size: Theme.fs;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+                ta-minus := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        Bridge.haptic("tick");
+                        let v = Math.max(minv, value - step);
+                        root.edited(v);
+                    }
+                }
+            }
+            track := Rectangle {
+                horizontal-stretch: 1;
+                height: Theme.touch ? 36px : 24px;
             Rectangle {
                 x: root.knob / 2;
                 width: parent.width - root.knob;
@@ -419,6 +444,29 @@ export component Slide inherits Rectangle {
                 }
                 moved => {
                     root.set-from(self.mouse-x);
+                }
+            }
+          }
+            // Кнопка увеличения на шаг (+)
+            Rectangle {
+                width: Theme.touch ? 36px : 24px;
+                height: Theme.touch ? 36px : 24px;
+                background: ta-plus.pressed ? Theme.t3 : Theme.bar;
+                border-radius: 4px;
+                Text {
+                    text: "+";
+                    color: Theme.t1;
+                    font-size: Theme.fs;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+                ta-plus := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        Bridge.haptic("tick");
+                        let v = Math.min(maxv, value + step);
+                        root.edited(v);
+                    }
                 }
             }
         }

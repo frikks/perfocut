@@ -22,6 +22,8 @@ pub fn export_format(r: &GenResult, fmt: &str) -> Option<Vec<u8>> {
         "pdf" => export::pdf(r),
         "csv" => export::csv(r).into_bytes(),
         "report" => export::report(r).into_bytes(),
+        "stl" => export::stl(r).into_bytes(),
+        "step" => export::step(r).into_bytes(),
         "stats" => serde_json::to_vec_pretty(&r.stats).ok()?,
         "settings" => {
             let v = serde_json::json!({ "app": "PerfoCut", "algo_version": params::ALGO_VERSION, "params": r.params });
@@ -142,7 +144,7 @@ mod tests {
         };
         let r = gen::generate(Some(&g), &p);
         assert!(r.stats.count > 10);
-        for f in ["dxf", "svg", "nc", "plt", "eps", "pdf", "csv", "report", "stats", "settings"] {
+        for f in ["dxf", "svg", "nc", "plt", "eps", "pdf", "csv", "report", "stats", "settings", "stl", "step"] {
             let b = export_format(&r, f).unwrap();
             assert!(b.len() > 50, "{f}");
         }

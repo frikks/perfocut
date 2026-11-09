@@ -78,10 +78,12 @@ pub struct Format {
     pub on: bool,
 }
 
-pub const FORMATS: [Format; 10] = [
+pub const FORMATS: [Format; 12] = [
     Format { id: "dxf", ext: "dxf", title: "DXF", note: "CypCut, AutoCAD · R12, окружности", on: true },
     Format { id: "nc", ext: "nc", title: "G-code .nc", note: "NCStudio, Unicut", on: true },
-    Format { id: "cnc", ext: "cnc", title: "G-code .cnc", note: "Тот же код с расширением .cnc", on: false },
+    Format { id: "cnc", ext: "cnc", title: "CNC .cnc", note: "Тот же код с расширением .cnc", on: false },
+    Format { id: "stl", ext: "stl", title: "3D STL", note: "3D модель листов под 3D печать/3D CAD", on: true },
+    Format { id: "step", ext: "step", title: "3D STEP", note: "CAD формат ISO 10303", on: true },
     Format { id: "svg", ext: "svg", title: "SVG", note: "Inkscape, LightBurn, веб", on: true },
     Format { id: "pdf", ext: "pdf", title: "PDF", note: "Вектор для согласования и печати", on: true },
     Format { id: "eps", ext: "eps", title: "EPS", note: "CorelDRAW, Illustrator", on: false },
@@ -98,6 +100,8 @@ pub fn mime_for(ext: &str) -> &'static str {
         "pdf" => "application/pdf",
         "png" => "image/png",
         "csv" => "text/csv",
+        "stl" => "model/stl",
+        "step" | "stp" => "model/step",
         "txt" | "nc" | "cnc" | "plt" => "text/plain",
         "zip" => "application/zip",
         "eps" => "application/postscript",

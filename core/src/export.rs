@@ -502,3 +502,193 @@ pub fn report(r: &GenResult) -> String {
     }
     o
 }
+
+// ---------------- 3D геометрия листа (общая для STL и STEP) ----------------
+type V3 = (f64, f64, f64);
+type Tri = (V3, V3, V3);
+
+fn poly_pts(s: &Shape) -> Vec<(f64, f64)> {
+    match s {
+        Shape::Circle { x, y, d } => circle_pts(*x, *y, *d, 0.05),
+        Shape::Poly { pts, .. } => pts.clone(),
+    }
+}
+
+/// Замкнутое тело листа: верх, низ, боковые грани и стенки отверстий.
+fn sheet_tris(r: &GenResult) -> Vec<Tri> {
+    let p = &r.params;
+    let (w, h, th) = (p.sheet_w, p.sheet_h, p.thickness.max(0.1));
+    let mut t: Vec<Tri> = Vec::with_capacity(r.shapes.len() * 12 + 16);
+
+    let quad = |t: &mut Vec<Tri>, a: V3, b: V3, c: V3, d: V3| {
+        t.push((a, b, c));
+        t.push((a, c, d));
+    };
+
+    // верх и низ
+    quad(&mut t, (0.0, 0.0, th), (w, 0.0, th), (w, h, th), (0.0, h, th));
+    quad(&mut t, (0.0, 0.0, 0.0), (0.0, h, 0.0), (w, h, 0.0), (w, 0.0, 0.0));
+    // боковины листа
+    quad(&mut t, (0.0, 0.0, 0.0), (w, 0.0, 0.0), (w, 0.0, th), (0.0, 0.0, th));
+    quad(&mut t, (w, 0.0, 0.0), (w, h, 0.0), (w, h, th), (w, 0.0, th));
+    quad(&mut t, (w, h, 0.0), (0.0, h, 0.0), (0.0, h, th), (w, h, th));
+    quad(&mut t, (0.0, h, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, th), (0.0, h, th));
+
+    // стенки отверстий
+    for s in &r.shapes {
+        let pts = poly_pts(s);
+        if pts.len() < 3 {
+            continue;
+        }
+        for i in 0..pts.len() {
+            let a = pts[i];
+            let b = pts[(i + 1) % pts.len()];
+            quad(
+                &mut t,
+                (a.0, a.1, 0.0),
+                (b.0, b.1, 0.0),
+                (b.0, b.1, th),
+                (a.0, a.1, th),
+            );
+        }
+    }
+    t
+}
+
+// ---------------- 3D STL (ASCII) ----------------
+pub fn stl(r: &GenResult) -> String {
+    let tris = sheet_tris(r);
+    let mut o = String::with_capacity(tris.len() * 220 + 128);
+    o.push_str("solid PerfoCutSheet\r\n");
+    for (a, b, c) in tris {
+        // нормаль через векторное произведение
+        let u = (b.0 - a.0, b.1 - a.1, b.2 - a.2);
+        let v = (c.0 - a.0, c.1 - a.1, c.2 - a.2);
+        let n = (u.1 * v.2 - u.2 * v.1, u.2 * v.0 - u.0 * v.2, u.0 * v.1 - u.1 * v.0);
+        let l = (n.0 * n.0 + n.1 * n.1 + n.2 * n.2).sqrt();
+        let n = if l > 1e-12 { (n.0 / l, n.1 / l, n.2 / l) } else { (0.0, 0.0, 0.0) };
+        let _ = write!(
+            o,
+            "facet normal {:.4} {:.4} {:.4}\r\n  outer loop\r\n    vertex {:.4} {:.4} {:.4}\r\n    vertex {:.4} {:.4} {:.4}\r\n    vertex {:.4} {:.4} {:.4}\r\n  endloop\r\nendfacet\r\n",
+            n.0, n.1, n.2, a.0, a.1, a.2, b.0, b.1, b.2, c.0, c.1, c.2
+        );
+    }
+    o.push_str("endsolid PerfoCutSheet\r\n");
+    o
+}
+
+// ---------------- CAD STEP (ISO 10303-21, AP214, FACETED_BREP) ----------------
+pub fn step(r: &GenResult) -> String {
+    let mut o = String::with_capacity(r.shapes.len() * 400 + 8000);
+    o.push_str("ISO-10303-21;\r\nHEADER;\r\n");
+    o.push_str("FILE_DESCRIPTION(('PerfoCut perforated sheet'),'2;1');\r\n");
+    o.push_str("FILE_NAME('sheet.step','2026-11-09T00:00:00',('PerfoCut'),('PerfoCut'),'PerfoCut','PerfoCut','');\r\n");
+    o.push_str("FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));\r\n");
+    o.push_str("ENDSEC;\r\nDATA;\r\n");
+
+    let mut id = 0u32;
+    let mut next = || {
+        id += 1;
+        id
+    };
+
+    // Контекст приложения и изделие
+    let ctx = next();
+    o.push_str(&format!("#{ctx}=APPLICATION_CONTEXT('automotive design');\r\n"));
+    let proto = next();
+    o.push_str(&format!(
+        "#{proto}=APPLICATION_PROTOCOL_DEFINITION('international standard','automotive_design',2000,#{ctx});\r\n"
+    ));
+    let pctx = next();
+    o.push_str(&format!("#{pctx}=PRODUCT_CONTEXT('',#{ctx},'mechanical');\r\n"));
+    let prod = next();
+    o.push_str(&format!("#{prod}=PRODUCT('PerfoCut','PerfoCut','',(#{pctx}));\r\n"));
+    let pdf = next();
+    o.push_str(&format!("#{pdf}=PRODUCT_DEFINITION_FORMATION('','',#{prod});\r\n"));
+    let pdctx = next();
+    o.push_str(&format!(
+        "#{pdctx}=PRODUCT_DEFINITION_CONTEXT('part definition',#{ctx},'design');\r\n"
+    ));
+    let pd = next();
+    o.push_str(&format!("#{pd}=PRODUCT_DEFINITION('design','',#{pdf},#{pdctx});\r\n"));
+    let pds = next();
+    o.push_str(&format!("#{pds}=PRODUCT_DEFINITION_SHAPE('','',#{pd});\r\n"));
+
+    // Единицы: миллиметры, радианы, стерадианы
+    let mm = next();
+    o.push_str(&format!("#{mm}=(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.));\r\n"));
+    let rad = next();
+    o.push_str(&format!("#{rad}=(NAMED_UNIT(*)PLANE_ANGLE_UNIT()SI_UNIT($,.RADIAN.));\r\n"));
+    let sr = next();
+    o.push_str(&format!(
+        "#{sr}=(NAMED_UNIT(*)SI_UNIT($,.STERADIAN.)SOLID_ANGLE_UNIT());\r\n"
+    ));
+    let unc = next();
+    o.push_str(&format!(
+        "#{unc}=UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-06),#{mm},'distance_accuracy_value','confusion accuracy');\r\n"
+    ));
+    let gctx = next();
+    o.push_str(&format!(
+        "#{gctx}=(GEOMETRIC_REPRESENTATION_CONTEXT(3)GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#{unc}))GLOBAL_UNIT_ASSIGNED_CONTEXT((#{mm},#{rad},#{sr}))REPRESENTATION_CONTEXT('',''));\r\n"
+    ));
+
+    // Треугольные грани из общей геометрии листа
+    let tris = sheet_tris(r);
+    let mut faces: Vec<u32> = Vec::with_capacity(tris.len());
+    for (a, b, c) in tris {
+        let mut pt = |o: &mut String, v: V3| {
+            let i = next();
+            o.push_str(&format!(
+                "#{i}=CARTESIAN_POINT('',({:.4},{:.4},{:.4}));\r\n",
+                v.0, v.1, v.2
+            ));
+            i
+        };
+        let qa = pt(&mut o, a);
+        let qb = pt(&mut o, b);
+        let qc = pt(&mut o, c);
+        let lp = next();
+        o.push_str(&format!("#{lp}=POLY_LOOP('',(#{qa},#{qb},#{qc}));\r\n"));
+        let bd = next();
+        o.push_str(&format!("#{bd}=FACE_OUTER_BOUND('',#{lp},.T.);\r\n"));
+        let fc = next();
+        o.push_str(&format!("#{fc}=FACE('',(#{bd}));\r\n"));
+        faces.push(fc);
+    }
+
+    // Замкнутая оболочка и тело
+    let mut list = String::with_capacity(faces.len() * 8);
+    for (i, f) in faces.iter().enumerate() {
+        if i > 0 {
+            list.push(',');
+        }
+        let _ = write!(list, "#{f}");
+    }
+    let shell = next();
+    o.push_str(&format!("#{shell}=CLOSED_SHELL('',({list}));\r\n"));
+    let brep = next();
+    o.push_str(&format!(
+        "#{brep}=FACETED_BREP('PerfoCutSheet',#{shell});\r\n"
+    ));
+
+    // Система координат и представление формы
+    let org = next();
+    o.push_str(&format!("#{org}=CARTESIAN_POINT('',(0.,0.,0.));\r\n"));
+    let dz = next();
+    o.push_str(&format!("#{dz}=DIRECTION('',(0.,0.,1.));\r\n"));
+    let dx = next();
+    o.push_str(&format!("#{dx}=DIRECTION('',(1.,0.,0.));\r\n"));
+    let axp = next();
+    o.push_str(&format!("#{axp}=AXIS2_PLACEMENT_3D('',#{org},#{dz},#{dx});\r\n"));
+    let shp = next();
+    o.push_str(&format!(
+        "#{shp}=SHAPE_REPRESENTATION('',(#{axp},#{brep}),#{gctx});\r\n"
+    ));
+    let sdr = next();
+    o.push_str(&format!(
+        "#{sdr}=SHAPE_DEFINITION_REPRESENTATION(#{pds},#{shp});\r\n"
+    ));
+
+    o.push_str("ENDSEC;\r\nEND-ISO-10303-21;\r\n");
+    o
+}
