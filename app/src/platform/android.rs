@@ -111,6 +111,11 @@ pub fn minimize(_ui: &AppWindow) {
     call_void("goBack", "()V", &[]);
 }
 
+/// Полный экран рисования: горизонтальная ориентация и скрытые системные панели.
+pub fn set_full_canvas(_ui: &AppWindow, on: bool) {
+    call_void("fullCanvas", "(Z)V", &[JValue::Bool(u8::from(on))]);
+}
+
 fn settings_path() -> Option<PathBuf> {
     DATA_DIR.get().cloned().flatten().map(|d| d.join("settings.json"))
 }

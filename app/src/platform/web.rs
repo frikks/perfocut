@@ -132,6 +132,9 @@ pub fn open_url(url: &str) {
 
 pub fn minimize(_ui: &AppWindow) {}
 
+/// В браузере холст занимает всю вкладку, отдельного полноэкранного окна нет.
+pub fn set_full_canvas(_ui: &AppWindow, _on: bool) {}
+
 fn storage() -> Option<web_sys::Storage> {
     window()?.local_storage().ok().flatten()
 }

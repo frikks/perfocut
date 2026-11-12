@@ -3,6 +3,7 @@ package com.perfocut.app;
 import android.app.NativeActivity;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -160,6 +161,26 @@ public class MainActivity extends NativeActivity {
 
     public void goBack() {
         runOnUiThread(new Runnable() { @Override public void run() { moveTaskToBack(true); } });
+    }
+
+    /** Полный экран для рисования: горизонтально, без строки состояния и навигации. */
+    public void fullCanvas(final boolean on) {
+        runOnUiThread(new Runnable() { @Override public void run() {
+            try {
+                setRequestedOrientation(on
+                    ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+            } catch (Exception e) {
+                // ориентацию менять нельзя — холст всё равно развернётся
+            }
+            Window w = getWindow();
+            View d = w.getDecorView();
+            int f = d.getSystemUiVisibility();
+            int hide = View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
+            f = on ? (f | hide) : (f & ~hide);
+            d.setSystemUiVisibility(f);
+        }});
     }
 
     public void setBars(final int color, final boolean light) {

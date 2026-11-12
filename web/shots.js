@@ -117,6 +117,14 @@ const scenes = {
     await u.shot('desktop');
     await u.close();
   },
+  async 'desktop-full'(b) {
+    const u = await open(b, DESK);
+    await u.click(D.example, 6000);
+    // Кнопка «на весь экран» в левом нижнем углу холста
+    await u.click([340, 884], 2500);
+    await u.shot('desktop-full');
+    await u.close();
+  },
   async 'contours'(b) {
     const u = await open(b, DESK);
     await u.click(D.example, 6000);

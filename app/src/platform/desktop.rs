@@ -84,6 +84,11 @@ pub fn minimize(ui: &AppWindow) {
     ui.window().set_minimized(true);
 }
 
+/// Полный экран для рисования: окно без рамки во весь экран.
+pub fn set_full_canvas(ui: &AppWindow, on: bool) {
+    ui.window().set_fullscreen(on);
+}
+
 fn settings_path() -> Option<PathBuf> {
     #[cfg(windows)]
     let dir = std::env::var_os("APPDATA").map(|d| PathBuf::from(d).join("PerfoCut"));

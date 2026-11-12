@@ -60,6 +60,8 @@ struct State {
     ink_timer: Timer,
     width_timer: Timer,
     live: Option<draw::Live>,
+    /// Был ли рисунок открыт до полного экрана: чтобы вернуть как было
+    full_had_drawing: bool,
     last_haptic: f64,
     formats: Rc<VecModel<Fmt>>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -169,6 +171,7 @@ pub fn run() -> Result<(), slint::PlatformError> {
         ink_timer: Timer::default(),
         width_timer: Timer::default(),
         live: None,
+        full_had_drawing: false,
         last_haptic: 0.0,
         formats,
         #[cfg(not(target_arch = "wasm32"))]
@@ -245,6 +248,12 @@ fn bind(ui: &AppWindow) {
     });
     s.on_reset(|| {
         with(reset);
+    });
+    s.on_image_clear(|| {
+        with(clear_image);
+    });
+    s.on_full_canvas_changed(|on| {
+        with(|st, ui| set_full_canvas(st, ui, on));
     });
     s.on_view_changed(|| {
         with(|st, ui| {
@@ -506,6 +515,27 @@ fn set_color(st: &mut State, ui: &AppWindow, which: i32, hex: &str) {
     request_draw(st);
 }
 
+/// Холст на весь экран. На телефоне — горизонтальная ориентация и скрытые панели,
+/// на компьютере — окно без рамки. Заодно открываем рисование, если его ещё не было.
+fn set_full_canvas(st: &mut State, ui: &AppWindow, on: bool) {
+    let store = ui.global::<Store>();
+    if on {
+        st.full_had_drawing = store.get_drawing();
+        platform::set_full_canvas(ui, true);
+        if !st.full_had_drawing {
+            draw::open(st, ui);
+        }
+    } else {
+        platform::set_full_canvas(ui, false);
+        if !st.full_had_drawing {
+            draw::close(st, ui);
+        }
+    }
+    // Холст стал другого размера: лист снова целиком в окне
+    st.view = View::default();
+    request_draw(st);
+}
+
 // ---------- Картинка и заказ ----------
 
 /// Открыть файл: картинку или заказ .perfo. Вызывается в потоке интерфейса.
@@ -558,6 +588,17 @@ fn install(st: &mut State, ui: &AppWindow, pic: Pic) {
     show_stats(st, ui);
     st.gen_timer.stop();
     run_gen(st, ui);
+}
+
+/// Убрать картинку вместе со штрихами и сразу рисовать на чистом холсте.
+fn clear_image(st: &mut State, ui: &AppWindow) {
+    if st.pic.is_none() {
+        return;
+    }
+    // Старую картинку выбрасываем; open() сделает пустой холст по размеру листа
+    st.pic = None;
+    draw::open(st, ui);
+    toast(st, ui, &t("Холст очищен"), 2200);
 }
 
 fn open_order(name: &str, bytes: &[u8]) {

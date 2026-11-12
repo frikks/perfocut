@@ -495,6 +495,9 @@ msgstr "Shape"
 msgid "Форматы"
 msgstr "Formats"
 
+msgid "Холст очищен"
+msgstr "Canvas cleared"
+
 msgid "Холостой ход"
 msgstr "Rapid travel"
 

@@ -53,6 +53,18 @@ export component SettingsPanel inherits VerticalLayout {
                         overflow: elide;
                     }
                 }
+                // Убрать картинку и сразу рисовать на пустом холсте
+                VerticalLayout {
+                    alignment: center;
+                    Btn {
+                        kind: 2;
+                        has-icon: true;
+                        icon: @image-url("icons/trash.svg");
+                        clicked => {
+                            Store.image-clear();
+                        }
+                    }
+                }
                 VerticalLayout {
                     alignment: center;
                     Btn {

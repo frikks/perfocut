@@ -231,7 +231,9 @@ fn changed(st: &mut State, ui: &AppWindow, full: bool) {
     request_draw(st);
 }
 
-fn open(st: &mut State, ui: &AppWindow) {
+/// Включить рисование: на пустом месте — чистый холст по размеру листа,
+/// поверх картинки — новый слой штрихов.
+pub(super) fn open(st: &mut State, ui: &AppWindow) {
     let store = ui.global::<Store>();
     if st.pic.is_none() {
         // Новый холст по размеру листа, картинка ложится ровно на лист

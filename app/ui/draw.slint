@@ -8,6 +8,19 @@ export component DrawTools inherits HorizontalLayout {
     in property <bool> compact;
     padding: 8px;
     spacing: root.compact ? 4px : 8px;
+    // Полный экран до инструментов: на телефоне в портрете места нет, поэтому только в развёрнутом виде
+    if !root.compact || Store.full-canvas: VerticalLayout {
+        alignment: center;
+        Btn {
+            kind: 2;
+            has-icon: true;
+            icon: Store.full-canvas ? @image-url("icons/collapse.svg") : @image-url("icons/expand.svg");
+            clicked => {
+                Store.full-canvas = !Store.full-canvas;
+                Store.full-canvas-changed(Store.full-canvas);
+            }
+        }
+    }
     VerticalLayout {
         alignment: center;
         width: root.compact ? 140px : 200px;

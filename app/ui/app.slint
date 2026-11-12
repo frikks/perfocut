@@ -357,7 +357,7 @@ component Stage inherits Rectangle {
                 }
             }
             if Store.has-image && Store.stats.hud != "" && !root.compact: Rectangle {
-                x: 12px;
+                x: Theme.row + 16px;
                 y: parent.height - self.height - 12px;
                 width: hud.preferred-width + 16px;
                 height: hud.preferred-height + 10px;
@@ -372,7 +372,7 @@ component Stage inherits Rectangle {
                     font-size: Theme.fs-s;
                 }
             }
-            if Store.has-image && root.compact: Btn {
+            if Store.has-image && (root.compact || Store.full-canvas): Btn {
                 width: Theme.row;
                 height: Theme.row;
                 x: parent.width - self.width - 8px;
@@ -481,6 +481,19 @@ component Stage inherits Rectangle {
                     }
                 }
             }
+            // Развернуть холст: на телефоне — горизонтально на весь экран, на компьютере — всё окно
+            if Store.has-image || Store.full-canvas: Btn {
+                width: Theme.row;
+                height: Theme.row;
+                x: 8px;
+                y: parent.height - self.height - 8px;
+                has-icon: true;
+                icon: Store.full-canvas ? @image-url("icons/collapse.svg") : @image-url("icons/expand.svg");
+                clicked => {
+                    Store.full-canvas = !Store.full-canvas;
+                    Store.full-canvas-changed(Store.full-canvas);
+                }
+            }
         }
     }
 }
@@ -553,7 +566,7 @@ export component AppWindow inherits Window {
     property <length> head-h: wide ? 56px : (Theme.touch ? 56px : 48px);
     property <length> left-w: Theme.touch ? 340px : 316px;
     property <length> right-w: Theme.touch ? 320px : 300px;
-    property <length> stage-h: wide ? area-h - head-h : Math.round((area-h - head-h) * (kb-open ? 0.26 : Store.drawing ? 0.74 : 0.44) / 1px) * 1px;
+    property <length> stage-h: Store.full-canvas ? area-h : wide ? area-h - head-h : Math.round((area-h - head-h) * (kb-open ? 0.26 : Store.drawing ? 0.74 : 0.44) / 1px) * 1px;
     property <[Preset]> sheet-a: [
         { c: #9a9ea3, hex: "#9a9ea3" }, { c: #c4c8cc, hex: "#c4c8cc" }, { c: #6e737a, hex: "#6e737a" },
         { c: #3a3c40, hex: "#3a3c40" }, { c: #e6e6e3, hex: "#e6e6e3" },
@@ -589,6 +602,11 @@ export component AppWindow inherits Window {
         }
         if root.settings-open {
             root.settings-open = false;
+            return true;
+        }
+        if Store.full-canvas {
+            Store.full-canvas = false;
+            Store.full-canvas-changed(false);
             return true;
         }
         if Store.drawing {
@@ -650,6 +668,7 @@ export component AppWindow inherits Window {
                 y: 0;
                 width: parent.width;
                 height: root.head-h;
+                visible: !Store.full-canvas;
                 wide: root.wide;
                 settings => {
                     root.settings-open = true;
@@ -657,9 +676,9 @@ export component AppWindow inherits Window {
             }
 
             stage := Stage {
-                x: root.wide ? root.left-w : 0px;
-                y: root.head-h;
-                width: root.wide ? parent.width - root.left-w - root.right-w : parent.width;
+                x: Store.full-canvas ? 0px : root.wide ? root.left-w : 0px;
+                y: Store.full-canvas ? 0px : root.head-h;
+                width: Store.full-canvas ? parent.width : root.wide ? parent.width - root.left-w - root.right-w : parent.width;
                 height: root.stage-h;
                 compact: !root.wide;
                 pick-color(i) => {
@@ -667,7 +686,7 @@ export component AppWindow inherits Window {
                 }
             }
 
-            if root.wide: Rectangle {
+            if root.wide && !Store.full-canvas: Rectangle {
                 x: 0;
                 y: root.head-h;
                 width: root.left-w;
@@ -690,7 +709,7 @@ export component AppWindow inherits Window {
                 }
             }
 
-            if root.wide: Rectangle {
+            if root.wide && !Store.full-canvas: Rectangle {
                 x: parent.width - root.right-w;
                 y: root.head-h;
                 width: root.right-w;
@@ -720,7 +739,7 @@ export component AppWindow inherits Window {
                 }
             }
 
-            if !root.wide: Rectangle {
+            if !root.wide && !Store.full-canvas: Rectangle {
                 property <length> cy;
                 property <int> seq: Kb.seq;
                 property <length> kbh: root.virtual-keyboard-size.height;

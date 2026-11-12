@@ -100,6 +100,12 @@ export global Store {
     callback draw-clear();
     callback width-changed();
     callback sketch-svg();
+    // Картинку и штрихи убрать: сразу чистый холст по размеру листа
+    callback image-clear();
+
+    // Холст на весь экран: на телефоне горизонтально, на компьютере во всё окно
+    in-out property <bool> full-canvas;
+    callback full-canvas-changed(bool);
 
     // Итог и экспорт
     in property <StatsUI> stats;
