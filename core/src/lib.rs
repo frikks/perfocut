@@ -6,6 +6,7 @@ pub mod gen;
 pub mod image;
 pub mod params;
 pub mod sketch;
+pub mod step;
 pub mod zip;
 
 use gen::GenResult;
@@ -23,7 +24,7 @@ pub fn export_format(r: &GenResult, fmt: &str) -> Option<Vec<u8>> {
         "csv" => export::csv(r).into_bytes(),
         "report" => export::report(r).into_bytes(),
         "stl" => export::stl(r).into_bytes(),
-        "step" => export::step(r).into_bytes(),
+        "step" => step::step(r).into_bytes(),
         "stats" => serde_json::to_vec_pretty(&r.stats).ok()?,
         "settings" => {
             let v = serde_json::json!({ "app": "PerfoCut", "algo_version": params::ALGO_VERSION, "params": r.params });

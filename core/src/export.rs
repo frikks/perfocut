@@ -514,42 +514,94 @@ fn poly_pts(s: &Shape) -> Vec<(f64, f64)> {
     }
 }
 
-/// Замкнутое тело листа: верх, низ, боковые грани и стенки отверстий.
+fn signed_area(pts: &[(f64, f64)]) -> f64 {
+    let mut a = 0.0;
+    for i in 0..pts.len() {
+        let p = pts[i];
+        let q = pts[(i + 1) % pts.len()];
+        a += p.0 * q.1 - q.0 * p.1;
+    }
+    a / 2.0
+}
+
+/// Контур против часовой стрелки: от этого зависит направление нормалей.
+fn to_ccw(mut pts: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
+    if signed_area(&pts) < 0.0 {
+        pts.reverse();
+    }
+    pts
+}
+
+/// Триангуляция плоской грани с отверстиями (earcut).
+fn cap_tris(outer: &[(f64, f64)], holes: &[Vec<(f64, f64)>]) -> Vec<[(f64, f64); 3]> {
+    let mut data: Vec<f64> = Vec::with_capacity((outer.len() + holes.iter().map(Vec::len).sum::<usize>()) * 2);
+    let mut starts: Vec<usize> = Vec::with_capacity(holes.len());
+    for p in outer {
+        data.push(p.0);
+        data.push(p.1);
+    }
+    for h in holes {
+        starts.push(data.len() / 2);
+        for p in h {
+            data.push(p.0);
+            data.push(p.1);
+        }
+    }
+    let mut out = Vec::new();
+    match earcutr::earcut(&data, &starts, 2) {
+        Ok(idx) if idx.len() >= 3 => {
+            for t in idx.chunks_exact(3) {
+                let g = |i: usize| (data[i * 2], data[i * 2 + 1]);
+                out.push([g(t[0]), g(t[1]), g(t[2])]);
+            }
+        }
+        // Вырожденный случай: хотя бы не оставляем лист без крышек
+        _ => {
+            for i in 1..outer.len().saturating_sub(1) {
+                out.push([outer[0], outer[i], outer[i + 1]]);
+            }
+        }
+    }
+    out
+}
+
+/// Замкнутое тело листа: верх и низ с отверстиями, торцы и стенки отверстий.
 fn sheet_tris(r: &GenResult) -> Vec<Tri> {
     let p = &r.params;
     let (w, h, th) = (p.sheet_w, p.sheet_h, p.thickness.max(0.1));
-    let mut t: Vec<Tri> = Vec::with_capacity(r.shapes.len() * 12 + 16);
+    let outer = vec![(0.0, 0.0), (w, 0.0), (w, h), (0.0, h)];
+    let holes: Vec<Vec<(f64, f64)>> = r
+        .shapes
+        .iter()
+        .map(poly_pts)
+        .filter(|h| h.len() >= 3)
+        .map(to_ccw)
+        .collect();
 
-    let quad = |t: &mut Vec<Tri>, a: V3, b: V3, c: V3, d: V3| {
-        t.push((a, b, c));
-        t.push((a, c, d));
-    };
+    let caps = cap_tris(&outer, &holes);
+    let mut t: Vec<Tri> = Vec::with_capacity(caps.len() * 2 + holes.iter().map(Vec::len).sum::<usize>() * 2 + 8);
 
-    // верх и низ
-    quad(&mut t, (0.0, 0.0, th), (w, 0.0, th), (w, h, th), (0.0, h, th));
-    quad(&mut t, (0.0, 0.0, 0.0), (0.0, h, 0.0), (w, h, 0.0), (w, 0.0, 0.0));
-    // боковины листа
-    quad(&mut t, (0.0, 0.0, 0.0), (w, 0.0, 0.0), (w, 0.0, th), (0.0, 0.0, th));
-    quad(&mut t, (w, 0.0, 0.0), (w, h, 0.0), (w, h, th), (w, 0.0, th));
-    quad(&mut t, (w, h, 0.0), (0.0, h, 0.0), (0.0, h, th), (w, h, th));
-    quad(&mut t, (0.0, h, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0, th), (0.0, h, th));
+    // Верх: нормаль +Z, низ: нормаль −Z (обратный обход)
+    for [a, b, c] in &caps {
+        t.push(((a.0, a.1, th), (b.0, b.1, th), (c.0, c.1, th)));
+        t.push(((a.0, a.1, 0.0), (c.0, c.1, 0.0), (b.0, b.1, 0.0)));
+    }
 
-    // стенки отверстий
-    for s in &r.shapes {
-        let pts = poly_pts(s);
-        if pts.len() < 3 {
-            continue;
-        }
-        for i in 0..pts.len() {
-            let a = pts[i];
-            let b = pts[(i + 1) % pts.len()];
-            quad(
-                &mut t,
-                (a.0, a.1, 0.0),
-                (b.0, b.1, 0.0),
-                (b.0, b.1, th),
-                (a.0, a.1, th),
-            );
+    // Торцы листа: наружу
+    for i in 0..outer.len() {
+        let a = outer[i];
+        let b = outer[(i + 1) % outer.len()];
+        t.push(((a.0, a.1, 0.0), (b.0, b.1, 0.0), (b.0, b.1, th)));
+        t.push(((a.0, a.1, 0.0), (b.0, b.1, th), (a.0, a.1, th)));
+    }
+
+    // Стенки отверстий: нормаль внутрь отверстия
+    for hole in &holes {
+        for i in 0..hole.len() {
+            let a = hole[i];
+            let b = hole[(i + 1) % hole.len()];
+            t.push(((a.0, a.1, 0.0), (b.0, b.1, th), (b.0, b.1, 0.0)));
+            t.push(((a.0, a.1, 0.0), (a.0, a.1, th), (b.0, b.1, th)));
         }
     }
     t
@@ -577,118 +629,116 @@ pub fn stl(r: &GenResult) -> String {
     o
 }
 
-// ---------------- CAD STEP (ISO 10303-21, AP214, FACETED_BREP) ----------------
-pub fn step(r: &GenResult) -> String {
-    let mut o = String::with_capacity(r.shapes.len() * 400 + 8000);
-    o.push_str("ISO-10303-21;\r\nHEADER;\r\n");
-    o.push_str("FILE_DESCRIPTION(('PerfoCut perforated sheet'),'2;1');\r\n");
-    o.push_str("FILE_NAME('sheet.step','2026-11-09T00:00:00',('PerfoCut'),('PerfoCut'),'PerfoCut','PerfoCut','');\r\n");
-    o.push_str("FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));\r\n");
-    o.push_str("ENDSEC;\r\nDATA;\r\n");
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gen::Stats;
+    use crate::params::Params;
+    use std::collections::HashMap;
 
-    let mut id = 0u32;
-    let mut next = || {
-        id += 1;
-        id
-    };
-
-    // Контекст приложения и изделие
-    let ctx = next();
-    o.push_str(&format!("#{ctx}=APPLICATION_CONTEXT('automotive design');\r\n"));
-    let proto = next();
-    o.push_str(&format!(
-        "#{proto}=APPLICATION_PROTOCOL_DEFINITION('international standard','automotive_design',2000,#{ctx});\r\n"
-    ));
-    let pctx = next();
-    o.push_str(&format!("#{pctx}=PRODUCT_CONTEXT('',#{ctx},'mechanical');\r\n"));
-    let prod = next();
-    o.push_str(&format!("#{prod}=PRODUCT('PerfoCut','PerfoCut','',(#{pctx}));\r\n"));
-    let pdf = next();
-    o.push_str(&format!("#{pdf}=PRODUCT_DEFINITION_FORMATION('','',#{prod});\r\n"));
-    let pdctx = next();
-    o.push_str(&format!(
-        "#{pdctx}=PRODUCT_DEFINITION_CONTEXT('part definition',#{ctx},'design');\r\n"
-    ));
-    let pd = next();
-    o.push_str(&format!("#{pd}=PRODUCT_DEFINITION('design','',#{pdf},#{pdctx});\r\n"));
-    let pds = next();
-    o.push_str(&format!("#{pds}=PRODUCT_DEFINITION_SHAPE('','',#{pd});\r\n"));
-
-    // Единицы: миллиметры, радианы, стерадианы
-    let mm = next();
-    o.push_str(&format!("#{mm}=(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.));\r\n"));
-    let rad = next();
-    o.push_str(&format!("#{rad}=(NAMED_UNIT(*)PLANE_ANGLE_UNIT()SI_UNIT($,.RADIAN.));\r\n"));
-    let sr = next();
-    o.push_str(&format!(
-        "#{sr}=(NAMED_UNIT(*)SI_UNIT($,.STERADIAN.)SOLID_ANGLE_UNIT());\r\n"
-    ));
-    let unc = next();
-    o.push_str(&format!(
-        "#{unc}=UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-06),#{mm},'distance_accuracy_value','confusion accuracy');\r\n"
-    ));
-    let gctx = next();
-    o.push_str(&format!(
-        "#{gctx}=(GEOMETRIC_REPRESENTATION_CONTEXT(3)GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#{unc}))GLOBAL_UNIT_ASSIGNED_CONTEXT((#{mm},#{rad},#{sr}))REPRESENTATION_CONTEXT('',''));\r\n"
-    ));
-
-    // Треугольные грани из общей геометрии листа
-    let tris = sheet_tris(r);
-    let mut faces: Vec<u32> = Vec::with_capacity(tris.len());
-    for (a, b, c) in tris {
-        let mut pt = |o: &mut String, v: V3| {
-            let i = next();
-            o.push_str(&format!(
-                "#{i}=CARTESIAN_POINT('',({:.4},{:.4},{:.4}));\r\n",
-                v.0, v.1, v.2
-            ));
-            i
+    fn sample() -> GenResult {
+        let p = Params {
+            sheet_w: 100.0,
+            sheet_h: 60.0,
+            thickness: 2.0,
+            ..Params::default()
         };
-        let qa = pt(&mut o, a);
-        let qb = pt(&mut o, b);
-        let qc = pt(&mut o, c);
-        let lp = next();
-        o.push_str(&format!("#{lp}=POLY_LOOP('',(#{qa},#{qb},#{qc}));\r\n"));
-        let bd = next();
-        o.push_str(&format!("#{bd}=FACE_OUTER_BOUND('',#{lp},.T.);\r\n"));
-        let fc = next();
-        o.push_str(&format!("#{fc}=FACE('',(#{bd}));\r\n"));
-        faces.push(fc);
-    }
-
-    // Замкнутая оболочка и тело
-    let mut list = String::with_capacity(faces.len() * 8);
-    for (i, f) in faces.iter().enumerate() {
-        if i > 0 {
-            list.push(',');
+        GenResult {
+            shapes: vec![
+                Shape::Circle { x: 20.0, y: 20.0, d: 10.0 },
+                Shape::Circle { x: 50.0, y: 30.0, d: 6.0 },
+                Shape::Poly {
+                    pts: vec![(70.0, 10.0), (85.0, 12.0), (80.0, 30.0), (68.0, 26.0)],
+                    size: 0.0,
+                },
+            ],
+            stats: Stats::default(),
+            params: p,
         }
-        let _ = write!(list, "#{f}");
     }
-    let shell = next();
-    o.push_str(&format!("#{shell}=CLOSED_SHELL('',({list}));\r\n"));
-    let brep = next();
-    o.push_str(&format!(
-        "#{brep}=FACETED_BREP('PerfoCutSheet',#{shell});\r\n"
-    ));
 
-    // Система координат и представление формы
-    let org = next();
-    o.push_str(&format!("#{org}=CARTESIAN_POINT('',(0.,0.,0.));\r\n"));
-    let dz = next();
-    o.push_str(&format!("#{dz}=DIRECTION('',(0.,0.,1.));\r\n"));
-    let dx = next();
-    o.push_str(&format!("#{dx}=DIRECTION('',(1.,0.,0.));\r\n"));
-    let axp = next();
-    o.push_str(&format!("#{axp}=AXIS2_PLACEMENT_3D('',#{org},#{dz},#{dx});\r\n"));
-    let shp = next();
-    o.push_str(&format!(
-        "#{shp}=SHAPE_REPRESENTATION('',(#{axp},#{brep}),#{gctx});\r\n"
-    ));
-    let sdr = next();
-    o.push_str(&format!(
-        "#{sdr}=SHAPE_DEFINITION_REPRESENTATION(#{pds},#{shp});\r\n"
-    ));
+    fn key(v: V3) -> (i64, i64, i64) {
+        (
+            (v.0 * 1e4).round() as i64,
+            (v.1 * 1e4).round() as i64,
+            (v.2 * 1e4).round() as i64,
+        )
+    }
 
-    o.push_str("ENDSEC;\r\nEND-ISO-10303-21;\r\n");
-    o
+    /// Замкнутая оболочка: каждое ребро принадлежит ровно двум треугольникам.
+    #[test]
+    fn mesh_is_watertight() {
+        let mut edges: HashMap<((i64, i64, i64), (i64, i64, i64)), i32> = HashMap::new();
+        for (a, b, c) in sheet_tris(&sample()) {
+            for (u, v) in [(a, b), (b, c), (c, a)] {
+                let (ku, kv) = (key(u), key(v));
+                let k = if ku <= kv { (ku, kv) } else { (kv, ku) };
+                *edges.entry(k).or_insert(0) += 1;
+            }
+        }
+        let bad = edges.values().filter(|n| **n != 2).count();
+        assert_eq!(bad, 0, "рёбер с неверной кратностью: {bad}");
+    }
+
+    /// Нормали смотрят наружу: объём положительный и равен площади листа на толщину.
+    #[test]
+    fn mesh_normals_point_outward() {
+        let tris = sheet_tris(&sample());
+        let mut v6 = 0.0;
+        for (a, b, c) in &tris {
+            let cross = (
+                b.1 * c.2 - b.2 * c.1,
+                b.2 * c.0 - b.0 * c.2,
+                b.0 * c.1 - b.1 * c.0,
+            );
+            v6 += a.0 * cross.0 + a.1 * cross.1 + a.2 * cross.2;
+        }
+        let vol = v6 / 6.0;
+        // 6000 − два круга (π·25 + π·9) − четырёхугольник (площадь 240), толщина 2 мм
+        let expect = (6000.0 - 78.54 - 28.27 - 240.0) * 2.0;
+        assert!(vol > 0.0, "объём отрицательный: {vol}");
+        assert!((vol - expect).abs() < expect * 0.02, "объём {vol}, ожидалось {expect}");
+    }
+
+    /// Крышки не должны закрывать отверстия.
+    #[test]
+    fn caps_have_holes() {
+        let r = sample();
+        let centers: Vec<(f64, f64)> = r
+            .shapes
+            .iter()
+            .map(|s| match s {
+                Shape::Circle { x, y, .. } => (*x, *y),
+                Shape::Poly { pts, .. } => (
+                    pts.iter().map(|p| p.0).sum::<f64>() / pts.len() as f64,
+                    pts.iter().map(|p| p.1).sum::<f64>() / pts.len() as f64,
+                ),
+            })
+            .collect();
+
+        let in_tri = |p: (f64, f64), a: (f64, f64), b: (f64, f64), c: (f64, f64)| {
+            let sign = |p1: (f64, f64), p2: (f64, f64), p3: (f64, f64)| {
+                (p1.0 - p3.0) * (p2.1 - p3.1) - (p2.0 - p3.0) * (p1.1 - p3.1)
+            };
+            let d1 = sign(p, a, b);
+            let d2 = sign(p, b, c);
+            let d3 = sign(p, c, a);
+            let neg = d1 < 0.0 || d2 < 0.0 || d3 < 0.0;
+            let pos = d1 > 0.0 || d2 > 0.0 || d3 > 0.0;
+            !(neg && pos)
+        };
+
+        for (a, b, c) in sheet_tris(&r) {
+            // только горизонтальные крышки
+            if !(a.2 == b.2 && b.2 == c.2) {
+                continue;
+            }
+            for q in &centers {
+                assert!(
+                    !in_tri(*q, (a.0, a.1), (b.0, b.1), (c.0, c.1)),
+                    "крышка перекрывает отверстие в {q:?}"
+                );
+            }
+        }
+    }
 }
