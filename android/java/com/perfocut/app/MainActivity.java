@@ -17,10 +17,14 @@ import android.view.View;
 import android.view.Window;
 import android.widget.Toast;
 import java.io.ByteArrayOutputStream;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Locale;
 
 /**
@@ -37,6 +41,7 @@ public class MainActivity extends NativeActivity {
     }
 
     private static native void onFilePicked(String name, byte[] data);
+    private static native void onUpdateInfo(String json);
 
     @Override
     protected void onCreate(Bundle state) {
@@ -149,6 +154,41 @@ public class MainActivity extends NativeActivity {
                 Toast.makeText(MainActivity.this, url, Toast.LENGTH_LONG).show();
             }
         }});
+    }
+
+    /**
+     * Последний стабильный релиз: GitHub по этому адресу не отдаёт предварительные версии.
+     * Ответ или ошибку после «!» возвращаем в Rust через onUpdateInfo.
+     */
+    public void checkUpdate() {
+        new Thread(new Runnable() { @Override public void run() {
+            String result = "!";
+            HttpURLConnection c = null;
+            try {
+                c = (HttpURLConnection) new URL("https://api.github.com/repos/frikks/perfocut/releases/latest").openConnection();
+                c.setRequestMethod("GET");
+                c.setRequestProperty("User-Agent", "PerfoCut");
+                c.setRequestProperty("Accept", "application/vnd.github+json");
+                c.setConnectTimeout(10000);
+                c.setReadTimeout(10000);
+                int code = c.getResponseCode();
+                if (code != 200) {
+                    result = "!HTTP " + code;
+                } else {
+                    BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"));
+                    StringBuilder b = new StringBuilder();
+                    String line;
+                    while ((line = r.readLine()) != null) b.append(line);
+                    r.close();
+                    result = b.toString();
+                }
+            } catch (Exception e) {
+                result = "!" + String.valueOf(e.getMessage());
+            } finally {
+                if (c != null) c.disconnect();
+            }
+            onUpdateInfo(result);
+        }}).start();
     }
 
     public float fontScale() {

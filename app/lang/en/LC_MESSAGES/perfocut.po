@@ -635,3 +635,21 @@ msgstr "strokes: {}"
 
 msgid "Сначала нарисуйте что-нибудь"
 msgstr "Draw something first"
+
+msgid "Обновления"
+msgstr "Updates"
+
+msgid "Проверить обновления"
+msgstr "Check for updates"
+
+msgid "Проверяю…"
+msgstr "Checking…"
+
+msgid "Доступна версия {v}"
+msgstr "Version {v} is available"
+
+msgid "Установлена последняя версия {v}"
+msgstr "You have the latest version {v}"
+
+msgid "Не удалось проверить обновления"
+msgstr "Could not check for updates"

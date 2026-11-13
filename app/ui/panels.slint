@@ -899,6 +899,52 @@ export component SettingsPanel inherits VerticalLayout {
             }
         }
     }
+
+    Section {
+        title: @tr("Обновления");
+        HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: "PerfoCut";
+                color: Theme.t1;
+                font-size: Theme.fs;
+                font-weight: 500;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+            Text {
+                text: "v" + Prefs.version;
+                color: Theme.t3;
+                font-family: Theme.mono;
+                font-size: Theme.fs-s;
+                vertical-alignment: center;
+            }
+        }
+        Btn {
+            text: Store.update-state == 1 ? @tr("Проверяю…") : @tr("Проверить обновления");
+            stretch: true;
+            enabled: Store.update-state != 1;
+            has-icon: true;
+            icon: @image-url("icons/download.svg");
+            clicked => {
+                Store.check-update();
+            }
+        }
+        if Store.update-state == 3: Btn {
+            kind: 1;
+            text: @tr("Скачать");
+            stretch: true;
+            clicked => {
+                Store.update-open();
+            }
+        }
+        if Store.update-note != "": Text {
+            text: Store.update-note;
+            color: Store.update-state == 3 ? Theme.acc-text : Store.update-state == 4 ? Theme.warn : Theme.t3;
+            font-size: Theme.fs-s;
+            wrap: word-wrap;
+        }
+    }
 }
 
 component Stat inherits Rectangle {

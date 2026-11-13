@@ -10,6 +10,7 @@ mod i18n;
 mod platform;
 mod render;
 mod saved;
+mod update;
 
 pub use app::run;
 

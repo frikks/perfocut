@@ -116,6 +116,12 @@ export global Store {
     callback export-zip();
     callback save-order();
 
+    // Проверка обновлений: 0 — не проверяли, 1 — проверяю, 2 — последняя версия, 3 — есть новая, 4 — ошибка
+    in property <int> update-state;
+    in property <string> update-note;
+    callback check-update();
+    callback update-open();
+
     in property <string> toast;
     in property <bool> toast-shown;
 }

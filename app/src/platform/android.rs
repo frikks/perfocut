@@ -145,6 +145,25 @@ pub fn set_bars(bg: slint::Color, light: bool) {
     call_void("setBars", "(IZ)V", &[JValue::Int(argb as i32), JValue::Bool(u8::from(light))]);
 }
 
+/// Проверка обновлений: запрос делает Java (HttpURLConnection), ответ вернёт `onUpdateInfo`.
+pub fn check_update() {
+    call_void("checkUpdate", "()V", &[]);
+}
+
+/// Java передаёт JSON последнего стабильного релиза или строку с ошибкой после `!`.
+#[no_mangle]
+pub extern "system" fn Java_com_perfocut_app_MainActivity_onUpdateInfo<'l>(
+    mut env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    data: JString<'l>,
+) {
+    let s: String = env.get_string(&data).map(Into::into).unwrap_or_default();
+    let _ = slint::invoke_from_event_loop(move || match s.strip_prefix('!') {
+        Some(err) => crate::app::update_failed(err),
+        None => crate::app::update_json(&s),
+    });
+}
+
 /// Java передаёт выбранный файл. Вызывается не из потока интерфейса.
 #[no_mangle]
 pub extern "system" fn Java_com_perfocut_app_MainActivity_onFilePicked<'l>(

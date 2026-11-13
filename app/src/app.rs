@@ -62,6 +62,8 @@ struct State {
     live: Option<draw::Live>,
     /// Был ли рисунок открыт до полного экрана: чтобы вернуть как было
     full_had_drawing: bool,
+    /// Страница последнего стабильного релиза, если проверка нашла новую версию
+    update_url: String,
     last_haptic: f64,
     formats: Rc<VecModel<Fmt>>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -172,6 +174,7 @@ pub fn run() -> Result<(), slint::PlatformError> {
         width_timer: Timer::default(),
         live: None,
         full_had_drawing: false,
+        update_url: String::new(),
         last_haptic: 0.0,
         formats,
         #[cfg(not(target_arch = "wasm32"))]
@@ -254,6 +257,28 @@ fn bind(ui: &AppWindow) {
     });
     s.on_full_canvas_changed(|on| {
         with(|st, ui| set_full_canvas(st, ui, on));
+    });
+    s.on_check_update(|| {
+        let started = with(|st, ui| {
+            let store = ui.global::<Store>();
+            if store.get_update_state() == 1 {
+                return false;
+            }
+            store.set_update_state(1);
+            store.set_update_note(t("Проверяю…").into());
+            st.update_url.clear();
+            true
+        });
+        if started == Some(true) {
+            platform::check_update();
+        }
+    });
+    s.on_update_open(|| {
+        with(|st, _| {
+            if !st.update_url.is_empty() {
+                platform::open_url(&st.update_url);
+            }
+        });
     });
     s.on_view_changed(|| {
         with(|st, ui| {
@@ -366,6 +391,46 @@ fn toast(st: &mut State, ui: &AppWindow, text: &str, ms: u64) {
 pub fn show_error(prefix: &str, err: &str) {
     let text = format!("{prefix}{err}");
     with(|st, ui| toast(st, ui, &text, 5000));
+}
+
+// ---------- Обновления ----------
+
+/// Ответ GitHub с последним стабильным релизом. Вызывается из потока или из веб-асинхронщины.
+pub(crate) fn update_json(json: &str) {
+    let current = env!("CARGO_PKG_VERSION");
+    match crate::update::parse(json) {
+        Ok(rel) => {
+            let newer = crate::update::is_newer(&rel.version, current);
+            let note = if newer {
+                tf("Доступна версия {v}", &[("v", &rel.version)])
+            } else {
+                tf("Установлена последняя версия {v}", &[("v", current)])
+            };
+            with(|st, ui| {
+                let store = ui.global::<Store>();
+                store.set_update_state(if newer { 3 } else { 2 });
+                store.set_update_note(note.as_str().into());
+                st.update_url = if newer { rel.url } else { String::new() };
+                if newer {
+                    toast(st, ui, &note, 4000);
+                }
+            });
+        }
+        Err(e) => update_failed(&e),
+    }
+}
+
+/// Проверка не удалась: сеть, нет стабильных релизов, непонятный ответ.
+pub(crate) fn update_failed(detail: &str) {
+    let base = t("Не удалось проверить обновления");
+    let note = if detail.trim().is_empty() { base } else { format!("{base}: {detail}") };
+    with(|st, ui| {
+        let store = ui.global::<Store>();
+        store.set_update_state(4);
+        store.set_update_note(note.as_str().into());
+        st.update_url.clear();
+        toast(st, ui, &note, 5000);
+    });
 }
 
 // ---------- Настройки ----------

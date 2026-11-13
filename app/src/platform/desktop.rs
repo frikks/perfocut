@@ -121,3 +121,45 @@ pub fn system_locale() -> String {
 }
 
 pub fn set_bars(_bg: slint::Color, _light: bool) {}
+
+/// Проверка обновлений через системный `curl`: свой TLS-стек в сборку не тянем.
+pub fn check_update() {
+    std::thread::spawn(|| {
+        let mut cmd = std::process::Command::new("curl");
+        cmd.args([
+            "-fsSL",
+            "--max-time",
+            "12",
+            "-H",
+            "User-Agent: PerfoCut",
+            "-H",
+            "Accept: application/vnd.github+json",
+            crate::update::API,
+        ]);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            // Оконная программа: не показываем мелькающую консоль
+            cmd.creation_flags(0x0800_0000);
+        }
+        match cmd.output() {
+            Ok(o) if o.status.success() => {
+                let json = String::from_utf8_lossy(&o.stdout).into_owned();
+                let _ = slint::invoke_from_event_loop(move || crate::app::update_json(&json));
+            }
+            Ok(o) => {
+                // curl -f: код 22 — ответ HTTP 4xx/5xx, обычно 404 (нет стабильных релизов)
+                let err = if o.status.code() == Some(22) {
+                    "HTTP 4xx/5xx".to_owned()
+                } else {
+                    format!("curl: {}", o.status)
+                };
+                let _ = slint::invoke_from_event_loop(move || crate::app::update_failed(&err));
+            }
+            Err(e) => {
+                let err = e.to_string();
+                let _ = slint::invoke_from_event_loop(move || crate::app::update_failed(&err));
+            }
+        }
+    });
+}

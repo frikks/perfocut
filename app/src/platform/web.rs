@@ -155,6 +155,47 @@ pub fn system_locale() -> String {
 
 pub fn set_bars(_bg: slint::Color, _light: bool) {}
 
+/// Проверка обновлений запросом к GitHub из браузера: fetch с CORS.
+pub fn check_update() {
+    let Some(w) = window() else { return };
+    // Страховка: fetch может ждать ответа бесконечно — через 15 с показываем ошибку
+    let done = std::rc::Rc::new(std::cell::Cell::new(false));
+    let d = done.clone();
+    let late = Closure::once(move || {
+        if !d.replace(true) {
+            crate::app::update_failed("");
+        }
+    });
+    let _ = w.set_timeout_with_callback_and_timeout_and_arguments_0(late.as_ref().unchecked_ref(), 15_000);
+    late.forget();
+    wasm_bindgen_futures::spawn_local(async move {
+        let text = match JsFuture::from(w.fetch_with_str(crate::update::API)).await {
+            Ok(v) => match v.dyn_into::<web_sys::Response>() {
+                Ok(r) if r.status() == 200 => match r.text() {
+                    Ok(p) => JsFuture::from(p).await.ok().and_then(|t| t.as_string()),
+                    Err(_) => None,
+                },
+                Ok(r) => {
+                    if !done.replace(true) {
+                        crate::app::update_failed(&format!("HTTP {}", r.status()));
+                    }
+                    return;
+                }
+                Err(_) => None,
+            },
+            // Сеть недоступна или запрос заблокирован: подробностей браузер не даёт
+            Err(_) => None,
+        };
+        if done.replace(true) {
+            return;
+        }
+        match text {
+            Some(s) => crate::app::update_json(&s),
+            None => crate::app::update_failed(""),
+        }
+    });
+}
+
 pub fn now_ms() -> f64 {
     js_sys::Date::now()
 }
