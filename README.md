@@ -45,9 +45,9 @@ SHA-256 для файлов версии **0.4.1**. Сверяйте после 
 
 | Файл | SHA-256 |
 | :--- | :--- |
-| `PerfoCut.exe` | _будет добавлено после сборки_ |
-| `PerfoCut.apk` | _будет добавлено после сборки_ |
-| `PerfoCut.html` | _будет добавлено после сборки_ |
+| `PerfoCut.exe` | `e91addb707b9731609b1bf520ce1350aa288f22fc64180d5f235c047d22c35d9` |
+| `PerfoCut.apk` | `4aa1517f5a327ce2f94b57e120643c00f09c5fe5828207608237a802b04c298b` |
+| `PerfoCut.html` | `a3641f309d10acda9e4f0fb9c1cf198a14b910aa7db1dfc989151a27b0d8f792` |
 
 Все суммы одним файлом: **[SHA256SUMS.txt](https://github.com/frikks/perfocut/releases/latest/download/SHA256SUMS.txt)**.
 
@@ -221,6 +221,14 @@ sha256sum PerfoCut.exe
 - обновление **скачивается прямо из программы**: `.exe` в «Загрузки» на Windows, `.apk` через `DownloadManager` на Android;
 - в браузере открывается страница релиза — WebAssembly-версия не может писать в папку загрузок сама;
 - проверяются только **стабильные релизы**: предварительные версии и черновики не предлагаются.
+
+<div align="center">
+
+**Компактные настройки: тема, язык, вибрация и кнопка «Обнова»**
+
+![Настройки и обновление](docs/screenshots/settings.png)
+
+</div>
 
 ---
 
