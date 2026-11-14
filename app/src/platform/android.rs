@@ -150,6 +150,37 @@ pub fn check_update() {
     call_void("checkUpdate", "()V", &[]);
 }
 
+/// Скачивание обновления: Java кладёт файл в «Загрузки» и сообщает имя через `onDownloadDone`.
+pub fn download_update(_release_url: &str, version: &str) {
+    let file = format!("PerfoCut-{version}.apk");
+    let url = crate::update::asset_url(version, "PerfoCut.apk");
+    let _ = with_activity(|env, act| {
+        let ju = env.new_string(&url)?;
+        let jn = env.new_string(&file)?;
+        env.call_method(
+            act,
+            "downloadUpdate",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[JValue::Object(&ju), JValue::Object(&jn)],
+        )
+        .map(|_| ())
+    });
+}
+
+/// Java сообщает имя скачанного файла или ошибку после `!`.
+#[no_mangle]
+pub extern "system" fn Java_com_perfocut_app_MainActivity_onDownloadDone<'l>(
+    mut env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    data: JString<'l>,
+) {
+    let s: String = env.get_string(&data).map(Into::into).unwrap_or_default();
+    let _ = slint::invoke_from_event_loop(move || match s.strip_prefix('!') {
+        Some(err) => crate::app::update_download_failed(err),
+        None => crate::app::update_downloaded(&s),
+    });
+}
+
 /// Java передаёт JSON последнего стабильного релиза или строку с ошибкой после `!`.
 #[no_mangle]
 pub extern "system" fn Java_com_perfocut_app_MainActivity_onUpdateInfo<'l>(

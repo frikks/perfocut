@@ -1,8 +1,12 @@
 package com.perfocut.app;
 
+import android.app.DownloadManager;
 import android.app.NativeActivity;
+import android.content.BroadcastReceiver;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.database.Cursor;
 import android.net.Uri;
@@ -33,7 +37,14 @@ import java.util.Locale;
  */
 public class MainActivity extends NativeActivity {
     private static final int PICK = 41;
+    private static final int PERM_WRITE = 42;
     private Vibrator vibrator;
+    /** Номер скачивания в DownloadManager; -1, пока ничего не качали */
+    private long downloadId = -1;
+    private BroadcastReceiver downloadReceiver;
+    /** Скачивание, которое ждёт разрешения на запись в «Загрузки» (Android 7–9) */
+    private String pendingUrl;
+    private String pendingName;
 
     static {
         // Нужна для onFilePicked: NativeActivity загружает библиотеку без регистрации JNI-методов
@@ -42,11 +53,52 @@ public class MainActivity extends NativeActivity {
 
     private static native void onFilePicked(String name, byte[] data);
     private static native void onUpdateInfo(String json);
+    private static native void onDownloadDone(String file);
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+        // Скачивание идёт через системный DownloadManager: ждём сообщение о готовности файла
+        downloadReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent intent) {
+                if (!DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(intent.getAction())) return;
+                long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                if (id < 0 || id != downloadId) return;
+                boolean ok = false;
+                String name = "PerfoCut.apk";
+                DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                Cursor c = dm.query(new DownloadManager.Query().setFilterById(id));
+                if (c != null) {
+                    if (c.moveToFirst()) {
+                        int status = c.getInt(c.getColumnIndex(DownloadManager.COLUMN_STATUS));
+                        ok = status == DownloadManager.STATUS_SUCCESSFUL;
+                        String title = c.getString(c.getColumnIndex(DownloadManager.COLUMN_TITLE));
+                        if (title != null && title.length() > 0) name = title;
+                    }
+                    c.close();
+                }
+                onDownloadDone(ok ? name : "!download failed");
+            }
+        };
+        IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(downloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(downloadReceiver, filter);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (downloadReceiver != null) {
+            try {
+                unregisterReceiver(downloadReceiver);
+            } catch (Exception ignored) {
+            }
+            downloadReceiver = null;
+        }
+        super.onDestroy();
     }
 
     public void pickFile() {
@@ -189,6 +241,56 @@ public class MainActivity extends NativeActivity {
             }
             onUpdateInfo(result);
         }}).start();
+    }
+
+    /**
+     * Скачивает APK в общую папку «Загрузки» через системный DownloadManager.
+     * На Android 7–9 сначала нужно разрешение на запись; на 10+ оно не требуется.
+     * Готовность файла придёт в onDownloadDone: имя файла или ошибка после «!».
+     */
+    public void downloadUpdate(final String url, final String name) {
+        runOnUiThread(new Runnable() { @Override public void run() {
+            if (Build.VERSION.SDK_INT < 29 && checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                pendingUrl = url;
+                pendingName = name;
+                requestPermissions(new String[] { android.Manifest.permission.WRITE_EXTERNAL_STORAGE }, PERM_WRITE);
+                return;
+            }
+            enqueueDownload(url, name);
+        }});
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(code, permissions, results);
+        if (code != PERM_WRITE) return;
+        String url = pendingUrl;
+        String name = pendingName;
+        pendingUrl = null;
+        pendingName = null;
+        if (url == null) return;
+        if (results.length > 0 && results[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            enqueueDownload(url, name);
+        } else {
+            onDownloadDone("!permission denied");
+        }
+    }
+
+    /** Ставит файл в очередь DownloadManager: он сам скачает его в общие «Загрузки». */
+    private void enqueueDownload(final String url, final String name) {
+        try {
+            DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            DownloadManager.Request r = new DownloadManager.Request(Uri.parse(url));
+            r.setTitle(name);
+            r.setDescription("PerfoCut");
+            r.setMimeType("application/vnd.android.package-archive");
+            r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            r.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name);
+            downloadId = dm.enqueue(r);
+        } catch (Exception e) {
+            onDownloadDone("!" + e.getMessage());
+        }
     }
 
     public float fontScale() {

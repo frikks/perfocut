@@ -130,6 +130,12 @@ pub fn open_url(url: &str) {
     }
 }
 
+/// Скачивание не повторяем в браузере: открываем страницу релиза, файл выбирает человек.
+pub fn download_update(url: &str, _version: &str) {
+    open_url(url);
+    crate::app::update_page_opened();
+}
+
 pub fn minimize(_ui: &AppWindow) {}
 
 /// В браузере холст занимает всю вкладку, отдельного полноэкранного окна нет.
@@ -190,8 +196,12 @@ pub fn check_update() {
             return;
         }
         match text {
-            Some(s) => crate::app::update_json(&s),
-            None => crate::app::update_failed(""),
+            Some(s) => {
+                let _ = slint::invoke_from_event_loop(move || crate::app::update_json(&s));
+            }
+            None => {
+                let _ = slint::invoke_from_event_loop(|| crate::app::update_failed(""));
+            }
         }
     });
 }

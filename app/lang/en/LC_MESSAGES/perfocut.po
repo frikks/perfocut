@@ -653,3 +653,21 @@ msgstr "You have the latest version {v}"
 
 msgid "Не удалось проверить обновления"
 msgstr "Could not check for updates"
+
+msgid "Обнова"
+msgstr "Update"
+
+msgid "Скачиваю…"
+msgstr "Downloading…"
+
+msgid "Скачано: {p}"
+msgstr "Saved: {p}"
+
+msgid "Скачано в Загрузки: {p}"
+msgstr "Saved to Downloads: {p}"
+
+msgid "Не удалось скачать обновление"
+msgstr "Could not download the update"
+
+msgid "Открыл страницу релиза — скачайте файл вручную"
+msgstr "Opened the release page — download the file manually"

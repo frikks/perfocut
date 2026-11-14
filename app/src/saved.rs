@@ -22,6 +22,10 @@ pub struct Saved {
     pub brush_size: f64,
     pub brush_soft: f64,
     pub brush_tone: f64,
+    /// Когда последний раз проверяли обновления, мс с 1970 года; 0 — ещё не проверяли
+    pub update_check: f64,
+    /// Последняя известная версия релиза: точка на шестерёнке видна сразу при запуске
+    pub update_version: String,
 }
 
 impl Default for Saved {
@@ -40,6 +44,8 @@ impl Default for Saved {
             brush_size: 8.0,
             brush_soft: 0.25,
             brush_tone: 1.0,
+            update_check: 0.0,
+            update_version: String::new(),
         }
     }
 }

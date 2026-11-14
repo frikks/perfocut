@@ -64,6 +64,10 @@ struct State {
     full_had_drawing: bool,
     /// Страница последнего стабильного релиза, если проверка нашла новую версию
     update_url: String,
+    /// Версия последнего стабильного релиза без ведущей `v`
+    update_version: String,
+    /// Проверка запущена сама, без кнопки: не показываем сообщения, только точку
+    update_silent: bool,
     last_haptic: f64,
     formats: Rc<VecModel<Fmt>>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -175,12 +179,50 @@ pub fn run() -> Result<(), slint::PlatformError> {
         live: None,
         full_had_drawing: false,
         update_url: String::new(),
+        update_version: String::new(),
+        update_silent: false,
         last_haptic: 0.0,
         formats,
         #[cfg(not(target_arch = "wasm32"))]
         jobs: start_worker(),
     };
     ST.with(|cell| *cell.borrow_mut() = Some(st));
+    // Прошлая проверка: точка на шестерёнке появляется сразу, без запроса в сеть
+    with(|st, ui| {
+        let known = st.saved.update_version.clone();
+        if crate::update::is_newer(&known, env!("CARGO_PKG_VERSION")) {
+            let store = ui.global::<Store>();
+            store.set_update_available(true);
+            store.set_update_state(3);
+            store.set_update_note(tf("Доступна версия {v}", &[("v", &known)]).into());
+            st.update_url = crate::update::release_url(&known);
+            st.update_version = known;
+        }
+    });
+    // Раз в сутки спрашиваем GitHub тихо: без сообщений, только точка при новой версии.
+    // Таймер стартует после запуска цикла интерфейса, чтобы ответ не потерялся.
+    let now = platform::now_ms();
+    let due = with(|st, _| {
+        let day = 24.0 * 60.0 * 60.0 * 1000.0;
+        st.saved.update_check <= 0.0 || now - st.saved.update_check >= day
+    });
+    if due == Some(true) {
+        Timer::single_shot(Duration::from_millis(1200), || {
+            let go = with(|st, ui| {
+                // Пока ждали, человек мог сам нажать «Обнова» — второй запрос не нужен
+                if ui.global::<Store>().get_update_state() == 1 {
+                    return false;
+                }
+                st.update_silent = true;
+                st.saved.update_check = platform::now_ms();
+                st.saved.store();
+                true
+            });
+            if go == Some(true) {
+                platform::check_update();
+            }
+        });
+    }
     with(|st, ui| {
         show_meta(st, ui);
         show_stats(st, ui);
@@ -264,6 +306,7 @@ fn bind(ui: &AppWindow) {
             if store.get_update_state() == 1 {
                 return false;
             }
+            st.update_silent = false;
             store.set_update_state(1);
             store.set_update_note(t("Проверяю…").into());
             st.update_url.clear();
@@ -273,12 +316,19 @@ fn bind(ui: &AppWindow) {
             platform::check_update();
         }
     });
-    s.on_update_open(|| {
-        with(|st, _| {
-            if !st.update_url.is_empty() {
-                platform::open_url(&st.update_url);
+    s.on_update_download(|| {
+        let job = with(|st, ui| {
+            if st.update_url.is_empty() || st.update_version.is_empty() {
+                return None;
             }
+            let store = ui.global::<Store>();
+            store.set_update_state(5);
+            store.set_update_note(t("Скачиваю…").into());
+            Some((st.update_url.clone(), st.update_version.clone()))
         });
+        if let Some(Some((url, version))) = job {
+            platform::download_update(&url, &version);
+        }
     });
     s.on_view_changed(|| {
         with(|st, ui| {
@@ -407,11 +457,20 @@ pub(crate) fn update_json(json: &str) {
                 tf("Установлена последняя версия {v}", &[("v", current)])
             };
             with(|st, ui| {
+                let silent = st.update_silent;
+                st.update_silent = false;
+                // Запоминаем время и версию: следующая тихая проверка будет через сутки,
+                // а точка на шестерёнке появится сразу при следующем запуске
+                st.saved.update_check = platform::now_ms();
+                st.saved.update_version = if newer { rel.version.clone() } else { String::new() };
+                st.saved.store();
                 let store = ui.global::<Store>();
+                store.set_update_available(newer);
                 store.set_update_state(if newer { 3 } else { 2 });
                 store.set_update_note(note.as_str().into());
                 st.update_url = if newer { rel.url } else { String::new() };
-                if newer {
+                st.update_version = if newer { rel.version } else { String::new() };
+                if newer && !silent {
                     toast(st, ui, &note, 4000);
                 }
             });
@@ -425,11 +484,67 @@ pub(crate) fn update_failed(detail: &str) {
     let base = t("Не удалось проверить обновления");
     let note = if detail.trim().is_empty() { base } else { format!("{base}: {detail}") };
     with(|st, ui| {
+        let silent = st.update_silent;
+        st.update_silent = false;
+        // Тихая проверка не мешает работе: если версия уже известна, точка остаётся
+        if silent {
+            return;
+        }
         let store = ui.global::<Store>();
-        store.set_update_state(4);
+        let text: SharedString = note.as_str().into();
+        if st.update_url.is_empty() {
+            store.set_update_state(4);
+            store.set_update_note(text.clone());
+        } else {
+            // Новая версия известна: кнопка скачивания остаётся, но сообщение предупреждает
+            store.set_update_state(7);
+            store.set_update_note(text.clone());
+        }
+        toast(st, ui, text.as_str(), 5000);
+    });
+}
+
+/// Файл обновления скачан: на компьютере это полный путь, на Android — имя в «Загрузках».
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub(crate) fn update_downloaded(path: &str) {
+    let note = {
+        #[cfg(target_os = "android")]
+        {
+            tf("Скачано в Загрузки: {p}", &[("p", path)])
+        }
+        #[cfg(not(target_os = "android"))]
+        {
+            tf("Скачано: {p}", &[("p", path)])
+        }
+    };
+    with(|st, ui| {
+        let store = ui.global::<Store>();
+        store.set_update_state(6);
         store.set_update_note(note.as_str().into());
-        st.update_url.clear();
+        toast(st, ui, &note, 6000);
+    });
+}
+
+/// Скачивание не удалось: предлагаем попробовать ещё раз.
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub(crate) fn update_download_failed(detail: &str) {
+    let base = t("Не удалось скачать обновление");
+    let note = if detail.trim().is_empty() { base } else { format!("{base}: {detail}") };
+    with(|st, ui| {
+        let store = ui.global::<Store>();
+        store.set_update_state(7);
+        store.set_update_note(note.as_str().into());
         toast(st, ui, &note, 5000);
+    });
+}
+
+/// Браузер не умеет качать файл сам: открыли страницу релиза, дальше — вручную.
+#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+pub(crate) fn update_page_opened() {
+    with(|_st, ui| {
+        let store = ui.global::<Store>();
+        store.set_update_state(3);
+        store.set_update_note(t("Открыл страницу релиза — скачайте файл вручную").into());
     });
 }
 

@@ -7,6 +7,17 @@
 #[cfg_attr(target_os = "android", allow(dead_code))]
 pub const API: &str = "https://api.github.com/repos/frikks/perfocut/releases/latest";
 
+/// Адрес страницы релиза по версии без ведущей `v`.
+pub fn release_url(version: &str) -> String {
+    format!("https://github.com/frikks/perfocut/releases/tag/v{version}")
+}
+
+/// Прямая ссылка на файл релиза: GitHub отдаёт его без страницы.
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub fn asset_url(version: &str, file: &str) -> String {
+    format!("https://github.com/frikks/perfocut/releases/download/v{version}/{file}")
+}
+
 pub struct Release {
     /// Версия без ведущей `v`, например `0.4.1`
     pub version: String,
@@ -79,5 +90,14 @@ mod tests {
     fn broken_json_is_reported() {
         assert!(parse("<!doctype html>").is_err());
         assert!(parse(r#"{"prerelease":false}"#).is_err());
+    }
+
+    #[test]
+    fn release_links_point_to_the_tag_and_file() {
+        assert_eq!(super::release_url("0.4.1"), "https://github.com/frikks/perfocut/releases/tag/v0.4.1");
+        assert_eq!(
+            super::asset_url("0.4.1", "PerfoCut.exe"),
+            "https://github.com/frikks/perfocut/releases/download/v0.4.1/PerfoCut.exe"
+        );
     }
 }

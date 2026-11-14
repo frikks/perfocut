@@ -122,6 +122,53 @@ pub fn system_locale() -> String {
 
 pub fn set_bars(_bg: slint::Color, _light: bool) {}
 
+/// Папка загрузок: обновление кладём туда, рядом с остальными файлами.
+fn downloads_dir() -> PathBuf {
+    #[cfg(windows)]
+    if let Some(p) = std::env::var_os("USERPROFILE") {
+        return PathBuf::from(p).join("Downloads");
+    }
+    #[cfg(not(windows))]
+    if let Some(h) = std::env::var_os("HOME") {
+        return PathBuf::from(h).join("Downloads");
+    }
+    std::env::temp_dir()
+}
+
+/// Скачивает файл релиза напрямую в «Загрузки» через системный curl.
+pub fn download_update(_release_url: &str, version: &str) {
+    let dir = downloads_dir();
+    let version = version.to_owned();
+    std::thread::spawn(move || {
+        let path = dir.join(format!("PerfoCut-{version}.exe"));
+        let url = crate::update::asset_url(&version, "PerfoCut.exe");
+        let mut cmd = std::process::Command::new("curl");
+        cmd.args(["-fL", "--max-time", "300", "-H", "User-Agent: PerfoCut", "-o"]);
+        cmd.arg(&path);
+        cmd.arg(&url);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            // Оконная программа: не показываем мелькающую консоль
+            cmd.creation_flags(0x0800_0000);
+        }
+        match cmd.output() {
+            Ok(o) if o.status.success() => {
+                let shown = path.display().to_string();
+                let _ = slint::invoke_from_event_loop(move || crate::app::update_downloaded(&shown));
+            }
+            Ok(o) => {
+                let err = format!("curl: {}", o.status);
+                let _ = slint::invoke_from_event_loop(move || crate::app::update_download_failed(&err));
+            }
+            Err(e) => {
+                let err = e.to_string();
+                let _ = slint::invoke_from_event_loop(move || crate::app::update_download_failed(&err));
+            }
+        }
+    });
+}
+
 /// Проверка обновлений через системный `curl`: свой TLS-стек в сборку не тянем.
 pub fn check_update() {
     std::thread::spawn(|| {

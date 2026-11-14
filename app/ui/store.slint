@@ -116,11 +116,14 @@ export global Store {
     callback export-zip();
     callback save-order();
 
-    // Проверка обновлений: 0 — не проверяли, 1 — проверяю, 2 — последняя версия, 3 — есть новая, 4 — ошибка
+    // Проверка обновлений: 0 — не проверяли, 1 — проверяю, 2 — последняя версия, 3 — есть новая,
+    // 4 — ошибка проверки, 5 — скачиваю, 6 — скачано, 7 — ошибка скачивания
     in property <int> update-state;
     in property <string> update-note;
+    // Найдена более новая версия: точка на шестерёнке
+    in property <bool> update-available;
     callback check-update();
-    callback update-open();
+    callback update-download();
 
     in property <string> toast;
     in property <bool> toast-shown;

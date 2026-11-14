@@ -5,6 +5,9 @@ name: Release
 on:
   push:
     branches: [main]
+    # README и заметки к релизу не требуют новой сборки
+    paths-ignore:
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:
@@ -71,6 +74,12 @@ jobs:
           [ -n "$ANDROID_KEY_ALIAS" ] || unset ANDROID_KEY_ALIAS
           bash android/build.sh
 
+      - name: Контрольные суммы SHA-256
+        run: |
+          cd dist
+          sha256sum PerfoCut.exe PerfoCut.apk PerfoCut.html > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
       - name: Файлы сборки
         uses: actions/upload-artifact@v4
         with:
@@ -106,3 +115,4 @@ jobs:
             dist/PerfoCut.exe
             dist/PerfoCut.apk
             dist/PerfoCut.html
+            dist/SHA256SUMS.txt

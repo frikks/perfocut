@@ -98,12 +98,30 @@ component Header inherits Rectangle {
         }
         VerticalLayout {
             alignment: center;
-            Btn {
-                kind: 2;
-                has-icon: true;
-                icon: @image-url("icons/gear.svg");
-                clicked => {
-                    root.settings();
+            Rectangle {
+                width: Theme.row;
+                height: Theme.row;
+                gb := Btn {
+                    width: parent.width;
+                    height: parent.height;
+                    kind: 2;
+                    has-icon: true;
+                    icon: @image-url("icons/gear.svg");
+                    clicked => {
+                        root.settings();
+                    }
+                }
+                // Точка: при проверке нашлась новая версия
+                Rectangle {
+                    x: parent.width - 12px;
+                    y: 3px;
+                    width: 9px;
+                    height: 9px;
+                    border-radius: 4.5px;
+                    background: Theme.acc;
+                    border-width: 2px;
+                    border-color: Theme.bg;
+                    visible: Store.update-available;
                 }
             }
         }
@@ -912,6 +930,46 @@ export component AppWindow inherits Window {
                     }
                     if !Prefs.is-phone: Hint {
                         text: @tr("Работает на телефоне");
+                    }
+                }
+                VerticalLayout {
+                    spacing: 4px;
+                    Caption {
+                        text: @tr("Обновления");
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Text {
+                            text: "v" + Prefs.version;
+                            color: Theme.t3;
+                            font-family: Theme.mono;
+                            font-size: Theme.fs-s;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                        }
+                        Btn {
+                            kind: 1;
+                            text: Store.update-state == 1 ? @tr("Проверяю…") : @tr("Обнова");
+                            enabled: Store.update-state != 1;
+                            clicked => {
+                                Store.check-update();
+                            }
+                        }
+                    }
+                    if Store.update-state == 3 || Store.update-state == 5 || Store.update-state == 7: Btn {
+                        kind: 0;
+                        stretch: true;
+                        text: Store.update-state == 5 ? @tr("Скачиваю…") : @tr("Скачать");
+                        enabled: Store.update-state != 5;
+                        clicked => {
+                            Store.update-download();
+                        }
+                    }
+                    if Store.update-note != "": Text {
+                        text: Store.update-note;
+                        color: Store.update-state == 4 || Store.update-state == 7 ? Theme.warn : Store.update-state == 3 || Store.update-state == 5 || Store.update-state == 6 ? Theme.acc-text : Theme.t3;
+                        font-size: Theme.fs-s;
+                        wrap: word-wrap;
                     }
                 }
             }
