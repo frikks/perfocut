@@ -54,6 +54,8 @@ struct State {
     res_ver: u64,
     view: View,
     pinch_z: f64,
+    /// Идёт жест двумя пальцами: синтетические нажатия Slint не должны начинать штрих
+    gesture: bool,
     gen_timer: Timer,
     draw_timer: Timer,
     toast_timer: Timer,
@@ -171,6 +173,7 @@ pub fn run() -> Result<(), slint::PlatformError> {
         res_ver: 0,
         view: View::default(),
         pinch_z: 1.0,
+        gesture: false,
         gen_timer: Timer::default(),
         draw_timer: Timer::default(),
         toast_timer: Timer::default(),
@@ -354,12 +357,21 @@ fn bind(ui: &AppWindow) {
         });
     });
     s.on_pinch_start(|| {
-        with(|st, _| st.pinch_z = st.view.z);
+        with(|st, _| {
+            st.gesture = true;
+            st.pinch_z = st.view.z;
+        });
     });
     s.on_pinch(|scale, x, y| {
         with(|st, ui| {
             let f = st.pinch_z * f64::from(scale) / st.view.z;
             zoom(st, ui, f64::from(x), f64::from(y), f);
+        });
+    });
+    s.on_pinch_end(|| {
+        // Жест закончился, но Slint ещё шлёт нажатие оставшегося пальца: снимаем флаг следующим тиком
+        Timer::single_shot(Duration::ZERO, || {
+            with(|st, _| st.gesture = false);
         });
     });
     s.on_fit_view(|| {

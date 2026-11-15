@@ -3,3 +3,5 @@
 /android/build
 /android/assets
 *.keystore
+Cargo.lock
+downloaded_artifacts/

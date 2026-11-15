@@ -8,7 +8,7 @@ import { Theme, Bridge, Kb } from "theme.slint";
 import { Store, Prefs, Par, KV, SizeRow, StatsUI, Fmt } from "store.slint";
 import { Btn, Seg, Check, Icon, Modal, Swatch, Hint, Caption, TextField } from "widgets.slint";
 import { SettingsPanel, SummaryPanel, ExportPanel } from "panels.slint";
-import { DrawTools, BrushBar } from "draw.slint";
+import { DrawTools, BrushBar, BrushPopup } from "draw.slint";
 
 export { Theme, Bridge, Kb, Store, Prefs, Par, KV, SizeRow, StatsUI, Fmt }
 
@@ -44,6 +44,9 @@ component Logo inherits HorizontalLayout {
 
 component Header inherits Rectangle {
     in property <bool> wide;
+    // Вырез экрана и системные панели: содержимое шапки не заезжает под них
+    in property <length> pad-l;
+    in property <length> pad-r;
     callback settings();
     background: Theme.bg;
     Rectangle {
@@ -52,8 +55,8 @@ component Header inherits Rectangle {
         background: Theme.line;
     }
     HorizontalLayout {
-        padding-left: 16px;
-        padding-right: root.wide ? 12px : 8px;
+        padding-left: 16px + root.pad-l;
+        padding-right: (root.wide ? 12px : 8px) + root.pad-r;
         spacing: 8px;
         Logo {
             compact: !root.wide;
@@ -148,15 +151,27 @@ component DimLabel inherits Rectangle {
 
 component Stage inherits Rectangle {
     in property <bool> compact;
+    // Отступы выреза: холст рисуем во всю ширину, а кнопки держим в безопасной зоне
+    in property <length> pad-l;
+    in property <length> pad-r;
+    // Карточка настроек кисти на телефоне
+    property <bool> brush-open: false;
+    // Зеркало Store.drawing: changed работает только со своим свойством
+    property <bool> drawing-now: Store.drawing;
     // Подписи «Лист» и «Фон» только когда хватает места под переключатель вида
     property <bool> roomy: !compact && self.width >= 560px;
     callback pick-color(int);
     out property <length> cw: canvas.width;
     out property <length> ch: canvas.height;
     background: Theme.bg0;
+    changed drawing-now => {
+        if !self.drawing-now {
+            root.brush-open = false;
+        }
+    }
     VerticalLayout {
         Rectangle {
-            height: Theme.row + 16px;
+            height: Store.drawing && root.compact ? Math.max(Theme.row, 44px) : Theme.row + 16px;
             background: Theme.bg;
             Rectangle {
                 y: parent.height - 1px;
@@ -165,9 +180,17 @@ component Stage inherits Rectangle {
             }
             if Store.drawing: DrawTools {
                 compact: root.compact;
+                pad-l: root.pad-l;
+                pad-r: root.pad-r;
+                brush-settings => {
+                    root.brush-open = !root.brush-open;
+                }
             }
             if !Store.drawing: HorizontalLayout {
-                padding: 8px;
+                padding-left: 8px + root.pad-l;
+                padding-right: 8px + root.pad-r;
+                padding-top: 8px;
+                padding-bottom: 8px;
                 spacing: 8px;
                 VerticalLayout {
                     alignment: center;
@@ -229,7 +252,7 @@ component Stage inherits Rectangle {
                 }
             }
         }
-        if Store.drawing: Rectangle {
+        if Store.drawing && !root.compact: Rectangle {
             height: bb.preferred-height;
             background: Theme.bg;
             Rectangle {
@@ -286,6 +309,13 @@ component Stage inherits Rectangle {
                     self.pcx = self.center.x;
                     self.pcy = self.center.y;
                     Store.pinch(self.scale, self.center.x, self.center.y);
+                }
+                ended => {
+                    // После жеста Slint шлёт синтетическое нажатие оставшегося пальца: его игнорируем
+                    Store.pinch-end();
+                }
+                cancelled => {
+                    Store.pinch-end();
                 }
                 ta := TouchArea {
                     property <length> lx;
@@ -393,7 +423,7 @@ component Stage inherits Rectangle {
             if Store.has-image && (root.compact || Store.full-canvas): Btn {
                 width: Theme.row;
                 height: Theme.row;
-                x: parent.width - self.width - 8px;
+                x: parent.width - self.width - root.pad-r - 8px;
                 y: parent.height - self.height - 8px;
                 has-icon: true;
                 icon: @image-url("icons/fit.svg");
@@ -406,9 +436,10 @@ component Stage inherits Rectangle {
                 TouchArea { }
                 VerticalLayout {
                     alignment: center;
-                    padding: 24px;
-                    spacing: 12px;
-                    HorizontalLayout {
+                    // Низкий экран в альбомной ориентации: меньше отступов и без крупной иконки
+                    padding: root.height >= 300px ? 24px : 12px;
+                    spacing: root.height >= 300px ? 12px : 8px;
+                    if root.height >= 240px: HorizontalLayout {
                         alignment: center;
                         Rectangle {
                             width: 48px;
@@ -432,7 +463,7 @@ component Stage inherits Rectangle {
                         font-weight: 500;
                         horizontal-alignment: center;
                     }
-                    Text {
+                    if root.height >= 280px: Text {
                         text: Prefs.can-drop ? @tr("Перетащите файл в окно или выберите его") : @tr("Выберите файл или откройте пример");
                         color: Theme.t2;
                         font-size: Theme.fs;
@@ -443,7 +474,7 @@ component Stage inherits Rectangle {
                     VerticalLayout {
                         spacing: 8px;
                         padding-top: 4px;
-                        HorizontalLayout {
+                        if root.width >= 560px: HorizontalLayout {
                             alignment: center;
                             spacing: 8px;
                             Btn {
@@ -455,13 +486,13 @@ component Stage inherits Rectangle {
                                     Store.open();
                                 }
                             }
-                            if !root.compact: Btn {
+                            Btn {
                                 text: @tr("Пример");
                                 clicked => {
                                     Store.sample();
                                 }
                             }
-                            if !root.compact: Btn {
+                            Btn {
                                 text: @tr("Нарисовать");
                                 has-icon: true;
                                 icon: @image-url("icons/brush.svg");
@@ -470,26 +501,42 @@ component Stage inherits Rectangle {
                                 }
                             }
                         }
-                        if root.compact: HorizontalLayout {
-                            alignment: center;
+                        if root.width < 560px: VerticalLayout {
                             spacing: 8px;
-                            Btn {
-                                text: @tr("Пример");
-                                clicked => {
-                                    Store.sample();
+                            HorizontalLayout {
+                                alignment: center;
+                                spacing: 8px;
+                                Btn {
+                                    text: @tr("Выбрать файл");
+                                    kind: 1;
+                                    has-icon: true;
+                                    icon: @image-url("icons/upload.svg");
+                                    clicked => {
+                                        Store.open();
+                                    }
                                 }
                             }
-                            Btn {
-                                text: @tr("Нарисовать");
-                                has-icon: true;
-                                icon: @image-url("icons/brush.svg");
-                                clicked => {
-                                    Store.draw-open();
+                            HorizontalLayout {
+                                alignment: center;
+                                spacing: 8px;
+                                Btn {
+                                    text: @tr("Пример");
+                                    clicked => {
+                                        Store.sample();
+                                    }
+                                }
+                                Btn {
+                                    text: @tr("Нарисовать");
+                                    has-icon: true;
+                                    icon: @image-url("icons/brush.svg");
+                                    clicked => {
+                                        Store.draw-open();
+                                    }
                                 }
                             }
                         }
                     }
-                    Text {
+                    if root.height >= 320px: Text {
                         text: "JPG, PNG, WebP, BMP, GIF, TIFF, .perfo";
                         color: Theme.t3;
                         font-family: Theme.mono;
@@ -503,7 +550,7 @@ component Stage inherits Rectangle {
             if Store.has-image || Store.full-canvas: Btn {
                 width: Theme.row;
                 height: Theme.row;
-                x: 8px;
+                x: root.pad-l + 8px;
                 y: parent.height - self.height - 8px;
                 has-icon: true;
                 icon: Store.full-canvas ? @image-url("icons/collapse.svg") : @image-url("icons/expand.svg");
@@ -512,6 +559,27 @@ component Stage inherits Rectangle {
                     Store.full-canvas-changed(Store.full-canvas);
                 }
             }
+        }
+    }
+    // Настройки кисти на телефоне: карточка поверх холста вместо второй строки
+    if root.compact && root.brush-open: Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        // Высота карточки: на низком экране чуть меньше, чтобы влезла целиком
+        property <length> card-h: Math.min(286px * Theme.font-scale, self.height - 16px);
+        background: #00000055;
+        TouchArea {
+            clicked => {
+                root.brush-open = false;
+            }
+        }
+        BrushPopup {
+            width: Math.min(parent.width - 16px, 340px);
+            height: parent.card-h;
+            x: (parent.width - self.width) / 2;
+            y: parent.height - parent.card-h - 8px;
         }
     }
 }
@@ -563,7 +631,8 @@ export component AppWindow inherits Window {
     preferred-width: 1320px;
     preferred-height: 820px;
     min-width: 360px;
-    min-height: 520px;
+    // Телефон в альбомной ориентации: окно бывает ниже 520 px, веб не должен растягивать холст
+    min-height: 360px;
     background: Theme.bg;
     forward-focus: fs;
 
@@ -579,12 +648,14 @@ export component AppWindow inherits Window {
     property <length> inset-top: self.safe-area-insets.top;
     property <length> inset-left: self.safe-area-insets.left;
     property <length> inset-right: self.safe-area-insets.right;
-    property <length> area-w: self.width - inset-left - inset-right;
+    // Холст во всю ширину окна: вырез экрана учитывается отступами панелей, а не краем холста
+    property <length> area-w: self.width;
     property <length> area-h: (kb-open ? Math.min(self.height - self.safe-area-insets.bottom, self.virtual-keyboard-position.y) : self.height - self.safe-area-insets.bottom) - inset-top;
     property <length> head-h: wide ? 56px : (Theme.touch ? 56px : 48px);
     property <length> left-w: Theme.touch ? 340px : 316px;
     property <length> right-w: Theme.touch ? 320px : 300px;
-    property <length> stage-h: Store.full-canvas ? area-h : wide ? area-h - head-h : Math.round((area-h - head-h) * (kb-open ? 0.26 : Store.drawing ? 0.74 : 0.44) / 1px) * 1px;
+    // На телефоне рисование занимает весь экран под шапкой: нижние вкладки спрятаны
+    property <length> stage-h: Store.full-canvas ? area-h : wide ? area-h - head-h : Store.drawing ? area-h - head-h : Math.round((area-h - head-h) * (kb-open ? 0.26 : 0.44) / 1px) * 1px;
     property <[Preset]> sheet-a: [
         { c: #9a9ea3, hex: "#9a9ea3" }, { c: #c4c8cc, hex: "#c4c8cc" }, { c: #6e737a, hex: "#6e737a" },
         { c: #3a3c40, hex: "#3a3c40" }, { c: #e6e6e3, hex: "#e6e6e3" },
@@ -676,7 +747,7 @@ export component AppWindow inherits Window {
         }
 
         area := Rectangle {
-            x: root.inset-left;
+            x: 0;
             y: root.inset-top;
             width: root.area-w;
             height: root.area-h;
@@ -688,24 +759,28 @@ export component AppWindow inherits Window {
                 height: root.head-h;
                 visible: !Store.full-canvas;
                 wide: root.wide;
+                pad-l: root.inset-left;
+                pad-r: root.inset-right;
                 settings => {
                     root.settings-open = true;
                 }
             }
 
             stage := Stage {
-                x: Store.full-canvas ? 0px : root.wide ? root.left-w : 0px;
+                x: Store.full-canvas ? 0px : root.wide ? root.inset-left + root.left-w : 0px;
                 y: Store.full-canvas ? 0px : root.head-h;
-                width: Store.full-canvas ? parent.width : root.wide ? parent.width - root.left-w - root.right-w : parent.width;
+                width: Store.full-canvas ? parent.width : root.wide ? parent.width - root.inset-left - root.inset-right - root.left-w - root.right-w : parent.width;
                 height: root.stage-h;
                 compact: !root.wide;
+                pad-l: root.inset-left;
+                pad-r: root.inset-right;
                 pick-color(i) => {
                     root.color-target = i;
                 }
             }
 
             if root.wide && !Store.full-canvas: Rectangle {
-                x: 0;
+                x: root.inset-left;
                 y: root.head-h;
                 width: root.left-w;
                 height: parent.height - root.head-h;
@@ -728,7 +803,7 @@ export component AppWindow inherits Window {
             }
 
             if root.wide && !Store.full-canvas: Rectangle {
-                x: parent.width - root.right-w;
+                x: parent.width - root.right-w - root.inset-right;
                 y: root.head-h;
                 width: root.right-w;
                 height: parent.height - root.head-h;
@@ -757,7 +832,7 @@ export component AppWindow inherits Window {
                 }
             }
 
-            if !root.wide && !Store.full-canvas: Rectangle {
+            if !root.wide && !Store.full-canvas && !Store.drawing: Rectangle {
                 property <length> cy;
                 property <int> seq: Kb.seq;
                 property <length> kbh: root.virtual-keyboard-size.height;
@@ -781,6 +856,8 @@ export component AppWindow inherits Window {
                 height: parent.height - root.head-h - root.stage-h;
                 background: Theme.bg;
                 VerticalLayout {
+                    padding-left: root.inset-left;
+                    padding-right: root.inset-right;
                     if !root.kb-open: Rectangle {
                         height: Theme.row + 16px;
                         Rectangle {

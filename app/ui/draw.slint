@@ -3,13 +3,84 @@ import { Theme, Bridge } from "theme.slint";
 import { Store } from "store.slint";
 import { Btn, Seg, Slide } from "widgets.slint";
 
+// Кнопка компактной строки: 40×40, чтобы все инструменты помещались в один ряд
+component ToolBtn inherits Btn {
+    kind: 2;
+    has-icon: true;
+    min-width: 40px;
+    min-height: 40px;
+    max-width: 40px;
+    max-height: 40px;
+    horizontal-stretch: 0;
+}
+
 // Верхняя строка над холстом вместо переключателя вида
 export component DrawTools inherits HorizontalLayout {
     in property <bool> compact;
-    padding: 8px;
+    in property <length> pad-l;
+    in property <length> pad-r;
+    callback brush-settings();
+    padding-left: (root.compact ? 2px : 8px) + root.pad-l;
+    padding-right: (root.compact ? 2px : 8px) + root.pad-r;
+    padding-top: root.compact ? 4px : 8px;
+    padding-bottom: root.compact ? 4px : 8px;
     spacing: root.compact ? 4px : 8px;
-    // Полный экран до инструментов: на телефоне в портрете места нет, поэтому только в развёрнутом виде
-    if !root.compact || Store.full-canvas: VerticalLayout {
+
+    // Телефон: один ряд значков, настройки кисти открываются отдельной карточкой
+    if root.compact: ToolBtn {
+        icon: @image-url("icons/brush.svg");
+        kind: Store.brush-tool == 0 ? 1 : 2;
+        clicked => {
+            Store.brush-tool = 0;
+        }
+    }
+    if root.compact: ToolBtn {
+        icon: @image-url("icons/eraser.svg");
+        kind: Store.brush-tool == 1 ? 1 : 2;
+        clicked => {
+            Store.brush-tool = 1;
+        }
+    }
+    if root.compact: ToolBtn {
+        icon: @image-url("icons/undo.svg");
+        enabled: Store.can-undo;
+        clicked => {
+            Store.draw-undo();
+        }
+    }
+    if root.compact: ToolBtn {
+        icon: @image-url("icons/redo.svg");
+        enabled: Store.can-redo;
+        clicked => {
+            Store.draw-redo();
+        }
+    }
+    if root.compact: Rectangle {
+        horizontal-stretch: 1;
+    }
+    if root.compact: ToolBtn {
+        icon: @image-url("icons/sliders.svg");
+        clicked => {
+            root.brush-settings();
+        }
+    }
+    if root.compact: ToolBtn {
+        icon: Store.full-canvas ? @image-url("icons/collapse.svg") : @image-url("icons/expand.svg");
+        clicked => {
+            Store.full-canvas = !Store.full-canvas;
+            Store.full-canvas-changed(Store.full-canvas);
+        }
+    }
+    if root.compact: ToolBtn {
+        kind: 1;
+        icon: @image-url("icons/check.svg");
+        clicked => {
+            Store.draw-close();
+        }
+    }
+
+    // Компьютер: просторная строка с подписями и вторая строка с ползунками
+    if !root.compact: VerticalLayout {
         alignment: center;
         Btn {
             kind: 2;
@@ -21,9 +92,9 @@ export component DrawTools inherits HorizontalLayout {
             }
         }
     }
-    VerticalLayout {
+    if !root.compact: VerticalLayout {
         alignment: center;
-        width: root.compact ? 140px : 200px;
+        width: 200px;
         Seg {
             items: [@tr("Кисть"), @tr("Ластик")];
             current: Store.brush-tool;
@@ -32,7 +103,7 @@ export component DrawTools inherits HorizontalLayout {
             }
         }
     }
-    VerticalLayout {
+    if !root.compact: VerticalLayout {
         alignment: center;
         Btn {
             kind: 2;
@@ -44,7 +115,7 @@ export component DrawTools inherits HorizontalLayout {
             }
         }
     }
-    VerticalLayout {
+    if !root.compact: VerticalLayout {
         alignment: center;
         Btn {
             kind: 2;
@@ -56,7 +127,7 @@ export component DrawTools inherits HorizontalLayout {
             }
         }
     }
-    VerticalLayout {
+    if !root.compact: VerticalLayout {
         alignment: center;
         Btn {
             kind: 2;
@@ -68,14 +139,14 @@ export component DrawTools inherits HorizontalLayout {
             }
         }
     }
-    Rectangle {
+    if !root.compact: Rectangle {
         horizontal-stretch: 1;
     }
-    VerticalLayout {
+    if !root.compact: VerticalLayout {
         alignment: center;
         Btn {
             kind: 1;
-            text: root.compact ? "" : @tr("Готово");
+            text: @tr("Готово");
             has-icon: true;
             icon: @image-url("icons/check.svg");
             clicked => {
@@ -85,7 +156,7 @@ export component DrawTools inherits HorizontalLayout {
     }
 }
 
-// Строка с настройками кисти под верхней строкой
+// Строка с настройками кисти под верхней строкой: на компьютере она всегда видна
 export component BrushBar inherits HorizontalLayout {
     property <float> lo: Store.brush-min;
     property <float> hi: Math.max(Store.brush-max, Store.brush-min * 4);
@@ -124,6 +195,68 @@ export component BrushBar inherits HorizontalLayout {
         shown: Bridge.fmt-n(Store.brush-tone * 100, 0) + " %";
         edited(v) => {
             Store.brush-tone = v;
+        }
+    }
+}
+
+// Настройки кисти на телефоне: одна карточка поверх холста вместо второй строки
+export component BrushPopup inherits Rectangle {
+    property <float> lo: Store.brush-min;
+    property <float> hi: Math.max(Store.brush-max, Store.brush-min * 4);
+    background: Theme.card;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: Theme.line2;
+    VerticalLayout {
+        padding: 10px;
+        spacing: 6px;
+        Slide {
+            label: @tr("Размер");
+            value: Math.log(Math.max(Store.brush-size, root.lo) / root.lo, root.hi / root.lo);
+            minv: 0;
+            maxv: 1;
+            step: 0.005;
+            shown: Bridge.fmt-n(Store.brush-size, Store.brush-size < 10 ? 1 : 0) + " " + @tr("мм");
+            edited(v) => {
+                Store.brush-size = Math.round(root.lo * Math.pow(root.hi / root.lo, v) * 10) / 10;
+            }
+        }
+        Slide {
+            label: @tr("Мягкость");
+            value: Store.brush-soft;
+            minv: 0;
+            maxv: 1;
+            shown: Bridge.fmt-n(Store.brush-soft * 100, 0) + " %";
+            edited(v) => {
+                Store.brush-soft = v;
+            }
+        }
+        if Store.brush-tool == 0: Slide {
+            label: @tr("Тон");
+            value: Store.brush-tone;
+            minv: 0.05;
+            maxv: 1;
+            shown: Bridge.fmt-n(Store.brush-tone * 100, 0) + " %";
+            edited(v) => {
+                Store.brush-tone = v;
+            }
+        }
+        Rectangle {
+            vertical-stretch: 1;
+        }
+        HorizontalLayout {
+            alignment: end;
+            spacing: 8px;
+            Btn {
+                text: @tr("Очистить");
+                kind: 2;
+                has-icon: true;
+                icon: @image-url("icons/trash.svg");
+                enabled: Store.strokes-n > 0;
+                clicked => {
+                    Store.draw-clear();
+                }
+            }
         }
     }
 }

@@ -49,6 +49,9 @@ pub(super) struct Live {
     ink: Pixmap,
     mask: Option<Mask>,
     last: (f32, f32),
+    /// Где штрих начался и как далеко палец ушёл от этой точки, пикселей экрана
+    start: (f32, f32),
+    max_d: f32,
     width: f32,
     color: tiny_skia::Color,
     erase: bool,
@@ -295,7 +298,7 @@ fn save_brush(st: &mut State, ui: &AppWindow) {
 
 fn begin(st: &mut State, ui: &AppWindow, x: f64, y: f64) {
     let store = ui.global::<Store>();
-    if !store.get_drawing() {
+    if !store.get_drawing() || st.gesture {
         return;
     }
     let Some(m) = map(st, ui) else { return };
@@ -317,7 +320,20 @@ fn begin(st: &mut State, ui: &AppWindow, x: f64, y: f64) {
         Some(mk)
     });
     store.set_ink_alpha(if erase && !blank { 0.7 } else { 1.0 });
-    let mut live = Live { raw: vec![m.to_mm(x, y)], ink, mask, last: (x as f32, y as f32), width, color, erase, size, soft, tone };
+    let mut live = Live {
+        raw: vec![m.to_mm(x, y)],
+        ink,
+        mask,
+        last: (x as f32, y as f32),
+        start: (x as f32, y as f32),
+        max_d: 0.0,
+        width,
+        color,
+        erase,
+        size,
+        soft,
+        tone,
+    };
     live.dot(x as f32, y as f32);
     st.live = Some(live);
     save_brush(st, ui);
@@ -325,10 +341,15 @@ fn begin(st: &mut State, ui: &AppWindow, x: f64, y: f64) {
 }
 
 fn moved(st: &mut State, ui: &AppWindow, x: f64, y: f64) {
+    if st.gesture {
+        return;
+    }
     let Some(m) = map(st, ui) else { return };
     let Some(live) = st.live.as_mut() else { return };
+    let (fx, fy) = (x as f32, y as f32);
+    live.max_d = live.max_d.max((fx - live.start.0).hypot(fy - live.start.1));
     live.raw.push(m.to_mm(x, y));
-    live.seg(x as f32, y as f32);
+    live.seg(fx, fy);
     flush(st);
 }
 
@@ -345,8 +366,18 @@ fn flush(st: &mut State) {
 }
 
 fn end(st: &mut State, ui: &AppWindow) {
+    // Синтетическое нажатие после жеста: это не новый штрих
+    if st.gesture {
+        cancel(st, ui);
+        return;
+    }
     let Some(live) = st.live.take() else { return };
     st.ink_timer.stop();
+    // На сенсорном экране касание без движения — не точка: иначе два пальца оставляют следы
+    if ui.global::<Theme>().get_touch() && live.max_d < 6.0 {
+        ui.global::<Store>().set_ink(Image::default());
+        return;
+    }
     let pts = sketch::smooth(&live.raw, live.size);
     let s = Stroke { erase: live.erase, size: r2(live.size), soft: r2(live.soft), tone: r2(live.tone), pts };
     if let Some(pic) = st.pic.as_mut() {
