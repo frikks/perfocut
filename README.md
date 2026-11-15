@@ -45,9 +45,9 @@ SHA-256 для файлов версии **0.4.1**. Сверяйте после 
 
 | Файл | SHA-256 |
 | :--- | :--- |
-| `PerfoCut.exe` | `e91addb707b9731609b1bf520ce1350aa288f22fc64180d5f235c047d22c35d9` |
-| `PerfoCut.apk` | `4aa1517f5a327ce2f94b57e120643c00f09c5fe5828207608237a802b04c298b` |
-| `PerfoCut.html` | `a3641f309d10acda9e4f0fb9c1cf198a14b910aa7db1dfc989151a27b0d8f792` |
+| `PerfoCut.exe` | `38454f04bbcaa8edf803aeb91402f80dd8a92b7578804a4eb3afef8237420bff` |
+| `PerfoCut.apk` | `f7975a53b6ac93d82985725505cf354fca5090b849d2d22afdcf0c4e5aa18032` |
+| `PerfoCut.html` | `2f672be5ecfdf63e14955816aed45955d8e0a618875e37c05f36357276d8d538` |
 
 Все суммы одним файлом: **[SHA256SUMS.txt](https://github.com/frikks/perfocut/releases/latest/download/SHA256SUMS.txt)**.
 
