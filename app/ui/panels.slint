@@ -335,12 +335,15 @@ export component SettingsPanel inherits VerticalLayout {
                 text: @tr("Форма");
             }
             Seg {
-                items: [@tr("Круг"), @tr("Квадр."), @tr("Ромб"), @tr("Овал"), @tr("Звезда"), @tr("Треуг.")];
+                columns: 4;
+                items: [@tr("Круг"), @tr("Квадр."), @tr("Ромб"), @tr("Овал"), @tr("Звезда"), @tr("Треуг."), @tr("Шест."), @tr("Прорезь")];
                 current: Store.p.shape == "square" ? 1
                     : Store.p.shape == "diamond" ? 2
                     : Store.p.shape == "oval" ? 3
                     : Store.p.shape == "star" ? 4
                     : Store.p.shape == "triangle" ? 5
+                    : Store.p.shape == "hex" ? 6
+                    : Store.p.shape == "slot" ? 7
                     : 0;
                 select(i) => {
                     Store.p.shape = i == 1 ? "square"
@@ -348,6 +351,8 @@ export component SettingsPanel inherits VerticalLayout {
                         : i == 3 ? "oval"
                         : i == 4 ? "star"
                         : i == 5 ? "triangle"
+                        : i == 6 ? "hex"
+                        : i == 7 ? "slot"
                         : "circle";
                     Store.changed();
                 }
@@ -359,6 +364,40 @@ export component SettingsPanel inherits VerticalLayout {
                     unit: "×";
                     edited(v) => {
                         Store.p.shape-aspect = v;
+                        Store.changed();
+                    }
+                }
+            }
+            if Store.p.shape == "slot": FieldRow {
+                label: @tr("Длина (× ширина)");
+                NumField {
+                    value: Store.p.shape-aspect;
+                    unit: "×";
+                    edited(v) => {
+                        Store.p.shape-aspect = v;
+                        Store.changed();
+                    }
+                }
+            }
+            if Store.p.shape == "star": FieldRow {
+                label: @tr("Лучей");
+                NumField {
+                    value: Store.p.star-points;
+                    integer: true;
+                    unit: @tr("шт");
+                    edited(v) => {
+                        Store.p.star-points = v;
+                        Store.changed();
+                    }
+                }
+            }
+            if Store.p.shape == "star": FieldRow {
+                label: @tr("Внутр. радиус");
+                NumField {
+                    value: Store.p.star-inner;
+                    unit: "%";
+                    edited(v) => {
+                        Store.p.star-inner = v;
                         Store.changed();
                     }
                 }
@@ -472,6 +511,28 @@ export component SettingsPanel inherits VerticalLayout {
                     unit: @tr("мм");
                     edited(v) => {
                         Store.p.quant = v;
+                        Store.changed();
+                    }
+                }
+            }
+            FieldRow {
+                label: @tr("Разброс размеров");
+                NumField {
+                    value: Store.p.jitter;
+                    unit: "%";
+                    edited(v) => {
+                        Store.p.jitter = v;
+                        Store.changed();
+                    }
+                }
+            }
+            if Store.p.jitter > 0: FieldRow {
+                label: @tr("Зерно");
+                NumField {
+                    value: Store.p.seed;
+                    integer: true;
+                    edited(v) => {
+                        Store.p.seed = v;
                         Store.changed();
                     }
                 }

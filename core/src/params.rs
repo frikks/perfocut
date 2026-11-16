@@ -27,9 +27,17 @@ pub struct Params {
     pub angle: f64,
     pub offset_x: f64,
     pub offset_y: f64,
-    pub shape: String, // circle | square | diamond | oval | star | triangle
-    /// Пропорция (высота/ширина) для овала и треугольника.
+    pub shape: String, // circle | square | diamond | oval | star | triangle | hex | slot
+    /// Пропорция (высота/ширина) для овала и треугольника; длина/ширина для прорези.
     pub shape_aspect: f64,
+    /// Число лучей звезды.
+    pub star_points: u32,
+    /// Внутренний радиус звезды в долях внешнего (0.05–0.95).
+    pub star_inner: f64,
+    /// Случайный разброс диаметров в процентах (0 — выкл).
+    pub jitter: f64,
+    /// Зерно (seed) для разброса: одно зерно — одна картинка.
+    pub seed: u64,
     pub d_min: f64,
     pub d_max: f64,
     pub size_mode: String, // range | prop (как SVG tracing: размер пропорционален тону)
@@ -107,6 +115,10 @@ impl Default for Params {
             offset_y: 0.0,
             shape: "circle".into(),
             shape_aspect: 0.5,
+            star_points: 5,
+            star_inner: 0.4,
+            jitter: 0.0,
+            seed: 1,
             d_min: 2.0,
             d_max: 10.0,
             size_mode: "range".into(),
@@ -178,6 +190,9 @@ impl Params {
         p.wave_amp = fin(p.wave_amp, 0.0).clamp(0.0, 10000.0);
         p.quant = fin(p.quant, 0.0).clamp(0.0, 100.0);
         p.shape_aspect = fin(p.shape_aspect, 0.5).clamp(0.1, 5.0);
+        p.star_points = p.star_points.clamp(3, 12);
+        p.star_inner = fin(p.star_inner, 0.4).clamp(0.05, 0.95);
+        p.jitter = fin(p.jitter, 0.0).clamp(0.0, 50.0);
         p.step = fin(p.step, 1.0).clamp(0.1, 100.0);
         p.thickness = fin(p.thickness, 1.0).clamp(0.0, 100.0);
         p.min_k = fin(p.min_k, 1.0).clamp(0.0, 10.0);

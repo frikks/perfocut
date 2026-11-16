@@ -646,6 +646,8 @@ pub fn report(r: &GenResult) -> String {
             "oval" => t("овал", "oval"),
             "star" => t("звезда", "star"),
             "triangle" => t("треугольник", "triangle"),
+            "hex" => t("шестиугольник", "hexagon"),
+            "slot" => t("прорезь", "slot"),
             _ => t("круг", "circle"),
         };
         format!(

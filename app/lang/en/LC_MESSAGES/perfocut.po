@@ -66,6 +66,9 @@ msgstr "Client preview"
 msgid "Включить"
 msgstr "On"
 
+msgid "Внутр. радиус"
+msgstr "Inner radius"
+
 msgid "Вписать"
 msgstr "Fit"
 
@@ -105,6 +108,9 @@ msgstr "Gamma"
 msgid "Диаметр растёт от нуля вместе с темнотой, как в SVG tracing. Отверстия меньше мин. размера не режутся."
 msgstr "Diameter grows from zero with darkness, like in SVG tracing. Holes below the min size are not cut."
 
+msgid "Длина (× ширина)"
+msgstr "Length (× width)"
+
 msgid "Длина волны"
 msgstr "Wavelength"
 
@@ -134,6 +140,9 @@ msgstr "Fill"
 
 msgid "Звезда"
 msgstr "Star"
+
+msgid "Зерно"
+msgstr "Seed"
 
 msgid "Знаков после точки"
 msgstr "Decimal places"
@@ -203,6 +212,9 @@ msgstr "Lines"
 
 msgid "Лист"
 msgstr "Sheet"
+
+msgid "Лучей"
+msgstr "Rays"
 
 msgid "Макс. размер"
 msgstr "Max size"
@@ -369,11 +381,17 @@ msgstr "Proportional"
 msgid "Пропорция (высота/ширина)"
 msgstr "Aspect (height/width)"
 
+msgid "Прорезь"
+msgstr "Slot"
+
 msgid "Работает на телефоне"
 msgstr "Works on a phone"
 
 msgid "Работает на телефоне."
 msgstr "Works on phones."
+
+msgid "Разброс размеров"
+msgstr "Size spread"
 
 msgid "Размер от тона"
 msgstr "Size from tone"
@@ -537,6 +555,9 @@ msgstr "Size step"
 msgid "Шаг сетки"
 msgstr "Grid pitch"
 
+msgid "Шест."
+msgstr "Hex"
+
 msgid "Ширина"
 msgstr "Width"
 
@@ -576,6 +597,9 @@ msgstr "mm/min"
 msgid "пример"
 msgstr "sample"
 
+msgid "прорезь"
+msgstr "slot"
+
 msgid "с"
 msgstr "s"
 
@@ -584,6 +608,9 @@ msgstr "format is not supported"
 
 msgid "ч"
 msgstr "h"
+
+msgid "шестиугольник"
+msgstr "hexagon"
 
 msgid "шт"
 msgstr "pcs"

@@ -107,7 +107,9 @@ mod tests {
     fn bridges_and_edges_hold() {
         let g = gradient(200, 120);
         for grid in ["square", "tri", "tri90"] {
-            for shape in ["circle", "square", "diamond", "oval", "star", "triangle"] {
+            for shape in [
+                "circle", "square", "diamond", "oval", "star", "triangle", "hex", "slot",
+            ] {
                 let p = Params {
                     grid: grid.into(),
                     shape: shape.into(),
@@ -239,7 +241,13 @@ mod tests {
     #[test]
     fn new_shapes_build_and_export() {
         let g = gradient(200, 120);
-        for (shape, pts_expected) in [("oval", 12usize), ("star", 10), ("triangle", 3)] {
+        for (shape, pts_expected) in [
+            ("oval", 12usize),
+            ("star", 10),
+            ("triangle", 3),
+            ("hex", 6),
+            ("slot", 14),
+        ] {
             let r = gen::generate(
                 Some(&g),
                 &Params {
@@ -253,7 +261,8 @@ mod tests {
                 match s {
                     gen::Shape::Poly { pts, .. } => {
                         assert!(pts.len() >= pts_expected, "{shape}: {}", pts.len());
-                        if shape != "oval" {
+                        // У овала и прорези число вершин зависит от диаметра — проверяем минимум.
+                        if matches!(shape, "triangle" | "hex" | "star") {
                             assert_eq!(pts.len(), pts_expected, "{shape}");
                         }
                     }
@@ -267,14 +276,116 @@ mod tests {
             }
             // Имя фигуры попадает в отчёт.
             let rep = String::from_utf8(export_format(&r, "report").unwrap()).unwrap();
-            let name = if shape == "oval" {
-                "овал"
-            } else if shape == "star" {
-                "звезда"
-            } else {
-                "треугольник"
+            let name = match shape {
+                "oval" => "овал",
+                "star" => "звезда",
+                "triangle" => "треугольник",
+                "hex" => "шестиугольник",
+                _ => "прорезь",
             };
             assert!(rep.contains(name), "{shape}: отчёт без имени фигуры");
+        }
+    }
+
+    #[test]
+    fn star_and_slot_params_work() {
+        let g = gradient(200, 120);
+        // 6 лучей — 12 вершин вместо 10 по умолчанию.
+        let s6 = gen::generate(
+            Some(&g),
+            &Params {
+                shape: "star".into(),
+                star_points: 6,
+                d_max: 8.0,
+                ..Params::default()
+            },
+        );
+        assert!(!s6.shapes.is_empty());
+        for s in &s6.shapes {
+            match s {
+                gen::Shape::Poly { pts, .. } => assert_eq!(pts.len(), 12),
+                _ => panic!("star: ожидался полигон"),
+            }
+        }
+        // Пропорция 2 у прорези: длина вдвое больше ширины (габаритные отношения).
+        let sl = gen::generate(
+            Some(&g),
+            &Params {
+                shape: "slot".into(),
+                shape_aspect: 2.0,
+                d_max: 8.0,
+                ..Params::default()
+            },
+        );
+        assert!(!sl.shapes.is_empty());
+        for s in &sl.shapes {
+            match s {
+                gen::Shape::Poly { pts, .. } => {
+                    let (mut x0, mut x1) = (f64::INFINITY, f64::NEG_INFINITY);
+                    let (mut y0, mut y1) = (f64::INFINITY, f64::NEG_INFINITY);
+                    for &(px, py) in pts {
+                        x0 = x0.min(px);
+                        x1 = x1.max(px);
+                        y0 = y0.min(py);
+                        y1 = y1.max(py);
+                    }
+                    let ratio = (x1 - x0) / (y1 - y0);
+                    assert!((ratio - 2.0).abs() < 0.05, "ratio={ratio}");
+                }
+                _ => panic!("slot: ожидался полигон"),
+            }
+        }
+    }
+
+    #[test]
+    fn jitter_is_deterministic() {
+        let g = gradient(200, 120);
+        let sizes = |r: &gen::GenResult| -> Vec<u64> {
+            r.shapes.iter().map(|s| s.size().to_bits()).collect()
+        };
+        let base = gen::generate(Some(&g), &Params::default());
+        let p = Params {
+            jitter: 15.0,
+            seed: 7,
+            ..Params::default()
+        };
+        let j1 = gen::generate(Some(&g), &p);
+        let j2 = gen::generate(Some(&g), &p);
+        assert!(!j1.shapes.is_empty());
+        // Одно зерно — один результат.
+        assert_eq!(sizes(&j1), sizes(&j2), "разброс недетерминирован");
+        // Разброс действительно меняет размеры...
+        assert_ne!(sizes(&j1), sizes(&base), "разброс не изменил размеры");
+        // ...а другое зерно даёт другую картинку.
+        let j3 = gen::generate(
+            Some(&g),
+            &Params {
+                jitter: 15.0,
+                seed: 8,
+                ..Params::default()
+            },
+        );
+        assert_ne!(sizes(&j1), sizes(&j3), "зерно не влияет на разброс");
+        // Перемычка держится: соседние круги не сливаются.
+        let c: Vec<(f64, f64, f64)> = j1
+            .shapes
+            .iter()
+            .filter_map(|s| match s {
+                gen::Shape::Circle { x, y, d } => Some((*x, *y, *d)),
+                _ => None,
+            })
+            .collect();
+        let p = Params {
+            jitter: 15.0,
+            ..Params::default()
+        };
+        for (i, a) in c.iter().enumerate() {
+            for b in c.iter().skip(i + 1) {
+                let dist = ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt();
+                if dist < 3.0 * p.pitch {
+                    assert!(dist - a.2 / 2.0 - b.2 / 2.0 >= p.bridge - 1e-6);
+                }
+            }
         }
     }
 

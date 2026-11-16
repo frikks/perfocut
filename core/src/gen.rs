@@ -175,6 +175,28 @@ fn round2(v: f64) -> f64 {
     (v * 100.0).round() / 100.0
 }
 
+/// Число вершин на полной окружности радиуса `r` при допуске по хорде 0,02 мм.
+fn chord_circle_n(r: f64) -> usize {
+    if r > 0.02 {
+        (PI / (1.0 - 0.02 / r).acos()).ceil() as usize
+    } else {
+        8
+    }
+    .clamp(12, 720)
+}
+
+/// Детерминированная псевдослучайная величина [0, 1) из координат и зерна (splitmix64).
+/// Одно и то же зерно всегда даёт одну и ту же «случайную» картинку.
+fn jitter_u01(seed: u64, x: f64, y: f64) -> f64 {
+    let mut z =
+        (seed.wrapping_mul(0x9E37_79B9_7F4A_7C15)) ^ x.to_bits() ^ y.to_bits().rotate_left(32);
+    z = z.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^= z >> 31;
+    (z >> 11) as f64 / (1u64 << 53) as f64
+}
+
 fn dist_to_seg(p: (f64, f64), a: (f64, f64), b: (f64, f64)) -> f64 {
     let (dx, dy) = (b.0 - a.0, b.1 - a.1);
     let ll = dx * dx + dy * dy;
@@ -651,6 +673,14 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                             .unwrap();
                     }
                     let d = if fixed.is_empty() { round2(d) } else { d };
+                    // Случайный разброс: диаметр гуляет на ±jitter % по зерну,
+                    // детерминированно от координат. Крупные не превышают каплю по перемычке.
+                    let d = if p.jitter > 0.0 && fixed.is_empty() {
+                        let u = jitter_u01(p.seed, x, y) * 2.0 - 1.0;
+                        (d * (1.0 + u * p.jitter / 100.0)).min(max_allowed)
+                    } else {
+                        d
+                    };
                     // Компенсация реза: траектория меньше номинала на kerf (отрицательный — раздувает).
                     let d = round2(d - p.kerf);
                     if d <= 0.01 {
@@ -669,14 +699,7 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                         }
                         "oval" => {
                             let (rx, ry) = (d / 2.0, d / 2.0 * p.shape_aspect);
-                            let r = rx.max(ry);
-                            // Столько же вершин, сколько у круга с допуском по хорде.
-                            let n = if r > 0.02 {
-                                (PI / (1.0 - 0.02 / r).acos()).ceil() as usize
-                            } else {
-                                8
-                            };
-                            let n = n.clamp(12, 720);
+                            let n = chord_circle_n(rx.max(ry));
                             Some(
                                 (0..n)
                                     .map(|i| {
@@ -692,15 +715,43 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                         }
                         "star" => {
                             let r = d / 2.0;
+                            let n = p.star_points as usize;
                             Some(
-                                (0..10)
+                                (0..2 * n)
                                     .map(|i| {
-                                        let rr = if i % 2 == 0 { r } else { r * 0.4 };
-                                        let a = PI / 2.0 + PI * i as f64 / 5.0;
+                                        let rr = if i % 2 == 0 { r } else { r * p.star_inner };
+                                        let a = PI / 2.0 + PI * i as f64 / n as f64;
                                         (rr * a.cos(), rr * a.sin())
                                     })
                                     .collect(),
                             )
+                        }
+                        "hex" => Some(
+                            (0..6)
+                                .map(|i| {
+                                    let a = PI / 3.0 * i as f64;
+                                    (d / 2.0 * a.cos(), d / 2.0 * a.sin())
+                                })
+                                .collect(),
+                        ),
+                        "slot" => {
+                            let r = d / 2.0;
+                            // Длина задаётся пропорцией (длина/ширина); меньше ширины не бывает,
+                            // при пропорции 1 и ниже получается круг.
+                            let c = (d * p.shape_aspect.max(1.0) - d) / 2.0;
+                            let n = (chord_circle_n(r) / 2).max(6);
+                            let mut pts: Vec<(f64, f64)> = Vec::with_capacity(2 * n + 2);
+                            // Правый торец: от -90° до +90° через 0°.
+                            for i in 0..=n {
+                                let a = -PI / 2.0 + PI * i as f64 / n as f64;
+                                pts.push((c + r * a.cos(), r * a.sin()));
+                            }
+                            // Левый торец: от 90° до 270° через 180°.
+                            for i in 0..=n {
+                                let a = PI / 2.0 + PI * i as f64 / n as f64;
+                                pts.push((-c + r * a.cos(), r * a.sin()));
+                            }
+                            Some(pts)
                         }
                         _ => None,
                     };
