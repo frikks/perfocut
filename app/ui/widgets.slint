@@ -190,6 +190,9 @@ export component NumField inherits Rectangle {
     horizontal-stretch: 1;
     min-width: 64px;
     opacity: enabled ? 1 : 0.45;
+    init => {
+        ti.text = root.shown;
+    }
     changed shown => {
         if !ti.has-focus {
             ti.text = shown;
@@ -211,7 +214,6 @@ export component NumField inherits Rectangle {
         width: parent.width - 20px - (root.unit == "" ? 0px : unit-t.width + 6px);
         height: parent.height;
         enabled: root.enabled;
-        text: root.shown;
         font-family: Theme.mono;
         font-size: Theme.fs-m;
         color: Theme.t1;
