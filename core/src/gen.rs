@@ -1,6 +1,7 @@
 use crate::image::Gray;
 use crate::params::Params;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::f64::consts::PI;
 
 /// Отрезок между двумя точками: (начало, конец)
@@ -19,9 +20,26 @@ impl Shape {
             Shape::Poly { size, .. } => *size,
         }
     }
+    pub fn center(&self) -> (f64, f64) {
+        match self {
+            Shape::Circle { x, y, .. } => (*x, *y),
+            Shape::Poly { pts, .. } => {
+                if pts.is_empty() {
+                    return (0.0, 0.0);
+                }
+                let (mut sx, mut sy) = (0.0, 0.0);
+                for p in pts {
+                    sx += p.0;
+                    sy += p.1;
+                }
+                let n = pts.len() as f64;
+                (sx / n, sy / n)
+            }
+        }
+    }
     pub fn start(&self) -> (f64, f64) {
         match self {
-            Shape::Circle { x, y, d } => (x + d / 2.0, *y),
+            Shape::Circle { x, y, .. } => (*x, *y),
             Shape::Poly { pts, .. } => pts[0],
         }
     }
@@ -124,7 +142,14 @@ impl<'a> Sampler<'a> {
             left = w / 2.0 + p.img_dx - dw / 2.0;
             top = h / 2.0 - p.img_dy - dh / 2.0;
         }
-        Sampler { img, left, top, sx, sy, p }
+        Sampler {
+            img,
+            left,
+            top,
+            sx,
+            sy,
+            p,
+        }
     }
 
     /// Тон 0..1 (1 = максимальное отверстие) в точке листа (X, Y вверх), усреднённый по радиусу r (мм).
@@ -150,6 +175,145 @@ fn round2(v: f64) -> f64 {
     (v * 100.0).round() / 100.0
 }
 
+fn dist_to_seg(p: (f64, f64), a: (f64, f64), b: (f64, f64)) -> f64 {
+    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+    let ll = dx * dx + dy * dy;
+    let t = if ll > 0.0 {
+        (((p.0 - a.0) * dx + (p.1 - a.1) * dy) / ll).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    ((p.0 - a.0 - t * dx).powi(2) + (p.1 - a.1 - t * dy).powi(2)).sqrt()
+}
+
+/// Упрощение открытой ломаной алгоритмом Рамера — Дугласа — Пекера.
+fn simplify_open(pts: &[(f64, f64)], eps: f64) -> Vec<(f64, f64)> {
+    let n = pts.len();
+    if n < 3 {
+        return pts.to_vec();
+    }
+    let mut keep = vec![false; n];
+    keep[0] = true;
+    keep[n - 1] = true;
+    let mut stack = vec![(0usize, n - 1)];
+    while let Some((i, j)) = stack.pop() {
+        let (mut best, mut at) = (0.0, 0);
+        for k in i + 1..j {
+            let d = dist_to_seg(pts[k], pts[i], pts[j]);
+            if d > best {
+                best = d;
+                at = k;
+            }
+        }
+        if best > eps {
+            keep[at] = true;
+            stack.push((i, at));
+            stack.push((at, j));
+        }
+    }
+    pts.iter()
+        .zip(keep)
+        .filter(|(_, k)| *k)
+        .map(|(p, _)| *p)
+        .collect()
+}
+
+/// Жадная оптимизация порядка резки (Nearest Neighbor с пространственным хешированием).
+///
+/// Ячейка сетки подстраивается под плотность раскладки: около одной фигуры на ячейку.
+/// Так разреженные узоры не деградируют — на шаге хватает ближайших колец сетки.
+fn optimize_path(shapes: Vec<Shape>, cell_size: f64) -> Vec<Shape> {
+    let n = shapes.len();
+    if n <= 2 {
+        return shapes;
+    }
+    let centers: Vec<(f64, f64)> = shapes.iter().map(Shape::center).collect();
+    let (mut x0, mut y0) = (f64::INFINITY, f64::INFINITY);
+    let (mut x1, mut y1) = (f64::NEG_INFINITY, f64::NEG_INFINITY);
+    for &(x, y) in &centers {
+        x0 = x0.min(x);
+        y0 = y0.min(y);
+        x1 = x1.max(x);
+        y1 = y1.max(y);
+    }
+    let side = (n as f64).sqrt().ceil().max(1.0);
+    let span = (x1 - x0).max(y1 - y0).max(1.0);
+    let cs = cell_size.max(span / side).max(5.0);
+    let max_ring = (span / cs).ceil() as i32 + 1;
+
+    let mut grid: HashMap<(i32, i32), Vec<usize>> = HashMap::with_capacity(n / 4 + 1);
+    for (idx, &(cx, cy)) in centers.iter().enumerate() {
+        let gx = (cx / cs).floor() as i32;
+        let gy = (cy / cs).floor() as i32;
+        grid.entry((gx, gy)).or_default().push(idx);
+    }
+
+    let mut visited = vec![false; n];
+    let mut order = Vec::with_capacity(n);
+    let mut cur = (0.0, 0.0);
+
+    for _ in 0..n {
+        let gx0 = (cur.0 / cs).floor() as i32;
+        let gy0 = (cur.1 / cs).floor() as i32;
+        let mut best_idx = None;
+        let mut best_d2 = f64::INFINITY;
+
+        for r in 0i32..=max_ring {
+            for dy in -r..=r {
+                for dx in -r..=r {
+                    if r > 0 && dx.abs() != r && dy.abs() != r {
+                        continue;
+                    }
+                    if let Some(bucket) = grid.get(&(gx0 + dx, gy0 + dy)) {
+                        for &idx in bucket {
+                            if visited[idx] {
+                                continue;
+                            }
+                            let p = centers[idx];
+                            let d2 = (p.0 - cur.0).powi(2) + (p.1 - cur.1).powi(2);
+                            if d2 < best_d2 {
+                                best_d2 = d2;
+                                best_idx = Some(idx);
+                            }
+                        }
+                    }
+                }
+            }
+            if best_idx.is_some() && r >= 1 {
+                break;
+            }
+        }
+
+        let chosen = match best_idx {
+            Some(idx) => idx,
+            None => {
+                let mut fb = 0;
+                let mut fb_d2 = f64::INFINITY;
+                for (idx, &p) in centers.iter().enumerate() {
+                    if !visited[idx] {
+                        let d2 = (p.0 - cur.0).powi(2) + (p.1 - cur.1).powi(2);
+                        if d2 < fb_d2 {
+                            fb_d2 = d2;
+                            fb = idx;
+                        }
+                    }
+                }
+                fb
+            }
+        };
+
+        visited[chosen] = true;
+        cur = centers[chosen];
+        order.push(chosen);
+    }
+
+    let mut opt: Vec<Option<Shape>> = shapes.into_iter().map(Some).collect();
+    order
+        .into_iter()
+        .filter_map(|idx| opt[idx].take())
+        .collect()
+}
+
 pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
     let p = params.sanitized();
     let en = p.lang == "en";
@@ -169,12 +333,20 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         return finish(shapes, warnings, removed_edge, min_allowed, max_allowed, p);
     }
     if img.is_none() {
-        warnings.push(tr(en, "Загрузите изображение, чтобы получить узор", "Load an image to get a pattern"));
+        warnings.push(tr(
+            en,
+            "Загрузите изображение, чтобы получить узор",
+            "Load an image to get a pattern",
+        ));
     }
 
     if p.pattern == "lines" {
         let lp = p.line_pitch;
-        let k = if p.wave { 2.0 * PI * p.wave_amp / p.wave_len } else { 0.0 };
+        let k = if p.wave {
+            2.0 * PI * p.wave_amp / p.wave_len
+        } else {
+            0.0
+        };
         let cos_f = 1.0 / (1.0 + k * k).sqrt();
         let cap = lp * cos_f - p.bridge;
         max_allowed = cap;
@@ -182,24 +354,48 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         let mut wmax = p.w_max;
         if wmax > cap {
             warnings.push(if en {
-                format!("Max width limited to {} mm to keep the bridge at least {} mm", dec(cap.max(0.0), en), dec(p.bridge, en))
+                format!(
+                    "Max width limited to {} mm to keep the bridge at least {} mm",
+                    dec(cap.max(0.0), en),
+                    dec(p.bridge, en)
+                )
             } else {
-                format!("Макс. ширина ограничена до {} мм, чтобы перемычка была не меньше {} мм", dec(cap.max(0.0), en), dec(p.bridge, en))
+                format!(
+                    "Макс. ширина ограничена до {} мм, чтобы перемычка была не меньше {} мм",
+                    dec(cap.max(0.0), en),
+                    dec(p.bridge, en)
+                )
             });
             wmax = cap;
         }
         if p.w_min < min_allowed {
             warnings.push(if en {
-                format!("Min width raised to {} mm: a slot in {} mm metal cannot be narrower", dec(min_allowed, en), dec(p.thickness, en))
+                format!(
+                    "Min width raised to {} mm: a slot in {} mm metal cannot be narrower",
+                    dec(min_allowed, en),
+                    dec(p.thickness, en)
+                )
             } else {
-                format!("Мин. ширина поднята до {} мм: для металла {} мм прорезь не может быть уже", dec(min_allowed, en), dec(p.thickness, en))
+                format!(
+                    "Мин. ширина поднята до {} мм: для металла {} мм прорезь не может быть уже",
+                    dec(min_allowed, en),
+                    dec(p.thickness, en)
+                )
             });
         }
         let est = (w * h) / (lp * p.step);
         if est > MAX_SHAPES * 4.0 {
-            warnings.push(tr(en, "Слишком мелкий шаг линий или выборки для такого листа", "Line pitch or sampling step is too small for this sheet"));
+            warnings.push(tr(
+                en,
+                "Слишком мелкий шаг линий или выборки для такого листа",
+                "Line pitch or sampling step is too small for this sheet",
+            ));
         } else if wmax < wmin {
-            warnings.push(tr(en, "Шаг линий слишком мал для заданной перемычки и мин. ширины", "Line pitch is too small for this bridge and min width"));
+            warnings.push(tr(
+                en,
+                "Шаг линий слишком мал для заданной перемычки и мин. ширины",
+                "Line pitch is too small for this bridge and min width",
+            ));
         } else if img.is_some() {
             let (cx, cy) = (w / 2.0, h / 2.0);
             let rad = p.line_angle.to_radians();
@@ -208,15 +404,21 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
             let m = (reach / lp).ceil() as i64;
             let n_steps = ((2.0 * reach) / p.step).ceil() as i64;
             let inside = |x: f64, y: f64| x >= b && x <= w - b && y >= b && y <= h - b;
+
             for j in -m..=m {
                 let v0 = j as f64 * lp + p.offset_y;
-                let mut runs: Vec<Vec<Segment>> = Vec::new();
+                let mut runs: Vec<(i64, i64, Vec<Segment>)> = Vec::new();
                 let mut cur: Vec<Segment> = Vec::new();
+                let mut cur_start = 0i64;
+
                 for s in 0..=n_steps {
                     let u = -reach + s as f64 * p.step + p.offset_x;
                     let (lv, dv) = if p.wave {
                         let ph = 2.0 * PI * u / p.wave_len;
-                        (v0 + p.wave_amp * ph.sin(), p.wave_amp * 2.0 * PI / p.wave_len * ph.cos())
+                        (
+                            v0 + p.wave_amp * ph.sin(),
+                            p.wave_amp * 2.0 * PI / p.wave_len * ph.cos(),
+                        )
                     } else {
                         (v0, 0.0)
                     };
@@ -230,7 +432,11 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                         if let Some(t) = sampler.tone(x, y, lp / 2.0) {
                             if t >= p.tone_cut {
                                 let tt = ((t - p.tone_cut) / (1.0 - p.tone_cut)).clamp(0.0, 1.0);
-                                let ww = if prop { wmax * t } else { wmin + (wmax - wmin) * tt };
+                                let ww = if prop {
+                                    wmax * t
+                                } else {
+                                    wmin + (wmax - wmin) * tt
+                                };
                                 let l = (x + nx * ww / 2.0, y + ny * ww / 2.0);
                                 let r = (x - nx * ww / 2.0, y - ny * ww / 2.0);
                                 if ww >= wmin - 1e-9 && inside(l.0, l.1) && inside(r.0, r.1) {
@@ -240,19 +446,40 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                         }
                     }
                     match ok {
-                        Some(pair) => cur.push(pair),
+                        Some(pair) => {
+                            if cur.is_empty() {
+                                cur_start = s;
+                            }
+                            cur.push(pair);
+                        }
                         None => {
                             if !cur.is_empty() {
-                                runs.push(std::mem::take(&mut cur));
+                                runs.push((cur_start, s - 1, std::mem::take(&mut cur)));
                             }
                         }
                     }
                 }
                 if !cur.is_empty() {
-                    runs.push(cur);
+                    runs.push((cur_start, n_steps, cur));
                 }
+
+                // Проверка перемычки вдоль линии: если разрыв между соседними прорезями меньше p.bridge,
+                // укорачиваем смежные торцы на половину нехватки — итоговый зазор ровно p.bridge.
+                let runs_len = runs.len();
+                for idx in 0..runs_len.saturating_sub(1) {
+                    let gap_steps = runs[idx + 1].0 - runs[idx].1;
+                    let gap_mm = gap_steps as f64 * p.step;
+                    let trim = ((p.bridge - gap_mm) / p.step / 2.0).ceil() as usize;
+                    if trim > 0 {
+                        let keep_left = runs[idx].2.len().saturating_sub(trim);
+                        runs[idx].2.truncate(keep_left);
+                        let drop_right = trim.min(runs[idx + 1].2.len());
+                        runs[idx + 1].2.drain(0..drop_right);
+                    }
+                }
+
                 let mut line_shapes = Vec::new();
-                for run in runs {
+                for (_, _, run) in runs {
                     if run.len() < 2 {
                         continue;
                     }
@@ -260,13 +487,20 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                     if len < wmin.max(p.step) {
                         continue;
                     }
-                    let mut pts: Vec<(f64, f64)> = run.iter().map(|q| q.0).collect();
-                    pts.extend(run.iter().rev().map(|q| q.1));
+                    let left_raw: Vec<(f64, f64)> = run.iter().map(|q| q.0).collect();
+                    let right_raw: Vec<(f64, f64)> = run.iter().rev().map(|q| q.1).collect();
+
+                    let mut pts = simplify_open(&left_raw, 0.02);
+                    pts.extend(simplify_open(&right_raw, 0.02));
+
                     let maxw = run
                         .iter()
                         .map(|q| ((q.0 .0 - q.1 .0).powi(2) + (q.0 .1 - q.1 .1).powi(2)).sqrt())
                         .fold(0.0, f64::max);
-                    line_shapes.push(Shape::Poly { pts, size: round2(maxw) });
+                    line_shapes.push(Shape::Poly {
+                        pts,
+                        size: round2(maxw),
+                    });
                 }
                 if j.rem_euclid(2) == 1 {
                     line_shapes.reverse();
@@ -285,18 +519,34 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         let mut dmax = p.d_max;
         if dmax > cap {
             warnings.push(if en {
-                format!("Max size limited to {} mm to keep the bridge at least {} mm", dec(cap.max(0.0), en), dec(p.bridge, en))
+                format!(
+                    "Max size limited to {} mm to keep the bridge at least {} mm",
+                    dec(cap.max(0.0), en),
+                    dec(p.bridge, en)
+                )
             } else {
-                format!("Макс. размер ограничен до {} мм, чтобы перемычка была не меньше {} мм", dec(cap.max(0.0), en), dec(p.bridge, en))
+                format!(
+                    "Макс. размер ограничен до {} мм, чтобы перемычка была не меньше {} мм",
+                    dec(cap.max(0.0), en),
+                    dec(p.bridge, en)
+                )
             });
             dmax = cap;
         }
         let dmin = p.d_min.max(min_allowed);
         if p.d_min < min_allowed {
             warnings.push(if en {
-                format!("Min size raised to {} mm: a hole in {} mm metal cannot be smaller", dec(min_allowed, en), dec(p.thickness, en))
+                format!(
+                    "Min size raised to {} mm: a hole in {} mm metal cannot be smaller",
+                    dec(min_allowed, en),
+                    dec(p.thickness, en)
+                )
             } else {
-                format!("Мин. размер поднят до {} мм: для металла {} мм отверстие не может быть меньше", dec(min_allowed, en), dec(p.thickness, en))
+                format!(
+                    "Мин. размер поднят до {} мм: для металла {} мм отверстие не может быть меньше",
+                    dec(min_allowed, en),
+                    dec(p.thickness, en)
+                )
             });
         }
         let mut fixed = if p.fixed { p.fixed_list() } else { vec![] };
@@ -304,21 +554,39 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
             let before = fixed.len();
             fixed.retain(|d| *d >= dmin - 1e-9 && *d <= dmax + 1e-9);
             if fixed.len() < before {
-                warnings.push(tr(en, "Часть заданных размеров вне допустимого диапазона и не используется", "Some fixed sizes are out of the allowed range and are not used"));
+                warnings.push(tr(
+                    en,
+                    "Часть заданных размеров вне допустимого диапазона и не используется",
+                    "Some fixed sizes are out of the allowed range and are not used",
+                ));
             }
             if fixed.is_empty() {
-                warnings.push(tr(en, "Нет ни одного допустимого заданного размера", "None of the fixed sizes is allowed"));
+                warnings.push(tr(
+                    en,
+                    "Нет ни одного допустимого заданного размера",
+                    "None of the fixed sizes is allowed",
+                ));
             }
         }
         let est = (w * h) / (pch * pch);
         if est > MAX_SHAPES {
             warnings.push(if en {
-                format!("Pitch is too small: about {} holes. Increase the pitch", count(est, en))
+                format!(
+                    "Pitch is too small: about {} holes. Increase the pitch",
+                    count(est, en)
+                )
             } else {
-                format!("Слишком мелкий шаг: около {} отверстий. Увеличьте шаг", count(est, en))
+                format!(
+                    "Слишком мелкий шаг: около {} отверстий. Увеличьте шаг",
+                    count(est, en)
+                )
             });
         } else if dmax < dmin {
-            warnings.push(tr(en, "Шаг слишком мал для заданной перемычки и мин. размера", "Pitch is too small for this bridge and min size"));
+            warnings.push(tr(
+                en,
+                "Шаг слишком мал для заданной перемычки и мин. размера",
+                "Pitch is too small for this bridge and min size",
+            ));
         } else if img.is_some() && !(p.fixed && fixed.is_empty()) {
             let (cx, cy) = (w / 2.0, h / 2.0);
             let rad = p.angle.to_radians();
@@ -332,7 +600,6 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
             };
             let nj = (reach / row_h).ceil() as i64 + 1;
             let ni = (reach / col_w).ceil() as i64 + 1;
-            // экстенты фигуры по осям с учётом поворота
             let ext = |d: f64| -> (f64, f64) {
                 match p.shape.as_str() {
                     "square" => {
@@ -374,7 +641,6 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                     }
                     let tt = ((t - p.tone_cut) / (1.0 - p.tone_cut)).clamp(0.0, 1.0);
                     let mut d = if prop {
-                        // как SVG tracing: диаметр от нуля пропорционален тону; меньше минимума не режем
                         let dp = dmax * t;
                         if dp < dmin - 1e-9 {
                             continue;
@@ -384,7 +650,6 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                         dmin + (dmax - dmin) * tt
                     };
                     if fixed.is_empty() && p.quant > 0.0 {
-                        // квантование: округляем вниз до шага, но не ниже минимума
                         d = ((d / p.quant + 1e-9).floor() * p.quant).max(dmin);
                     }
                     if !fixed.is_empty() {
@@ -394,7 +659,11 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                             .unwrap();
                     }
                     let (ex, ey) = ext(d);
-                    if x - ex < b - 1e-9 || x + ex > w - b + 1e-9 || y - ey < b - 1e-9 || y + ey > h - b + 1e-9 {
+                    if x - ex < b - 1e-9
+                        || x + ex > w - b + 1e-9
+                        || y - ey < b - 1e-9
+                        || y + ey > h - b + 1e-9
+                    {
                         removed_edge += 1;
                         continue;
                     }
@@ -404,7 +673,10 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                             let hs = d / 2.0;
                             let c = [(hs, hs), (-hs, hs), (-hs, -hs), (hs, -hs)];
                             Shape::Poly {
-                                pts: c.iter().map(|q| (x + q.0 * ca - q.1 * sa, y + q.0 * sa + q.1 * ca)).collect(),
+                                pts: c
+                                    .iter()
+                                    .map(|q| (x + q.0 * ca - q.1 * sa, y + q.0 * sa + q.1 * ca))
+                                    .collect(),
                                 size: d,
                             }
                         }
@@ -412,7 +684,10 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                             let hs = d / 2.0;
                             let c = [(hs, 0.0), (0.0, hs), (-hs, 0.0), (0.0, -hs)];
                             Shape::Poly {
-                                pts: c.iter().map(|q| (x + q.0 * ca - q.1 * sa, y + q.0 * sa + q.1 * ca)).collect(),
+                                pts: c
+                                    .iter()
+                                    .map(|q| (x + q.0 * ca - q.1 * sa, y + q.0 * sa + q.1 * ca))
+                                    .collect(),
                                 size: d,
                             }
                         }
@@ -428,19 +703,25 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         }
     }
 
+    // У узора «линии» порядок уже задан построчно серпантином — оптимизация только ломает его.
+    let shapes = if p.pattern == "lines" {
+        shapes
+    } else {
+        optimize_path(shapes, p.pitch * 2.0)
+    };
+
     finish(shapes, warnings, removed_edge, min_allowed, max_allowed, p)
 }
 
 fn finish(
     shapes: Vec<Shape>,
-    warnings: Vec<String>,
+    mut warnings: Vec<String>,
     removed_edge: usize,
     min_allowed: f64,
     max_allowed: f64,
     p: Params,
 ) -> GenResult {
     let (w, h) = (p.sheet_w, p.sheet_h);
-    // Статистика
     let mut st = Stats {
         count: shapes.len(),
         removed_edge,
@@ -478,7 +759,10 @@ fn finish(
             while j < sizes.len() && (sizes[j] - sizes[i]).abs() < 1e-9 {
                 j += 1;
             }
-            st.by_size.push(SizeCount { size: sizes[i], count: j - i });
+            st.by_size.push(SizeCount {
+                size: sizes[i],
+                count: j - i,
+            });
             i = j;
         }
     }
@@ -488,19 +772,37 @@ fn finish(
     st.cut_len_m = cut / 1000.0;
     st.travel_m = travel / 1000.0;
     st.pierces = shapes.len() + if p.outline { 1 } else { 0 };
-    st.time_min = cut / p.cut_speed + travel / p.rapid_speed + st.pierces as f64 * p.pierce_time / 60.0;
+    st.time_min =
+        cut / p.cut_speed + travel / p.rapid_speed + st.pierces as f64 * p.pierce_time / 60.0;
     st.cost_cut = st.cut_len_m * p.price_m;
     st.cost_pierce = st.pierces as f64 * p.price_pierce;
     st.cost_material = w * h / 1e6 * p.price_m2;
     st.cost_fixed = p.price_fixed;
     st.cost = st.cost_cut + st.cost_pierce + st.cost_material + st.cost_fixed;
-    // масса листа после перфорации: мм² * мм = мм³; г/см³ -> кг: мм³ * 1e-3 см³ * ρ г / 1000
     st.weight_kg = (w * h - area) * p.thickness * p.density * 1e-6;
+    // STEP — единственный формат, который растёт на ~1,2 КБ на отверстие: предупреждаем заранее.
+    if shapes.len() > 20_000 {
+        let mb = (shapes.len() as f64 * 1.2 / 1024.0).round().max(1.0) as u64;
+        warnings.push(if p.lang == "en" {
+            format!(
+                "STEP will be large: about {} holes, ~{mb} MB. For CAD prefer STL or a smaller area",
+                count(shapes.len() as f64, true)
+            )
+        } else {
+            format!(
+                "STEP будет большим: около {} отверстий, ~{mb} МБ. Для CAD лучше STL или меньшее поле",
+                count(shapes.len() as f64, false)
+            )
+        });
+    }
     st.warnings = warnings;
-    GenResult { shapes, stats: st, params: p }
+    GenResult {
+        shapes,
+        stats: st,
+        params: p,
+    }
 }
 
-/// Дробное число для сообщений: до двух знаков, в русском через запятую, как в остальном интерфейсе.
 fn dec(v: f64, en: bool) -> String {
     let s = crate::export::num(v, 2);
     if en {
@@ -510,7 +812,6 @@ fn dec(v: f64, en: bool) -> String {
     }
 }
 
-/// Целое с разделением разрядов: 1 234 567 или 1,234,567.
 fn count(v: f64, en: bool) -> String {
     let digits = (v.round().max(0.0) as u64).to_string();
     let sep = if en { ',' } else { '\u{a0}' };
@@ -525,5 +826,9 @@ fn count(v: f64, en: bool) -> String {
 }
 
 fn tr(en: bool, ru: &str, eng: &str) -> String {
-    if en { eng.to_string() } else { ru.to_string() }
+    if en {
+        eng.to_string()
+    } else {
+        ru.to_string()
+    }
 }

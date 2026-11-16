@@ -41,14 +41,22 @@ pub struct Sketch {
 
 impl Sketch {
     pub fn new(w: f64, h: f64) -> Sketch {
-        Sketch { w, h, width_k: 1.0, strokes: Vec::new() }
+        Sketch {
+            w,
+            h,
+            width_k: 1.0,
+            strokes: Vec::new(),
+        }
     }
 
     /// Размер растра под холст: длинная сторона `max_side` пикселей.
     pub fn raster_size(&self, max_side: usize) -> (usize, usize) {
         let (w, h) = (self.w.max(1e-3), self.h.max(1e-3));
         let k = max_side as f64 / w.max(h);
-        (((w * k).round() as usize).max(1), ((h * k).round() as usize).max(1))
+        (
+            ((w * k).round() as usize).max(1),
+            ((h * k).round() as usize).max(1),
+        )
     }
 
     /// Все штрихи поверх подложки `base` (RGBA, w×h).
@@ -108,7 +116,11 @@ impl Sketch {
                         continue;
                     }
                     let mx = (x as f64 + 0.5) / kx;
-                    let t = if ll > 0.0 { (((mx - a[0]) * dx + (my - a[1]) * dy) / ll).clamp(0.0, 1.0) } else { 0.0 };
+                    let t = if ll > 0.0 {
+                        (((mx - a[0]) * dx + (my - a[1]) * dy) / ll).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
                     let (ex, ey) = (mx - a[0] - t * dx, my - a[1] - t * dy);
                     let d = (ex * ex + ey * ey).sqrt();
                     if d >= e1 {
@@ -159,7 +171,11 @@ impl Sketch {
             if s.pts.is_empty() {
                 continue;
             }
-            let g = if s.erase { 255 } else { ((1.0 - s.tone.clamp(0.0, 1.0)) * 255.0).round() as u8 };
+            let g = if s.erase {
+                255
+            } else {
+                ((1.0 - s.tone.clamp(0.0, 1.0)) * 255.0).round() as u8
+            };
             let _ = write!(
                 o,
                 "<path class=\"{}\" stroke=\"#{g:02x}{g:02x}{g:02x}\" stroke-width=\"{}\" d=\"M",
@@ -186,7 +202,11 @@ impl Sketch {
 fn dist_to_seg(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> f64 {
     let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
     let ll = dx * dx + dy * dy;
-    let t = if ll > 0.0 { (((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / ll).clamp(0.0, 1.0) } else { 0.0 };
+    let t = if ll > 0.0 {
+        (((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / ll).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
     ((p[0] - a[0] - t * dx).powi(2) + (p[1] - a[1] - t * dy).powi(2)).sqrt()
 }
 
@@ -276,7 +296,13 @@ mod tests {
         let (w, h) = sk.raster_size(200);
         assert_eq!((w, h), (200, 100));
         let base = white(w, h);
-        sk.strokes.push(Stroke { erase: false, size: 10.0, soft: 0.0, tone: 1.0, pts: vec![[10.0, 25.0], [90.0, 25.0]] });
+        sk.strokes.push(Stroke {
+            erase: false,
+            size: 10.0,
+            soft: 0.0,
+            tone: 1.0,
+            pts: vec![[10.0, 25.0], [90.0, 25.0]],
+        });
         let px = sk.render(&base, w, h);
         assert_eq!(at(&px, w, 100, 50), 0);
         assert_eq!(at(&px, w, 100, 5), 255);
@@ -285,7 +311,13 @@ mod tests {
         let px = sk.render(&base, w, h);
         assert!((120..=135).contains(&at(&px, w, 100, 50)));
         sk.strokes[0].tone = 1.0;
-        sk.strokes.push(Stroke { erase: true, size: 10.0, soft: 0.0, tone: 1.0, pts: vec![[50.0, 25.0]] });
+        sk.strokes.push(Stroke {
+            erase: true,
+            size: 10.0,
+            soft: 0.0,
+            tone: 1.0,
+            pts: vec![[50.0, 25.0]],
+        });
         let px = sk.render(&base, w, h);
         assert_eq!(at(&px, w, 100, 50), 255);
         assert_eq!(at(&px, w, 40, 50), 0);
@@ -300,15 +332,27 @@ mod tests {
     fn soft_edge_fades() {
         let mut sk = Sketch::new(100.0, 100.0);
         let base = white(100, 100);
-        sk.strokes.push(Stroke { erase: false, size: 40.0, soft: 1.0, tone: 1.0, pts: vec![[50.0, 50.0]] });
+        sk.strokes.push(Stroke {
+            erase: false,
+            size: 40.0,
+            soft: 1.0,
+            tone: 1.0,
+            pts: vec![[50.0, 50.0]],
+        });
         let px = sk.render(&base, 100, 100);
-        let (c, m, e) = (at(&px, 100, 50, 50), at(&px, 100, 60, 50), at(&px, 100, 69, 50));
+        let (c, m, e) = (
+            at(&px, 100, 50, 50),
+            at(&px, 100, 60, 50),
+            at(&px, 100, 69, 50),
+        );
         assert!(c < 20 && c < m && m < e && e > 200, "{c} {m} {e}");
     }
 
     #[test]
     fn smooth_keeps_ends_and_drops_jitter() {
-        let raw: Vec<[f64; 2]> = (0..=200).map(|i| [i as f64 * 0.5, if i % 2 == 0 { 0.02 } else { -0.02 }]).collect();
+        let raw: Vec<[f64; 2]> = (0..=200)
+            .map(|i| [i as f64 * 0.5, if i % 2 == 0 { 0.02 } else { -0.02 }])
+            .collect();
         let s = smooth(&raw, 4.0);
         assert!(s.len() < 10, "{}", s.len());
         assert_eq!(s.first().copied(), Some([0.0, 0.02]));
@@ -319,17 +363,35 @@ mod tests {
     #[test]
     fn json_and_svg() {
         let mut sk = Sketch::new(300.0, 200.0);
-        sk.strokes.push(Stroke { erase: false, size: 6.0, soft: 0.3, tone: 1.0, pts: vec![[1.0, 2.0], [30.0, 40.5]] });
-        sk.strokes.push(Stroke { erase: true, size: 3.0, soft: 0.0, tone: 1.0, pts: vec![[5.0, 5.0]] });
+        sk.strokes.push(Stroke {
+            erase: false,
+            size: 6.0,
+            soft: 0.3,
+            tone: 1.0,
+            pts: vec![[1.0, 2.0], [30.0, 40.5]],
+        });
+        sk.strokes.push(Stroke {
+            erase: true,
+            size: 3.0,
+            soft: 0.0,
+            tone: 1.0,
+            pts: vec![[5.0, 5.0]],
+        });
         let j = serde_json::to_string(&sk).unwrap();
         let back: Sketch = serde_json::from_str(&j).unwrap();
         assert_eq!(back, sk);
-        let old: Sketch = serde_json::from_str(r#"{"w":10,"h":5,"strokes":[{"size":2,"pts":[[1,1]]}]}"#).unwrap();
-        assert_eq!((old.width_k, old.strokes[0].tone, old.strokes[0].erase), (1.0, 1.0, false));
+        let old: Sketch =
+            serde_json::from_str(r#"{"w":10,"h":5,"strokes":[{"size":2,"pts":[[1,1]]}]}"#).unwrap();
+        assert_eq!(
+            (old.width_k, old.strokes[0].tone, old.strokes[0].erase),
+            (1.0, 1.0, false)
+        );
         let svg = sk.svg("A & B");
         assert!(svg.contains("width=\"300mm\""));
         assert!(svg.contains("stroke=\"#000000\" stroke-width=\"6\" d=\"M1 2L30 40.5\""));
-        assert!(svg.contains("class=\"eraser\" stroke=\"#ffffff\" stroke-width=\"3\" d=\"M5 5L5 5\""));
+        assert!(
+            svg.contains("class=\"eraser\" stroke=\"#ffffff\" stroke-width=\"3\" d=\"M5 5L5 5\"")
+        );
         assert!(svg.contains("A &amp; B"));
     }
 }

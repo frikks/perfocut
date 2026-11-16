@@ -1,11 +1,20 @@
-//! Простейший ZIP (метод «без сжатия»), достаточный для файла заказа и пакета форматов.
+//! ZIP-архиватор и ридер (поддержка Stored method 0 и Deflate method 8 для .perfo и .zip).
+
+use std::borrow::Cow;
+
+/// Предел распаковки одной записи: защита от zip-бомбы в .perfo и .zip.
+const MAX_INFLATE: usize = 256 << 20;
 
 fn crc_table() -> [u32; 256] {
     let mut t = [0u32; 256];
     for i in 0..256u32 {
         let mut c = i;
         for _ in 0..8 {
-            c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
+            c = if c & 1 != 0 {
+                0xEDB8_8320 ^ (c >> 1)
+            } else {
+                c >> 1
+            };
         }
         t[i as usize] = c;
     }
@@ -94,7 +103,7 @@ impl ZipWriter {
     }
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone, Debug)]
 pub struct Entry {
     pub name: String,
     pub offset: usize,
@@ -102,31 +111,55 @@ pub struct Entry {
     pub method: u16,
 }
 
+impl Entry {
+    /// Извлекает байты файла из архива (поддерживает без сжатия method 0 и Deflate method 8).
+    pub fn read<'a>(&self, archive: &'a [u8]) -> Option<Cow<'a, [u8]>> {
+        let raw = archive.get(self.offset..self.offset + self.len)?;
+        match self.method {
+            0 => Some(Cow::Borrowed(raw)),
+            // Предел распаковки защищает от zip-бомбы: 1 КБ сжатых данных не съест гигабайты памяти.
+            8 => miniz_oxide::inflate::decompress_to_vec_with_limit(raw, MAX_INFLATE)
+                .ok()
+                .map(Cow::Owned),
+            _ => None,
+        }
+    }
+}
+
 fn rd16(d: &[u8], i: usize) -> Option<u16> {
     d.get(i..i + 2).map(|s| u16::from_le_bytes([s[0], s[1]]))
 }
 fn rd32(d: &[u8], i: usize) -> Option<u32> {
-    d.get(i..i + 4).map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]]))
+    d.get(i..i + 4)
+        .map(|s| u32::from_le_bytes([s[0], s[1], s[2], s[3]]))
 }
 
-/// Читает оглавление ZIP. Для записей без сжатия (method 0) offset/len указывают на данные.
+/// Читает оглавление ZIP с проверкой валидности Central Directory.
 pub fn list(d: &[u8]) -> Option<Vec<Entry>> {
     if d.len() < 22 {
         return None;
     }
+    let min_e = d.len().saturating_sub(65_557);
     let mut e = d.len() - 22;
-    loop {
+    let (n, mut p) = loop {
         if rd32(d, e)? == 0x0605_4b50 {
-            break;
+            let count = rd16(d, e + 10)? as usize;
+            let cd_off = rd32(d, e + 16)? as usize;
+            let comment_len = rd16(d, e + 20)? as usize;
+            // Хвост после EOCD допускаем: некоторые архиваторы дописывают подпись/метку.
+            if e + 22 + comment_len <= d.len()
+                && (count == 0 || rd32(d, cd_off) == Some(0x0201_4b50))
+            {
+                break (count, cd_off);
+            }
         }
-        if e == 0 || d.len() - e > 70000 {
+        if e <= min_e {
             return None;
         }
         e -= 1;
-    }
-    let n = rd16(d, e + 10)? as usize;
-    let mut p = rd32(d, e + 16)? as usize;
-    let mut out = Vec::new();
+    };
+
+    let mut out = Vec::with_capacity(n);
     for _ in 0..n {
         if rd32(d, p)? != 0x0201_4b50 {
             return None;
@@ -137,6 +170,9 @@ pub fn list(d: &[u8]) -> Option<Vec<Entry>> {
         let xlen = rd16(d, p + 30)? as usize;
         let clen = rd16(d, p + 32)? as usize;
         let loff = rd32(d, p + 42)? as usize;
+        if rd32(d, loff)? != 0x0403_4b50 {
+            return None;
+        }
         let name = String::from_utf8_lossy(d.get(p + 46..p + 46 + nlen)?).to_string();
         let lnl = rd16(d, loff + 26)? as usize;
         let lxl = rd16(d, loff + 28)? as usize;
@@ -144,7 +180,12 @@ pub fn list(d: &[u8]) -> Option<Vec<Entry>> {
         if data_off + csize > d.len() {
             return None;
         }
-        out.push(Entry { name, offset: data_off, len: csize, method });
+        out.push(Entry {
+            name,
+            offset: data_off,
+            len: csize,
+            method,
+        });
         p += 46 + nlen + xlen + clen;
     }
     Some(out)

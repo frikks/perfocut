@@ -21,7 +21,9 @@ pub fn set_app(app: &slint::android::AndroidApp) {
 }
 
 /// Вызов метода активности. Ошибки Java гасим: приложение работает дальше без функции.
-fn with_activity<R>(f: impl FnOnce(&mut JNIEnv<'_>, &JObject<'_>) -> jni::errors::Result<R>) -> Option<R> {
+fn with_activity<R>(
+    f: impl FnOnce(&mut JNIEnv<'_>, &JObject<'_>) -> jni::errors::Result<R>,
+) -> Option<R> {
     let vm_ptr = VM.load(Ordering::Relaxed) as *mut jni::sys::JavaVM;
     let act_ptr = ACTIVITY.load(Ordering::Relaxed) as jni::sys::jobject;
     if vm_ptr.is_null() || act_ptr.is_null() {
@@ -44,7 +46,9 @@ fn call_void(name: &str, sig: &str, args: &[JValue<'_, '_>]) {
 }
 
 fn call_str(env: &mut JNIEnv<'_>, act: &JObject<'_>, name: &str) -> jni::errors::Result<String> {
-    let o = env.call_method(act, name, "()Ljava/lang/String;", &[])?.l()?;
+    let o = env
+        .call_method(act, name, "()Ljava/lang/String;", &[])?
+        .l()?;
     if o.is_null() {
         return Ok(String::new());
     }
@@ -77,7 +81,11 @@ pub fn save_file(name: &str, mime: &str, bytes: Vec<u8>) -> SaveOutcome {
                 act,
                 "saveFile",
                 "(Ljava/lang/String;Ljava/lang/String;[B)Ljava/lang/String;",
-                &[JValue::Object(&jn), JValue::Object(&jm), JValue::Object(&jb)],
+                &[
+                    JValue::Object(&jn),
+                    JValue::Object(&jm),
+                    JValue::Object(&jb),
+                ],
             )?
             .l()?;
         if o.is_null() {
@@ -95,14 +103,26 @@ pub fn save_file(name: &str, mime: &str, bytes: Vec<u8>) -> SaveOutcome {
 pub fn vibrate(kind: &str) {
     let _ = with_activity(|env, act| {
         let k = env.new_string(kind)?;
-        env.call_method(act, "vibrate", "(Ljava/lang/String;)V", &[JValue::Object(&k)]).map(|_| ())
+        env.call_method(
+            act,
+            "vibrate",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&k)],
+        )
+        .map(|_| ())
     });
 }
 
 pub fn open_url(url: &str) {
     let _ = with_activity(|env, act| {
         let u = env.new_string(url)?;
-        env.call_method(act, "openUrl", "(Ljava/lang/String;)V", &[JValue::Object(&u)]).map(|_| ())
+        env.call_method(
+            act,
+            "openUrl",
+            "(Ljava/lang/String;)V",
+            &[JValue::Object(&u)],
+        )
+        .map(|_| ())
     });
 }
 
@@ -117,7 +137,11 @@ pub fn set_full_canvas(_ui: &AppWindow, on: bool) {
 }
 
 fn settings_path() -> Option<PathBuf> {
-    DATA_DIR.get().cloned().flatten().map(|d| d.join("settings.json"))
+    DATA_DIR
+        .get()
+        .cloned()
+        .flatten()
+        .map(|d| d.join("settings.json"))
 }
 
 pub fn load_settings() -> Option<String> {
@@ -141,8 +165,15 @@ pub fn system_locale() -> String {
 
 /// Цвет строки состояния и панели навигации под тему.
 pub fn set_bars(bg: slint::Color, light: bool) {
-    let argb = (u32::from(bg.alpha()) << 24) | (u32::from(bg.red()) << 16) | (u32::from(bg.green()) << 8) | u32::from(bg.blue());
-    call_void("setBars", "(IZ)V", &[JValue::Int(argb as i32), JValue::Bool(u8::from(light))]);
+    let argb = (u32::from(bg.alpha()) << 24)
+        | (u32::from(bg.red()) << 16)
+        | (u32::from(bg.green()) << 8)
+        | u32::from(bg.blue());
+    call_void(
+        "setBars",
+        "(IZ)V",
+        &[JValue::Int(argb as i32), JValue::Bool(u8::from(light))],
+    );
 }
 
 /// Проверка обновлений: запрос делает Java (HttpURLConnection), ответ вернёт `onUpdateInfo`.
@@ -203,7 +234,12 @@ pub extern "system" fn Java_com_perfocut_app_MainActivity_onFilePicked<'l>(
     name: JString<'l>,
     data: JByteArray<'l>,
 ) {
-    let name: String = env.get_string(&name).map(Into::into).unwrap_or_else(|_| "file".into());
-    let Ok(bytes) = env.convert_byte_array(&data) else { return };
+    let name: String = env
+        .get_string(&name)
+        .map(Into::into)
+        .unwrap_or_else(|_| "file".into());
+    let Ok(bytes) = env.convert_byte_array(&data) else {
+        return;
+    };
     let _ = slint::invoke_from_event_loop(move || crate::app::open_bytes(name, bytes));
 }

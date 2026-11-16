@@ -27,7 +27,11 @@ fn n4(v: f64) -> String {
 /// Окружность в многоугольник с допуском по хорде.
 pub fn circle_pts(x: f64, y: f64, d: f64, tol: f64) -> Vec<(f64, f64)> {
     let r = d / 2.0;
-    let mut n = if r > tol { (PI / (1.0 - tol / r).acos()).ceil() as usize } else { 8 };
+    let mut n = if r > tol {
+        (PI / (1.0 - tol / r).acos()).ceil() as usize
+    } else {
+        8
+    };
     n = n.clamp(12, 720);
     (0..n)
         .map(|i| {
@@ -98,11 +102,19 @@ pub fn dxf(r: &GenResult) -> String {
     g(0, "TABLE");
     g(2, "LAYER");
     g(70, &layers.len().to_string());
+    // Технологическая расцветка слоев под CypCut / NCStudio:
+    // CONTOUR — ACI 3 (зеленый, отдельный слой обрезки контура листа)
+    // Слои отверстий — ACI 1 (красный), 2 (желтый), 4 (голубой), 5 (синий), 6 (пурпурный), 7 (белый)
+    let hole_palette = [1, 2, 4, 5, 6, 7];
     for (i, l) in layers.iter().enumerate() {
         g(0, "LAYER");
         g(2, l);
         g(70, "0");
-        let color = if i == 0 { 7 } else { ((i - 1) % 6) + 1 };
+        let color = if i == 0 {
+            3
+        } else {
+            hole_palette[(i - 1) % hole_palette.len()]
+        };
         g(62, &color.to_string());
         g(6, "CONTINUOUS");
     }
@@ -163,13 +175,24 @@ pub fn svg(r: &GenResult) -> String {
         h = n4(h)
     );
     if p.outline {
-        let _ = writeln!(o, "<rect id=\"contour\" x=\"0\" y=\"0\" width=\"{}\" height=\"{}\"/>", n4(w), n4(h));
+        let _ = writeln!(
+            o,
+            "<rect id=\"contour\" x=\"0\" y=\"0\" width=\"{}\" height=\"{}\"/>",
+            n4(w),
+            n4(h)
+        );
     }
     o.push_str("<g id=\"holes\">\n");
     for s in &r.shapes {
         match s {
             Shape::Circle { x, y, d } => {
-                let _ = writeln!(o, "<circle cx=\"{}\" cy=\"{}\" r=\"{}\"/>", n4(*x), n4(h - y), n4(d / 2.0));
+                let _ = writeln!(
+                    o,
+                    "<circle cx=\"{}\" cy=\"{}\" r=\"{}\"/>",
+                    n4(*x),
+                    n4(h - y),
+                    n4(d / 2.0)
+                );
             }
             Shape::Poly { pts, .. } => {
                 o.push_str("<path d=\"M");
@@ -188,10 +211,35 @@ pub fn svg(r: &GenResult) -> String {
 }
 
 fn xml_esc(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 // ---------------- G-code ----------------
+
+/// Центроид площади многоугольника: для вогнутых контуров точка врезки остаётся в металле,
+/// а не «усредняется» к пустоте, как при простом среднем вершин.
+fn area_centroid(pts: &[(f64, f64)]) -> Option<(f64, f64)> {
+    if pts.len() < 3 {
+        return None;
+    }
+    let (mut a, mut cx, mut cy) = (0.0, 0.0, 0.0);
+    for i in 0..pts.len() {
+        let (x0, y0) = pts[i];
+        let (x1, y1) = pts[(i + 1) % pts.len()];
+        let cr = x0 * y1 - x1 * y0;
+        a += cr;
+        cx += (x0 + x1) * cr;
+        cy += (y0 + y1) * cr;
+    }
+    if a.abs() < 1e-12 {
+        return None;
+    }
+    Some((cx / (3.0 * a), cy / (3.0 * a)))
+}
+
 pub fn gcode(r: &GenResult) -> String {
     let p = &r.params;
     let (w, h) = (p.sheet_w, p.sheet_h);
@@ -203,7 +251,7 @@ pub fn gcode(r: &GenResult) -> String {
     };
     let f = |v: f64| num(v, dec);
     let feed = num(p.cut_speed, 0);
-    let mut o = String::with_capacity(r.shapes.len() * 120 + 1000);
+    let mut o = String::with_capacity(r.shapes.len() * 140 + 1000);
     let mut ln = 0u32;
     let mut line = |o: &mut String, s: &str| {
         if s.is_empty() {
@@ -216,17 +264,48 @@ pub fn gcode(r: &GenResult) -> String {
         o.push_str(s);
         o.push_str(NL);
     };
-    line(&mut o, &format!("(PerfoCut: {} x {} mm, contours {})", f(w), f(h), r.shapes.len() + p.outline as usize));
+    line(
+        &mut o,
+        &format!(
+            "(PerfoCut: {} x {} mm, contours {})",
+            f(w),
+            f(h),
+            r.shapes.len() + p.outline as usize
+        ),
+    );
     for l in p.gc_header.lines() {
         line(&mut o, l.trim());
     }
-    let cut_poly = |o: &mut String, line: &mut dyn FnMut(&mut String, &str), pts: &[(f64, f64)]| {
+
+    let cut_poly = |o: &mut String,
+                    line: &mut dyn FnMut(&mut String, &str),
+                    pts: &[(f64, f64)],
+                    center_pierce: bool| {
         let s = pts[0];
-        line(o, &format!("G00 X{} Y{}", f(s.0 - ox), f(s.1 - oy)));
-        line(o, &p.gc_on);
+        if center_pierce && pts.len() >= 3 {
+            let (cx, cy) = area_centroid(pts).unwrap_or_else(|| {
+                let n = pts.len() as f64;
+                let (sx, sy) = pts
+                    .iter()
+                    .fold((0.0, 0.0), |(ax, ay), q| (ax + q.0, ay + q.1));
+                (sx / n, sy / n)
+            });
+            line(o, &format!("G00 X{} Y{}", f(cx - ox), f(cy - oy)));
+            line(o, &p.gc_on);
+            line(
+                o,
+                &format!("G01 X{} Y{} F{}", f(s.0 - ox), f(s.1 - oy), feed),
+            );
+        } else {
+            line(o, &format!("G00 X{} Y{}", f(s.0 - ox), f(s.1 - oy)));
+            line(o, &p.gc_on);
+        }
         for (i, q) in pts.iter().enumerate().skip(1) {
-            if i == 1 {
-                line(o, &format!("G01 X{} Y{} F{}", f(q.0 - ox), f(q.1 - oy), feed));
+            if i == 1 && !center_pierce {
+                line(
+                    o,
+                    &format!("G01 X{} Y{} F{}", f(q.0 - ox), f(q.1 - oy), feed),
+                );
             } else {
                 line(o, &format!("G01 X{} Y{}", f(q.0 - ox), f(q.1 - oy)));
             }
@@ -234,27 +313,41 @@ pub fn gcode(r: &GenResult) -> String {
         line(o, &format!("G01 X{} Y{}", f(s.0 - ox), f(s.1 - oy)));
         line(o, &p.gc_off);
     };
+
     for s in &r.shapes {
         match s {
             Shape::Circle { x, y, d } => {
+                let rr = d / 2.0;
                 if p.gc_arcs {
-                    let rr = d / 2.0;
-                    line(&mut o, &format!("G00 X{} Y{}", f(x + rr - ox), f(y - oy)));
+                    line(&mut o, &format!("G00 X{} Y{}", f(x - ox), f(y - oy)));
                     line(&mut o, &p.gc_on);
-                    line(&mut o, &format!("G02 X{} Y{} I{} J0 F{}", f(x - rr - ox), f(y - oy), f(-rr), feed));
-                    line(&mut o, &format!("G02 X{} Y{} I{} J0", f(x + rr - ox), f(y - oy), f(rr)));
+                    line(
+                        &mut o,
+                        &format!("G01 X{} Y{} F{}", f(x + rr - ox), f(y - oy), feed),
+                    );
+                    line(
+                        &mut o,
+                        &format!("G02 X{} Y{} I{} J0", f(x - rr - ox), f(y - oy), f(-rr)),
+                    );
+                    line(
+                        &mut o,
+                        &format!("G02 X{} Y{} I{} J0", f(x + rr - ox), f(y - oy), f(rr)),
+                    );
                     line(&mut o, &p.gc_off);
                 } else {
                     let pts = circle_pts(*x, *y, *d, 0.02);
-                    cut_poly(&mut o, &mut line, &pts);
+                    cut_poly(&mut o, &mut line, &pts, true);
                 }
             }
-            Shape::Poly { pts, .. } => cut_poly(&mut o, &mut line, pts),
+            Shape::Poly { pts, .. } => {
+                let is_hole = p.pattern != "lines";
+                cut_poly(&mut o, &mut line, pts, is_hole);
+            }
         }
     }
     if p.outline {
         line(&mut o, "(contour)");
-        cut_poly(&mut o, &mut line, &sheet_outline(w, h));
+        cut_poly(&mut o, &mut line, &sheet_outline(w, h), false);
     }
     line(&mut o, &format!("G00 X{} Y{}", f(-ox), f(-oy)));
     for l in p.gc_footer.lines() {
@@ -307,7 +400,12 @@ pub fn eps(r: &GenResult) -> String {
         n4(w * k),
         n4(h * k)
     );
-    let _ = write!(o, "/c {{newpath 0 360 arc closepath stroke}} bind def\n{} {} scale\n0.1 setlinewidth\n", n4(k), n4(k));
+    let _ = write!(
+        o,
+        "/c {{newpath 0 360 arc closepath stroke}} bind def\n{} {} scale\n0.1 setlinewidth\n",
+        n4(k),
+        n4(k)
+    );
     let poly = |o: &mut String, pts: &[(f64, f64)]| {
         let _ = write!(o, "newpath {} {} moveto", n4(pts[0].0), n4(pts[0].1));
         for q in pts.iter().skip(1) {
@@ -387,7 +485,6 @@ pub fn pdf(r: &GenResult) -> Vec<u8> {
     out.extend_from_slice(c.as_bytes());
     out.extend_from_slice(b"\nendstream\nendobj\n");
     offs.push(out.len());
-    // info
     out.extend_from_slice(b"5 0 obj\n<< /Producer (PerfoCut) /Creator (PerfoCut) >>\nendobj\n");
     let xref = out.len();
     out.extend_from_slice(format!("xref\n0 {}\n0000000000 65535 f \n", offs.len() + 1).as_bytes());
@@ -395,7 +492,12 @@ pub fn pdf(r: &GenResult) -> Vec<u8> {
         out.extend_from_slice(format!("{:010} 00000 n \n", o).as_bytes());
     }
     out.extend_from_slice(
-        format!("trailer\n<< /Size {} /Root 1 0 R /Info 5 0 R >>\nstartxref\n{}\n%%EOF\n", offs.len() + 1, xref).as_bytes(),
+        format!(
+            "trailer\n<< /Size {} /Root 1 0 R /Info 5 0 R >>\nstartxref\n{}\n%%EOF\n",
+            offs.len() + 1,
+            xref
+        )
+        .as_bytes(),
     );
     out
 }
@@ -409,21 +511,77 @@ pub fn csv(r: &GenResult) -> String {
     let mut o = String::from("\u{FEFF}");
     let d = |v: f64, n: usize| {
         let s = format!("{:.*}", n, v);
-        if en { s } else { s.replace('.', ",") }
+        if en {
+            s
+        } else {
+            s.replace('.', ",")
+        }
     };
-    let _ = write!(o, "{};{}{NL}", t("Параметр", "Parameter"), t("Значение", "Value"));
-    let _ = write!(o, "{};{} x {}{NL}", t("Лист, мм", "Sheet, mm"), d(p.sheet_w, 1), d(p.sheet_h, 1));
-    let _ = write!(o, "{};{}{NL}", t("Толщина, мм", "Thickness, mm"), d(p.thickness, 2));
+    let _ = write!(
+        o,
+        "{};{}{NL}",
+        t("Параметр", "Parameter"),
+        t("Значение", "Value")
+    );
+    let _ = write!(
+        o,
+        "{};{} x {}{NL}",
+        t("Лист, мм", "Sheet, mm"),
+        d(p.sheet_w, 1),
+        d(p.sheet_h, 1)
+    );
+    let _ = write!(
+        o,
+        "{};{}{NL}",
+        t("Толщина, мм", "Thickness, mm"),
+        d(p.thickness, 2)
+    );
     let _ = write!(o, "{};{}{NL}", t("Контуров", "Contours"), st.count);
     let _ = write!(o, "{};{}{NL}", t("Врезок", "Pierces"), st.pierces);
-    let _ = write!(o, "{};{}{NL}", t("Длина реза, м", "Cut length, m"), d(st.cut_len_m, 2));
-    let _ = write!(o, "{};{}{NL}", t("Холостой ход, м", "Rapid travel, m"), d(st.travel_m, 2));
-    let _ = write!(o, "{};{}{NL}", t("Время, мин", "Time, min"), d(st.time_min, 1));
-    let _ = write!(o, "{};{}{NL}", t("Перфорация, %", "Open area, %"), d(st.open_area_pct, 2));
-    let _ = write!(o, "{};{}{NL}", t("Масса листа, кг", "Sheet weight, kg"), d(st.weight_kg, 2));
-    let _ = write!(o, "{}, {};{}{NL}", t("Стоимость", "Cost"), p.currency, d(st.cost, 2));
+    let _ = write!(
+        o,
+        "{};{}{NL}",
+        t("Длина реза, м", "Cut length, m"),
+        d(st.cut_len_m, 2)
+    );
+    let _ = write!(
+        o,
+        "{};{}{NL}",
+        t("Холостой ход, м", "Rapid travel, m"),
+        d(st.travel_m, 2)
+    );
+    let _ = write!(
+        o,
+        "{};{}{NL}",
+        t("Время, мин", "Time, min"),
+        d(st.time_min, 1)
+    );
+    let _ = write!(
+        o,
+        "{};{}{NL}",
+        t("Перфорация, %", "Open area, %"),
+        d(st.open_area_pct, 2)
+    );
+    let _ = write!(
+        o,
+        "{};{}{NL}",
+        t("Масса листа, кг", "Sheet weight, kg"),
+        d(st.weight_kg, 2)
+    );
+    let _ = write!(
+        o,
+        "{}, {};{}{NL}",
+        t("Стоимость", "Cost"),
+        p.currency,
+        d(st.cost, 2)
+    );
     if !st.by_size.is_empty() {
-        let _ = write!(o, "{NL}{};{}{NL}", t("Размер, мм", "Size, mm"), t("Количество", "Count"));
+        let _ = write!(
+            o,
+            "{NL}{};{}{NL}",
+            t("Размер, мм", "Size, mm"),
+            t("Количество", "Count")
+        );
         for b in &st.by_size {
             let _ = write!(o, "{};{}{NL}", d(b.size, 2), b.count);
         }
@@ -436,9 +594,17 @@ pub fn report(r: &GenResult) -> String {
     let p = &r.params;
     let en = p.lang == "en";
     let t = |ru: &'static str, e: &'static str| if en { e } else { ru };
-    let (mm, m, min, kg, pcs) = if en { ("mm", "m", "min", "kg", "pcs") } else { ("мм", "м", "мин", "кг", "шт") };
+    let (mm, m, min, kg, pcs) = if en {
+        ("mm", "m", "min", "kg", "pcs")
+    } else {
+        ("мм", "м", "мин", "кг", "шт")
+    };
     let mut o = String::new();
-    let _ = write!(o, "{}{NL}{NL}", t("PerfoCut — паспорт заказа", "PerfoCut — order sheet"));
+    let _ = write!(
+        o,
+        "{}{NL}{NL}",
+        t("PerfoCut — паспорт заказа", "PerfoCut — order sheet")
+    );
     let kv = |o: &mut String, k: &str, v: &str| {
         if !v.trim().is_empty() {
             let _ = write!(o, "{:<22}{}{NL}", k, v);
@@ -454,10 +620,20 @@ pub fn report(r: &GenResult) -> String {
     kv(
         &mut o,
         t("Лист:", "Sheet:"),
-        &format!("{} x {} {mm}, {} {} {mm}", num(p.sheet_w, 1), num(p.sheet_h, 1), t("толщина", "thickness"), num(p.thickness, 2)),
+        &format!(
+            "{} x {} {mm}, {} {} {mm}",
+            num(p.sheet_w, 1),
+            num(p.sheet_h, 1),
+            t("толщина", "thickness"),
+            num(p.thickness, 2)
+        ),
     );
     let pat = if p.pattern == "lines" {
-        format!("{} {} {mm}", t("линии, шаг", "lines, pitch"), num(p.line_pitch, 2))
+        format!(
+            "{} {} {mm}",
+            t("линии, шаг", "lines, pitch"),
+            num(p.line_pitch, 2)
+        )
     } else {
         let g = match p.grid.as_str() {
             "square" => t("квадратная", "square"),
@@ -469,25 +645,68 @@ pub fn report(r: &GenResult) -> String {
             "diamond" => t("ромб", "diamond"),
             _ => t("круг", "circle"),
         };
-        format!("{}, {} {}, {} {} {mm}", s, t("сетка", "grid"), g, t("шаг", "pitch"), num(p.pitch, 2))
+        format!(
+            "{}, {} {}, {} {} {mm}",
+            s,
+            t("сетка", "grid"),
+            g,
+            t("шаг", "pitch"),
+            num(p.pitch, 2)
+        )
     };
     kv(&mut o, t("Узор:", "Pattern:"), &pat);
     kv(&mut o, t("Контуров:", "Contours:"), &st.count.to_string());
     kv(&mut o, t("Врезок:", "Pierces:"), &st.pierces.to_string());
-    kv(&mut o, t("Длина реза:", "Cut length:"), &format!("{:.2} {m}", st.cut_len_m));
-    kv(&mut o, t("Время резки:", "Cutting time:"), &format!("≈ {:.1} {min}", st.time_min));
-    kv(&mut o, t("Перфорация:", "Open area:"), &format!("{:.2} %", st.open_area_pct));
-    kv(&mut o, t("Масса листа:", "Sheet weight:"), &format!("{:.2} {kg}", st.weight_kg));
+    kv(
+        &mut o,
+        t("Длина реза:", "Cut length:"),
+        &format!("{:.2} {m}", st.cut_len_m),
+    );
+    kv(
+        &mut o,
+        t("Время резки:", "Cutting time:"),
+        &format!("≈ {:.1} {min}", st.time_min),
+    );
+    kv(
+        &mut o,
+        t("Перфорация:", "Open area:"),
+        &format!("{:.2} %", st.open_area_pct),
+    );
+    kv(
+        &mut o,
+        t("Масса листа:", "Sheet weight:"),
+        &format!("{:.2} {kg}", st.weight_kg),
+    );
     let _ = write!(o, "{NL}{}{NL}", t("Стоимость", "Cost"));
-    kv(&mut o, t("  резка:", "  cutting:"), &format!("{:.2} {}", st.cost_cut, p.currency));
-    kv(&mut o, t("  врезки:", "  pierces:"), &format!("{:.2} {}", st.cost_pierce, p.currency));
+    kv(
+        &mut o,
+        t("  резка:", "  cutting:"),
+        &format!("{:.2} {}", st.cost_cut, p.currency),
+    );
+    kv(
+        &mut o,
+        t("  врезки:", "  pierces:"),
+        &format!("{:.2} {}", st.cost_pierce, p.currency),
+    );
     if st.cost_material > 0.0 {
-        kv(&mut o, t("  металл:", "  metal:"), &format!("{:.2} {}", st.cost_material, p.currency));
+        kv(
+            &mut o,
+            t("  металл:", "  metal:"),
+            &format!("{:.2} {}", st.cost_material, p.currency),
+        );
     }
     if st.cost_fixed > 0.0 {
-        kv(&mut o, t("  подготовка:", "  setup:"), &format!("{:.2} {}", st.cost_fixed, p.currency));
+        kv(
+            &mut o,
+            t("  подготовка:", "  setup:"),
+            &format!("{:.2} {}", st.cost_fixed, p.currency),
+        );
     }
-    kv(&mut o, t("  итого:", "  total:"), &format!("{:.2} {}", st.cost, p.currency));
+    kv(
+        &mut o,
+        t("  итого:", "  total:"),
+        &format!("{:.2} {}", st.cost, p.currency),
+    );
     if !st.by_size.is_empty() {
         let _ = write!(o, "{NL}{}{NL}", t("Отверстия по размерам", "Holes by size"));
         for b in &st.by_size {
@@ -524,9 +743,9 @@ fn signed_area(pts: &[(f64, f64)]) -> f64 {
     a / 2.0
 }
 
-/// Контур против часовой стрелки: от этого зависит направление нормалей.
-fn to_ccw(mut pts: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
-    if signed_area(&pts) < 0.0 {
+/// Контур по часовой стрелке (CW): противоположный обходу внешнего контура (CCW) для корректной работы earcut.
+fn to_cw(mut pts: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
+    if signed_area(&pts) > 0.0 {
         pts.reverse();
     }
     pts
@@ -534,7 +753,8 @@ fn to_ccw(mut pts: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
 
 /// Триангуляция плоской грани с отверстиями (earcut).
 fn cap_tris(outer: &[(f64, f64)], holes: &[Vec<(f64, f64)>]) -> Vec<[(f64, f64); 3]> {
-    let mut data: Vec<f64> = Vec::with_capacity((outer.len() + holes.iter().map(Vec::len).sum::<usize>()) * 2);
+    let mut data: Vec<f64> =
+        Vec::with_capacity((outer.len() + holes.iter().map(Vec::len).sum::<usize>()) * 2);
     let mut starts: Vec<usize> = Vec::with_capacity(holes.len());
     for p in outer {
         data.push(p.0);
@@ -555,7 +775,6 @@ fn cap_tris(outer: &[(f64, f64)], holes: &[Vec<(f64, f64)>]) -> Vec<[(f64, f64);
                 out.push([g(t[0]), g(t[1]), g(t[2])]);
             }
         }
-        // Вырожденный случай: хотя бы не оставляем лист без крышек
         _ => {
             for i in 1..outer.len().saturating_sub(1) {
                 out.push([outer[0], outer[i], outer[i + 1]]);
@@ -575,13 +794,14 @@ fn sheet_tris(r: &GenResult) -> Vec<Tri> {
         .iter()
         .map(poly_pts)
         .filter(|h| h.len() >= 3)
-        .map(to_ccw)
+        .map(to_cw)
         .collect();
 
     let caps = cap_tris(&outer, &holes);
-    let mut t: Vec<Tri> = Vec::with_capacity(caps.len() * 2 + holes.iter().map(Vec::len).sum::<usize>() * 2 + 8);
+    let mut t: Vec<Tri> =
+        Vec::with_capacity(caps.len() * 2 + holes.iter().map(Vec::len).sum::<usize>() * 2 + 8);
 
-    // Верх: нормаль +Z, низ: нормаль −Z (обратный обход)
+    // Верх: нормаль +Z, низ: нормаль −Z
     for [a, b, c] in &caps {
         t.push(((a.0, a.1, th), (b.0, b.1, th), (c.0, c.1, th)));
         t.push(((a.0, a.1, 0.0), (c.0, c.1, 0.0), (b.0, b.1, 0.0)));
@@ -600,8 +820,8 @@ fn sheet_tris(r: &GenResult) -> Vec<Tri> {
         for i in 0..hole.len() {
             let a = hole[i];
             let b = hole[(i + 1) % hole.len()];
-            t.push(((a.0, a.1, 0.0), (b.0, b.1, th), (b.0, b.1, 0.0)));
-            t.push(((a.0, a.1, 0.0), (a.0, a.1, th), (b.0, b.1, th)));
+            t.push(((a.0, a.1, 0.0), (b.0, b.1, 0.0), (b.0, b.1, th)));
+            t.push(((a.0, a.1, 0.0), (b.0, b.1, th), (a.0, a.1, th)));
         }
     }
     t
@@ -613,12 +833,19 @@ pub fn stl(r: &GenResult) -> String {
     let mut o = String::with_capacity(tris.len() * 220 + 128);
     o.push_str("solid PerfoCutSheet\r\n");
     for (a, b, c) in tris {
-        // нормаль через векторное произведение
         let u = (b.0 - a.0, b.1 - a.1, b.2 - a.2);
         let v = (c.0 - a.0, c.1 - a.1, c.2 - a.2);
-        let n = (u.1 * v.2 - u.2 * v.1, u.2 * v.0 - u.0 * v.2, u.0 * v.1 - u.1 * v.0);
+        let n = (
+            u.1 * v.2 - u.2 * v.1,
+            u.2 * v.0 - u.0 * v.2,
+            u.0 * v.1 - u.1 * v.0,
+        );
         let l = (n.0 * n.0 + n.1 * n.1 + n.2 * n.2).sqrt();
-        let n = if l > 1e-12 { (n.0 / l, n.1 / l, n.2 / l) } else { (0.0, 0.0, 0.0) };
+        let n = if l > 1e-12 {
+            (n.0 / l, n.1 / l, n.2 / l)
+        } else {
+            (0.0, 0.0, 0.0)
+        };
         let _ = write!(
             o,
             "facet normal {:.4} {:.4} {:.4}\r\n  outer loop\r\n    vertex {:.4} {:.4} {:.4}\r\n    vertex {:.4} {:.4} {:.4}\r\n    vertex {:.4} {:.4} {:.4}\r\n  endloop\r\nendfacet\r\n",
@@ -645,8 +872,16 @@ mod tests {
         };
         GenResult {
             shapes: vec![
-                Shape::Circle { x: 20.0, y: 20.0, d: 10.0 },
-                Shape::Circle { x: 50.0, y: 30.0, d: 6.0 },
+                Shape::Circle {
+                    x: 20.0,
+                    y: 20.0,
+                    d: 10.0,
+                },
+                Shape::Circle {
+                    x: 50.0,
+                    y: 30.0,
+                    d: 6.0,
+                },
                 Shape::Poly {
                     pts: vec![(70.0, 10.0), (85.0, 12.0), (80.0, 30.0), (68.0, 26.0)],
                     size: 0.0,
@@ -665,7 +900,6 @@ mod tests {
         )
     }
 
-    /// Замкнутая оболочка: каждое ребро принадлежит ровно двум треугольникам.
     #[test]
     fn mesh_is_watertight() {
         let mut edges: HashMap<((i64, i64, i64), (i64, i64, i64)), i32> = HashMap::new();
@@ -680,7 +914,6 @@ mod tests {
         assert_eq!(bad, 0, "рёбер с неверной кратностью: {bad}");
     }
 
-    /// Нормали смотрят наружу: объём положительный и равен площади листа на толщину.
     #[test]
     fn mesh_normals_point_outward() {
         let tris = sheet_tris(&sample());
@@ -694,13 +927,14 @@ mod tests {
             v6 += a.0 * cross.0 + a.1 * cross.1 + a.2 * cross.2;
         }
         let vol = v6 / 6.0;
-        // 6000 − два круга (π·25 + π·9) − четырёхугольник (площадь 240), толщина 2 мм
         let expect = (6000.0 - 78.54 - 28.27 - 240.0) * 2.0;
         assert!(vol > 0.0, "объём отрицательный: {vol}");
-        assert!((vol - expect).abs() < expect * 0.02, "объём {vol}, ожидалось {expect}");
+        assert!(
+            (vol - expect).abs() < expect * 0.02,
+            "объём {vol}, ожидалось {expect}"
+        );
     }
 
-    /// Крышки не должны закрывать отверстия.
     #[test]
     fn caps_have_holes() {
         let r = sample();
@@ -729,7 +963,6 @@ mod tests {
         };
 
         for (a, b, c) in sheet_tris(&r) {
-            // только горизонтальные крышки
             if !(a.2 == b.2 && b.2 == c.2) {
                 continue;
             }

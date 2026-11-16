@@ -33,15 +33,20 @@ fn decode_base64(text: &str) -> Vec<u8> {
 }
 
 fn unpack_assets(src: &Path, dst: &Path) {
-    for dir in ["fonts", "icons"] {
+    for dir in ["fonts", "icons", "images"] {
         let from = src.join(dir);
         let to = dst.join(dir);
         fs::create_dir_all(&to).expect("assets dir");
         let entries = fs::read_dir(&from).unwrap_or_else(|e| panic!("{}: {e}", from.display()));
         for entry in entries {
             let path = entry.expect("assets entry").path();
-            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
-            let Some(target) = name.strip_suffix(".zlib.b64") else { continue };
+            let name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or_default();
+            let Some(target) = name.strip_suffix(".zlib.b64") else {
+                continue;
+            };
             let text = fs::read_to_string(&path).expect("read asset");
             let bytes = miniz_oxide::inflate::decompress_to_vec_zlib(&decode_base64(&text))
                 .unwrap_or_else(|e| panic!("{name}: {e:?}"));

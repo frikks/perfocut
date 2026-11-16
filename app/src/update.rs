@@ -33,13 +33,22 @@ pub fn parse(json: &str) -> Result<Release, String> {
     {
         return Err("not a stable release".into());
     }
-    let tag = v.get("tag_name").and_then(serde_json::Value::as_str).ok_or("no tag_name")?;
-    let url = v.get("html_url").and_then(serde_json::Value::as_str).ok_or("no html_url")?;
+    let tag = v
+        .get("tag_name")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("no tag_name")?;
+    let url = v
+        .get("html_url")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("no html_url")?;
     let version = tag.trim().trim_start_matches(['v', 'V']).to_owned();
     if version.is_empty() {
         return Err("empty tag_name".into());
     }
-    Ok(Release { version, url: url.to_owned() })
+    Ok(Release {
+        version,
+        url: url.to_owned(),
+    })
 }
 
 /// Сравнивает версии по числам: `0.10.0` новее `0.9.9`. Хвост после дефиса не учитывается.
@@ -51,7 +60,10 @@ fn key(v: &str) -> Vec<u64> {
     let core = v.trim().trim_start_matches(['v', 'V']);
     // Предварительные выпуски сравниваем по числовой части: 0.4.1-rc1 > 0.4.0
     let core = core.split(['-', '+']).next().unwrap_or(core);
-    let mut out: Vec<u64> = core.split('.').map(|p| p.trim().parse().unwrap_or(0)).collect();
+    let mut out: Vec<u64> = core
+        .split('.')
+        .map(|p| p.trim().parse().unwrap_or(0))
+        .collect();
     while out.len() > 1 && out.last() == Some(&0) {
         out.pop();
     }
@@ -94,7 +106,10 @@ mod tests {
 
     #[test]
     fn release_links_point_to_the_tag_and_file() {
-        assert_eq!(super::release_url("0.4.1"), "https://github.com/frikks/perfocut/releases/tag/v0.4.1");
+        assert_eq!(
+            super::release_url("0.4.1"),
+            "https://github.com/frikks/perfocut/releases/tag/v0.4.1"
+        );
         assert_eq!(
             super::asset_url("0.4.1", "PerfoCut.exe"),
             "https://github.com/frikks/perfocut/releases/download/v0.4.1/PerfoCut.exe"

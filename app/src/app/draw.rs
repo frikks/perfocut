@@ -28,14 +28,22 @@ pub(super) struct Sk {
 
 impl Sk {
     pub fn new(sketch: Sketch, base: Pixmap, blank: bool) -> Sk {
-        Sk { sketch, base, blank, undo: Vec::new(), redo: Vec::new() }
+        Sk {
+            sketch,
+            base,
+            blank,
+            undo: Vec::new(),
+            redo: Vec::new(),
+        }
     }
 
     /// Все штрихи поверх подложки.
     pub fn render(&self) -> Pixmap {
         let (w, h) = (self.base.width(), self.base.height());
         let data = self.sketch.render(self.base.data(), w as usize, h as usize);
-        IntSize::from_wh(w, h).and_then(|s| Pixmap::from_vec(data, s)).unwrap_or_else(|| self.base.clone())
+        IntSize::from_wh(w, h)
+            .and_then(|s| Pixmap::from_vec(data, s))
+            .unwrap_or_else(|| self.base.clone())
     }
 
     fn has_any(&self) -> bool {
@@ -71,7 +79,13 @@ impl Live {
     fn dot(&mut self, x: f32, y: f32) {
         if let Some(path) = PathBuilder::from_circle(x, y, (self.width / 2.0).max(0.5)) {
             let paint = self.paint();
-            self.ink.fill_path(&path, &paint, FillRule::Winding, Transform::identity(), self.mask.as_ref());
+            self.ink.fill_path(
+                &path,
+                &paint,
+                FillRule::Winding,
+                Transform::identity(),
+                self.mask.as_ref(),
+            );
         }
     }
 
@@ -80,9 +94,19 @@ impl Live {
         pb.move_to(self.last.0, self.last.1);
         pb.line_to(x, y);
         if let Some(path) = pb.finish() {
-            let st = tiny_skia::Stroke { width: self.width.max(1.0), line_cap: LineCap::Round, ..tiny_skia::Stroke::default() };
+            let st = tiny_skia::Stroke {
+                width: self.width.max(1.0),
+                line_cap: LineCap::Round,
+                ..tiny_skia::Stroke::default()
+            };
             let paint = self.paint();
-            self.ink.stroke_path(&path, &paint, &st, Transform::identity(), self.mask.as_ref());
+            self.ink.stroke_path(
+                &path,
+                &paint,
+                &st,
+                Transform::identity(),
+                self.mask.as_ref(),
+            );
         }
         self.last = (x, y);
     }
@@ -103,7 +127,10 @@ pub(super) struct Map {
 
 impl Map {
     fn to_mm(&self, x: f64, y: f64) -> [f64; 2] {
-        [((x - self.ox) / self.s - self.l) * self.kx, ((y - self.top) / self.s - self.t) * self.ky]
+        [
+            ((x - self.ox) / self.s - self.l) * self.kx,
+            ((y - self.top) / self.s - self.t) * self.ky,
+        ]
     }
 
     /// Точек экрана в миллиметре холста
@@ -131,11 +158,25 @@ pub(super) fn map(st: &State, ui: &AppWindow) -> Option<Map> {
     let sk = pic.sk.as_ref()?;
     let (cw, ch) = (f64::from(ui.get_cw()), f64::from(ui.get_ch()));
     let tf = Tf::fit(cw, ch, &st.p, &st.view);
-    let (l, t, dw, dh) = render::image_rect(&st.p, f64::from(pic.pix.width()), f64::from(pic.pix.height()));
+    let (l, t, dw, dh) = render::image_rect(
+        &st.p,
+        f64::from(pic.pix.width()),
+        f64::from(pic.pix.height()),
+    );
     if dw <= 0.0 || dh <= 0.0 {
         return None;
     }
-    Some(Map { s: tf.s, ox: tf.ox, top: tf.oy - st.p.sheet_h * tf.s, l, t, dw, dh, kx: sk.sketch.w / dw, ky: sk.sketch.h / dh })
+    Some(Map {
+        s: tf.s,
+        ox: tf.ox,
+        top: tf.oy - st.p.sheet_h * tf.s,
+        l,
+        t,
+        dw,
+        dh,
+        kx: sk.sketch.w / dw,
+        ky: sk.sketch.h / dh,
+    })
 }
 
 /// Уменьшенная копия для карточки картинки: среднее по блокам, без лесенки.
@@ -166,7 +207,9 @@ pub(super) fn thumb(pm: &Pixmap) -> Image {
             }
         }
     }
-    Image::from_rgba8_premultiplied(SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(&out, tw as u32, th as u32))
+    Image::from_rgba8_premultiplied(SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
+        &out, tw as u32, th as u32,
+    ))
 }
 
 /// Карточка картинки и состояние кнопок рисования.
@@ -184,9 +227,21 @@ pub(super) fn show_pic(st: &State, ui: &AppWindow) {
     store.set_thumb(thumb(&pic.pix));
     let sk = pic.sk.as_ref();
     let blank = sk.is_some_and(|s| s.blank);
-    store.set_img_name(if blank { t("Рисунок") } else { pic.name.clone() }.into());
+    store.set_img_name(
+        if blank {
+            t("Рисунок")
+        } else {
+            pic.name.clone()
+        }
+        .into(),
+    );
     let size = match sk {
-        Some(s) if s.blank => format!("{} × {} {}", fmt_n(s.sketch.w, 0), fmt_n(s.sketch.h, 0), t("мм")),
+        Some(s) if s.blank => format!(
+            "{} × {} {}",
+            fmt_n(s.sketch.w, 0),
+            fmt_n(s.sketch.h, 0),
+            t("мм")
+        ),
         _ => format!("{} × {} px", pic.w0, pic.h0),
     };
     let n = sk.map_or(0, |s| s.sketch.strokes.len());
@@ -208,14 +263,26 @@ pub(super) fn blank_pic(sketch: Sketch) -> Option<Pic> {
     let sk = Sk::new(sketch, base, true);
     let pix = sk.render();
     let gray = Arc::new(Gray::from_rgba(pix.data(), w, h));
-    Some(Pic { name: t("Рисунок"), bytes: Vec::new(), w0: w as u32, h0: h as u32, pix, gray, sk: Some(sk) })
+    Some(Pic {
+        name: t("Рисунок"),
+        bytes: Vec::new(),
+        w0: w as u32,
+        h0: h as u32,
+        pix,
+        gray,
+        sk: Some(sk),
+    })
 }
 
 /// Рисунок поверх только что открытой картинки (из файла заказа).
 pub(super) fn attach(pic: &mut Pic, sketch: Sketch) {
     let sk = Sk::new(sketch, pic.pix.clone(), false);
     pic.pix = sk.render();
-    pic.gray = Arc::new(Gray::from_rgba(pic.pix.data(), pic.pix.width() as usize, pic.pix.height() as usize));
+    pic.gray = Arc::new(Gray::from_rgba(
+        pic.pix.data(),
+        pic.pix.width() as usize,
+        pic.pix.height() as usize,
+    ));
     pic.sk = Some(sk);
 }
 
@@ -227,7 +294,11 @@ fn changed(st: &mut State, ui: &AppWindow, full: bool) {
             pic.pix = sk.render();
         }
     }
-    pic.gray = Arc::new(Gray::from_rgba(pic.pix.data(), pic.pix.width() as usize, pic.pix.height() as usize));
+    pic.gray = Arc::new(Gray::from_rgba(
+        pic.pix.data(),
+        pic.pix.width() as usize,
+        pic.pix.height() as usize,
+    ));
     st.p_ver += 1;
     show_pic(st, ui);
     schedule_gen(st);
@@ -250,11 +321,18 @@ pub(super) fn open(st: &mut State, ui: &AppWindow) {
         install(st, ui, pic);
     } else if let Some(pic) = st.pic.as_mut() {
         if pic.sk.is_none() {
-            let (_, _, dw, dh) = render::image_rect(&st.p, f64::from(pic.pix.width()), f64::from(pic.pix.height()));
+            let (_, _, dw, dh) = render::image_rect(
+                &st.p,
+                f64::from(pic.pix.width()),
+                f64::from(pic.pix.height()),
+            );
             pic.sk = Some(Sk::new(Sketch::new(r2(dw), r2(dh)), pic.pix.clone(), false));
         }
     }
-    let size = f64::from(store.get_brush_size()).clamp(f64::from(store.get_brush_min()), f64::from(store.get_brush_max()));
+    let size = f64::from(store.get_brush_size()).clamp(
+        f64::from(store.get_brush_min()),
+        f64::from(store.get_brush_max()),
+    );
     store.set_brush_size(size as f32);
     store.set_drawing(true);
     show_pic(st, ui);
@@ -302,21 +380,35 @@ fn begin(st: &mut State, ui: &AppWindow, x: f64, y: f64) {
         return;
     }
     let Some(m) = map(st, ui) else { return };
-    let Some(sk) = st.pic.as_ref().and_then(|p| p.sk.as_ref()) else { return };
+    let Some(sk) = st.pic.as_ref().and_then(|p| p.sk.as_ref()) else {
+        return;
+    };
     let (blank, wk) = (sk.blank, sk.sketch.width_k);
-    let (w, h) = ((ui.get_cw().round() as u32).max(1), (ui.get_ch().round() as u32).max(1));
+    let (w, h) = (
+        (ui.get_cw().round() as u32).max(1),
+        (ui.get_ch().round() as u32).max(1),
+    );
     let Some(ink) = Pixmap::new(w, h) else { return };
     let erase = store.get_brush_tool() == 1;
     let size = f64::from(store.get_brush_size()).max(0.05);
     let soft = f64::from(store.get_brush_soft()).clamp(0.0, 1.0);
     let tone = f64::from(store.get_brush_tone()).clamp(0.0, 1.0);
     let g = ((1.0 - tone) * 255.0).round() as u8;
-    let color = if erase { tiny_skia::Color::WHITE } else { tiny_skia::Color::from_rgba8(g, g, g, 255) };
+    let color = if erase {
+        tiny_skia::Color::WHITE
+    } else {
+        tiny_skia::Color::from_rgba8(g, g, g, 255)
+    };
     // Мягкий край на экране кажется уже: показываем ту ширину, что видна после отпускания
     let width = (size * wk * m.px_per_mm() * (1.0 - 0.45 * soft)) as f32;
     let mask = m.clip(&st.p).and_then(|r| {
         let mut mk = Mask::new(w, h)?;
-        mk.fill_path(&PathBuilder::from_rect(r), FillRule::Winding, false, Transform::identity());
+        mk.fill_path(
+            &PathBuilder::from_rect(r),
+            FillRule::Winding,
+            false,
+            Transform::identity(),
+        );
         Some(mk)
     });
     store.set_ink_alpha(if erase && !blank { 0.7 } else { 1.0 });
@@ -355,14 +447,20 @@ fn moved(st: &mut State, ui: &AppWindow, x: f64, y: f64) {
 
 /// Слой штриха на экран, не чаще одного раза за кадр.
 fn flush(st: &mut State) {
-    st.ink_timer.start(TimerMode::SingleShot, Duration::ZERO, || {
-        with(|st, ui| {
-            if let Some(l) = &st.live {
-                let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(l.ink.data(), l.ink.width(), l.ink.height());
-                ui.global::<Store>().set_ink(Image::from_rgba8_premultiplied(buf));
-            }
+    st.ink_timer
+        .start(TimerMode::SingleShot, Duration::ZERO, || {
+            with(|st, ui| {
+                if let Some(l) = &st.live {
+                    let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
+                        l.ink.data(),
+                        l.ink.width(),
+                        l.ink.height(),
+                    );
+                    ui.global::<Store>()
+                        .set_ink(Image::from_rgba8_premultiplied(buf));
+                }
+            });
         });
-    });
 }
 
 fn end(st: &mut State, ui: &AppWindow) {
@@ -379,11 +477,18 @@ fn end(st: &mut State, ui: &AppWindow) {
         return;
     }
     let pts = sketch::smooth(&live.raw, live.size);
-    let s = Stroke { erase: live.erase, size: r2(live.size), soft: r2(live.soft), tone: r2(live.tone), pts };
+    let s = Stroke {
+        erase: live.erase,
+        size: r2(live.size),
+        soft: r2(live.soft),
+        tone: r2(live.tone),
+        pts,
+    };
     if let Some(pic) = st.pic.as_mut() {
         if let Some(sk) = pic.sk.as_mut() {
             let (w, h) = (pic.pix.width() as usize, pic.pix.height() as usize);
-            sk.sketch.paint(pic.pix.data_mut(), sk.base.data(), w, h, &s);
+            sk.sketch
+                .paint(pic.pix.data_mut(), sk.base.data(), w, h, &s);
             sk.sketch.strokes.push(s.clone());
             sk.undo.push(Act::Add(s));
             sk.redo.clear();
@@ -408,7 +513,9 @@ fn undo(st: &mut State, ui: &AppWindow) {
     if st.live.is_some() {
         return;
     }
-    let Some(sk) = st.pic.as_mut().and_then(|p| p.sk.as_mut()) else { return };
+    let Some(sk) = st.pic.as_mut().and_then(|p| p.sk.as_mut()) else {
+        return;
+    };
     match sk.undo.pop() {
         Some(Act::Add(s)) => {
             sk.sketch.strokes.pop();
@@ -427,7 +534,9 @@ fn redo(st: &mut State, ui: &AppWindow) {
     if st.live.is_some() {
         return;
     }
-    let Some(sk) = st.pic.as_mut().and_then(|p| p.sk.as_mut()) else { return };
+    let Some(sk) = st.pic.as_mut().and_then(|p| p.sk.as_mut()) else {
+        return;
+    };
     match sk.redo.pop() {
         Some(Act::Add(s)) => {
             sk.sketch.strokes.push(s.clone());
@@ -443,7 +552,9 @@ fn redo(st: &mut State, ui: &AppWindow) {
 }
 
 fn clear(st: &mut State, ui: &AppWindow) {
-    let Some(sk) = st.pic.as_mut().and_then(|p| p.sk.as_mut()) else { return };
+    let Some(sk) = st.pic.as_mut().and_then(|p| p.sk.as_mut()) else {
+        return;
+    };
     if sk.sketch.strokes.is_empty() {
         return;
     }
@@ -455,12 +566,15 @@ fn clear(st: &mut State, ui: &AppWindow) {
 
 fn width_changed(st: &mut State, ui: &AppWindow) {
     let k = f64::from(ui.global::<Store>().get_width_k()).clamp(0.05, 20.0);
-    let Some(sk) = st.pic.as_mut().and_then(|p| p.sk.as_mut()) else { return };
+    let Some(sk) = st.pic.as_mut().and_then(|p| p.sk.as_mut()) else {
+        return;
+    };
     sk.sketch.width_k = r2(k);
     // Ползунок шлёт много значений подряд: пересчитываем рисунок по последнему
-    st.width_timer.start(TimerMode::SingleShot, Duration::from_millis(60), || {
-        with(|st, ui| changed(st, ui, true));
-    });
+    st.width_timer
+        .start(TimerMode::SingleShot, Duration::from_millis(60), || {
+            with(|st, ui| changed(st, ui, true));
+        });
 }
 
 fn export_svg() {

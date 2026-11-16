@@ -80,7 +80,8 @@ mod tests {
 
     #[test]
     fn old_or_partial_settings_still_load() {
-        let s: Saved = serde_json::from_str(r#"{"theme":3,"unknown":1,"params":{"pitch":9}}"#).expect("json");
+        let s: Saved =
+            serde_json::from_str(r#"{"theme":3,"unknown":1,"params":{"pitch":9}}"#).expect("json");
         assert_eq!(s.theme, 3);
         assert!(s.vibro);
         assert_eq!(s.params.map(|p| p.pitch), Some(9.0));

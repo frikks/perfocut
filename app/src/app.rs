@@ -13,7 +13,10 @@ use perfo_core::gen::{self, GenResult};
 use perfo_core::image::Gray;
 use perfo_core::params::Params;
 use perfo_core::sketch::Sketch;
-use slint::{ComponentHandle, Image, Model, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, Timer, TimerMode, VecModel, Weak};
+use slint::{
+    ComponentHandle, Image, Model, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, Timer,
+    TimerMode, VecModel, Weak,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -119,7 +122,11 @@ fn sk(c: slint::Color) -> tiny_skia::Color {
 fn format_rows(saved: &Saved) -> Vec<Fmt> {
     FORMATS
         .iter()
-        .map(|f| Fmt { title: t(f.title).into(), note: t(f.note).into(), on: saved.formats.get(f.id).copied().unwrap_or(f.on) })
+        .map(|f| Fmt {
+            title: t(f.title).into(),
+            note: t(f.note).into(),
+            on: saved.formats.get(f.id).copied().unwrap_or(f.on),
+        })
         .collect()
 }
 
@@ -353,7 +360,13 @@ fn bind(ui: &AppWindow) {
     s.on_wheel(|x, y, dy| {
         with(|st, ui| {
             // Колесо мыши: шаг около 12 % за щелчок
-            zoom(st, ui, f64::from(x), f64::from(y), (f64::from(dy) * 0.002).exp());
+            zoom(
+                st,
+                ui,
+                f64::from(x),
+                f64::from(y),
+                (f64::from(dy) * 0.002).exp(),
+            );
         });
     });
     s.on_pinch_start(|| {
@@ -386,7 +399,9 @@ fn bind(ui: &AppWindow) {
     s.on_format_toggled(|i, on| {
         with(|st, _| {
             let Ok(idx) = usize::try_from(i) else { return };
-            let (Some(mut row), Some(f)) = (st.formats.row_data(idx), FORMATS.get(idx)) else { return };
+            let (Some(mut row), Some(f)) = (st.formats.row_data(idx), FORMATS.get(idx)) else {
+                return;
+            };
             row.on = on;
             st.formats.set_row_data(idx, row);
             st.saved.formats.insert(f.id.to_owned(), on);
@@ -442,11 +457,15 @@ fn toast(st: &mut State, ui: &AppWindow, text: &str, ms: u64) {
     store.set_toast(text.into());
     store.set_toast_shown(true);
     let w = st.ui.clone();
-    st.toast_timer.start(TimerMode::SingleShot, Duration::from_millis(ms), move || {
-        if let Some(ui) = w.upgrade() {
-            ui.global::<Store>().set_toast_shown(false);
-        }
-    });
+    st.toast_timer.start(
+        TimerMode::SingleShot,
+        Duration::from_millis(ms),
+        move || {
+            if let Some(ui) = w.upgrade() {
+                ui.global::<Store>().set_toast_shown(false);
+            }
+        },
+    );
 }
 
 /// Сообщение об ошибке из любого места программы.
@@ -474,7 +493,11 @@ pub(crate) fn update_json(json: &str) {
                 // Запоминаем время и версию: следующая тихая проверка будет через сутки,
                 // а точка на шестерёнке появится сразу при следующем запуске
                 st.saved.update_check = platform::now_ms();
-                st.saved.update_version = if newer { rel.version.clone() } else { String::new() };
+                st.saved.update_version = if newer {
+                    rel.version.clone()
+                } else {
+                    String::new()
+                };
                 st.saved.store();
                 let store = ui.global::<Store>();
                 store.set_update_available(newer);
@@ -494,7 +517,11 @@ pub(crate) fn update_json(json: &str) {
 /// Проверка не удалась: сеть, нет стабильных релизов, непонятный ответ.
 pub(crate) fn update_failed(detail: &str) {
     let base = t("Не удалось проверить обновления");
-    let note = if detail.trim().is_empty() { base } else { format!("{base}: {detail}") };
+    let note = if detail.trim().is_empty() {
+        base
+    } else {
+        format!("{base}: {detail}")
+    };
     with(|st, ui| {
         let silent = st.update_silent;
         st.update_silent = false;
@@ -541,7 +568,11 @@ pub(crate) fn update_downloaded(path: &str) {
 #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub(crate) fn update_download_failed(detail: &str) {
     let base = t("Не удалось скачать обновление");
-    let note = if detail.trim().is_empty() { base } else { format!("{base}: {detail}") };
+    let note = if detail.trim().is_empty() {
+        base
+    } else {
+        format!("{base}: {detail}")
+    };
     with(|st, ui| {
         let store = ui.global::<Store>();
         store.set_update_state(7);
@@ -603,7 +634,11 @@ fn show_meta(st: &State, ui: &AppWindow) {
     store.set_sheet_meta(format!("{} × {}", fmt_n(p.sheet_w, 0), fmt_n(p.sheet_h, 0)).into());
     store.set_metal_meta(format!("{} {}", fmt_n(p.thickness, 1), t("мм")).into());
     let long = long_side(p);
-    let n = if p.pitch > 0.0 && long > 0.0 { (long / p.pitch).round() } else { 0.0 };
+    let n = if p.pitch > 0.0 && long > 0.0 {
+        (long / p.pitch).round()
+    } else {
+        0.0
+    };
     store.set_holes_n(n.min(1e6) as i32);
     // Самая широкая кисть — треть длинной стороны листа
     store.set_brush_max((p.sheet_w.max(p.sheet_h) / 3.0).clamp(20.0, 5000.0) as f32);
@@ -623,7 +658,9 @@ fn set_holes(st: &mut State, ui: &AppWindow, v: f64) {
 fn aspect(st: &mut State, ui: &AppWindow) {
     let Some(pic) = &st.pic else { return };
     let mut p = st.p.clone();
-    p.sheet_h = (p.sheet_w * f64::from(pic.h0) / f64::from(pic.w0)).round().max(1.0);
+    p.sheet_h = (p.sheet_w * f64::from(pic.h0) / f64::from(pic.w0))
+        .round()
+        .max(1.0);
     st.saved.ratio = p.sheet_w / p.sheet_h;
     set_params(st, ui, p, true);
 }
@@ -637,7 +674,12 @@ fn trace(st: &mut State, ui: &AppWindow) {
     p.tone_cut = 0.05;
     p.d_max = r2((p.pitch * 1.3 / 1.5).min(p.pitch - p.bridge)).max(0.0);
     set_params(st, ui, p, true);
-    toast(st, ui, &t("Как в SVG tracing: квадратная сетка, круги, диаметр пропорционален тону"), 4000);
+    toast(
+        st,
+        ui,
+        &t("Как в SVG tracing: квадратная сетка, круги, диаметр пропорционален тону"),
+        4000,
+    );
 }
 
 fn reset(st: &mut State, ui: &AppWindow) {
@@ -754,7 +796,15 @@ fn set_picture_with(name: String, bytes: Vec<u8>, sketch: Option<Sketch>) -> boo
         }
     };
     with(move |st, ui| {
-        let mut pic = Pic { name, bytes, w0: d.w0, h0: d.h0, pix: d.pix, gray: Arc::new(d.gray), sk: None };
+        let mut pic = Pic {
+            name,
+            bytes,
+            w0: d.w0,
+            h0: d.h0,
+            pix: d.pix,
+            gray: Arc::new(d.gray),
+            sk: None,
+        };
         if let Some(sk) = sketch {
             draw::attach(&mut pic, sk);
         }
@@ -812,7 +862,9 @@ fn open_order(name: &str, bytes: &[u8]) {
     let (source, sketch) = (order.source, order.sketch);
     if order.blank && sketch.is_some() {
         // Рисунок на чистом холсте: картинка в заказе — только его копия для старых версий
-        let Some(pic) = sketch.and_then(draw::blank_pic) else { return };
+        let Some(pic) = sketch.and_then(draw::blank_pic) else {
+            return;
+        };
         with(|st, ui| install(st, ui, pic));
     } else if let Some((src_name, data)) = source {
         if !set_picture_with(src_name, data, sketch) {
@@ -826,9 +878,10 @@ fn open_order(name: &str, bytes: &[u8]) {
 // ---------- Расчёт ----------
 
 fn schedule_gen(st: &mut State) {
-    st.gen_timer.start(TimerMode::SingleShot, Duration::from_millis(90), || {
-        with(run_gen);
-    });
+    st.gen_timer
+        .start(TimerMode::SingleShot, Duration::from_millis(90), || {
+            with(run_gen);
+        });
 }
 
 fn run_gen(st: &mut State, ui: &AppWindow) {
@@ -849,7 +902,11 @@ fn run_gen(st: &mut State, ui: &AppWindow) {
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
-        let job = Job { ver, gray: pic.gray.clone(), p: st.p.clone() };
+        let job = Job {
+            ver,
+            gray: pic.gray.clone(),
+            p: st.p.clone(),
+        };
         if st.jobs.send(job).is_err() {
             let r = gen::generate(Some(&pic.gray), &st.p);
             apply_result(st, ui, ver, r);
@@ -902,7 +959,13 @@ fn stats_ui(st: &State) -> StatsUI {
     if x.cost_fixed > 0.0 {
         rows.push((t("Подготовка"), x.cost_fixed));
     }
-    let rows: Vec<KV> = rows.into_iter().map(|(k, v)| KV { k: k.into(), v: format!("{} {cur}", fmt_n(v, 0)).into() }).collect();
+    let rows: Vec<KV> = rows
+        .into_iter()
+        .map(|(k, v)| KV {
+            k: k.into(),
+            v: format!("{} {cur}", fmt_n(v, 0)).into(),
+        })
+        .collect();
     s.rows = ModelRc::new(VecModel::from(rows));
     s.count = fmt_n(x.count as f64, 0).into();
     s.pierces = fmt_n(x.pierces as f64, 0).into();
@@ -918,21 +981,43 @@ fn stats_ui(st: &State) -> StatsUI {
         list.sort_by_key(|b| std::cmp::Reverse(b.count));
         list.truncate(14);
         list.sort_by(|a, b| a.size.total_cmp(&b.size));
-        s.sizes_note = tf("Показаны 14 из {n}. Увеличьте шаг размеров", &[("n", &bs.len().to_string())]).into();
+        s.sizes_note = tf(
+            "Показаны 14 из {n}. Увеличьте шаг размеров",
+            &[("n", &bs.len().to_string())],
+        )
+        .into();
     }
     let sizes: Vec<SizeRow> = list
         .iter()
         .map(|b| {
-            let d = if (b.size - b.size.round()).abs() > 1e-9 { 1 } else { 0 };
-            let label = if lines { format!("{} {}", fmt_n(b.size, d), t("мм")) } else { format!("Ø {}", fmt_n(b.size, d)) };
-            SizeRow { label: label.into(), frac: (b.count as f64 / mx).max(0.02) as f32, n: fmt_n(b.count as f64, 0).into() }
+            let d = if (b.size - b.size.round()).abs() > 1e-9 {
+                1
+            } else {
+                0
+            };
+            let label = if lines {
+                format!("{} {}", fmt_n(b.size, d), t("мм"))
+            } else {
+                format!("Ø {}", fmt_n(b.size, d))
+            };
+            SizeRow {
+                label: label.into(),
+                frac: (b.count as f64 / mx).max(0.02) as f32,
+                n: fmt_n(b.count as f64, 0).into(),
+            }
         })
         .collect();
     s.sizes = ModelRc::new(VecModel::from(sizes));
 
     let mut warns: Vec<SharedString> = x.warnings.iter().map(|w| w.as_str().into()).collect();
     if x.removed_edge > 0 {
-        warns.push(tf("{n} отв. у края не поместились в поле и пропущены", &[("n", &fmt_n(x.removed_edge as f64, 0))]).into());
+        warns.push(
+            tf(
+                "{n} отв. у края не поместились в поле и пропущены",
+                &[("n", &fmt_n(x.removed_edge as f64, 0))],
+            )
+            .into(),
+        );
     }
     s.warnings = ModelRc::new(VecModel::from(warns));
     let key = if lines {
@@ -940,8 +1025,23 @@ fn stats_ui(st: &State) -> StatsUI {
     } else {
         "Размеры от {a} до {b} мм, перемычка не меньше {c} мм"
     };
-    s.ok_line = tf(key, &[("a", &fmt_n(x.size_min, 1)), ("b", &fmt_n(x.size_max, 1)), ("c", &fmt_n(p.bridge, 1))]).into();
-    s.hud = tf("{n} контуров · {p} %", &[("n", &fmt_n(x.count as f64, 0)), ("p", &fmt_n(x.open_area_pct, 1))]).into();
+    s.ok_line = tf(
+        key,
+        &[
+            ("a", &fmt_n(x.size_min, 1)),
+            ("b", &fmt_n(x.size_max, 1)),
+            ("c", &fmt_n(p.bridge, 1)),
+        ],
+    )
+    .into();
+    s.hud = tf(
+        "{n} контуров · {p} %",
+        &[
+            ("n", &fmt_n(x.count as f64, 0)),
+            ("p", &fmt_n(x.open_area_pct, 1)),
+        ],
+    )
+    .into();
     s
 }
 
@@ -974,9 +1074,10 @@ fn zoom(st: &mut State, ui: &AppWindow, x: f64, y: f64, f: f64) {
 
 // Частые события (перетаскивание, колесо) склеиваются в одну перерисовку
 fn request_draw(st: &mut State) {
-    st.draw_timer.start(TimerMode::SingleShot, Duration::ZERO, || {
-        with(draw_now);
-    });
+    st.draw_timer
+        .start(TimerMode::SingleShot, Duration::ZERO, || {
+            with(draw_now);
+        });
 }
 
 fn draw_now(st: &mut State, ui: &AppWindow) {
@@ -992,10 +1093,16 @@ fn draw_now(st: &mut State, ui: &AppWindow) {
         return;
     }
     // Чёткость по пикселям экрана, но не больше 2× в браузере, чтобы не тормозить
-    let max_sf = if cfg!(target_arch = "wasm32") { 2.0 } else { 3.0 };
+    let max_sf = if cfg!(target_arch = "wasm32") {
+        2.0
+    } else {
+        3.0
+    };
     let sf = f64::from(ui.window().scale_factor()).clamp(1.0, max_sf);
     let (pw, ph) = ((cw * sf).round() as u32, (ch * sf).round() as u32);
-    let Some(mut pm) = tiny_skia::Pixmap::new(pw.max(1), ph.max(1)) else { return };
+    let Some(mut pm) = tiny_skia::Pixmap::new(pw.max(1), ph.max(1)) else {
+        return;
+    };
     let p = &st.p;
     let tf = Tf::fit(cw, ch, p, &st.view);
     let lk = look(st, ui);
@@ -1004,7 +1111,17 @@ fn draw_now(st: &mut State, ui: &AppWindow) {
     // Во время рисования виден сам рисунок и контуры отверстий поверх него
     let drawing = store.get_drawing();
     let mode = if drawing { 2 } else { store.get_view_mode() };
-    render::paint_sheet(&mut pm, ts, &tf, (cw, ch), p, shapes, mode, &lk, Some(&pic.pix));
+    render::paint_sheet(
+        &mut pm,
+        ts,
+        &tf,
+        (cw, ch),
+        p,
+        shapes,
+        mode,
+        &lk,
+        Some(&pic.pix),
+    );
     render::paint_dims(&mut pm, ts, &tf, p, lk.dim);
     let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(pm.data(), pw.max(1), ph.max(1));
     store.set_preview(Image::from_rgba8_premultiplied(buf));
@@ -1039,7 +1156,12 @@ fn ready(st: &mut State, ui: &AppWindow) -> Option<Arc<GenResult>> {
 }
 
 fn selected(st: &State) -> Vec<&'static Format> {
-    FORMATS.iter().enumerate().filter(|(i, _)| st.formats.row_data(*i).is_some_and(|r| r.on)).map(|(_, f)| f).collect()
+    FORMATS
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| st.formats.row_data(*i).is_some_and(|r| r.on))
+        .map(|(_, f)| f)
+        .collect()
 }
 
 /// Сохранить готовые байты. Окно сохранения может быть модальным, поэтому вне `with`.
@@ -1049,7 +1171,9 @@ fn save_out(name: String, mime: &str, bytes: Vec<u8>) {
         SaveOutcome::Saved(path) => toast(st, ui, &format!("{}{path}", t("Сохранено: ")), 4000),
         SaveOutcome::Downloaded(n) => toast(st, ui, &format!("{}{n}", t("Скачано: ")), 2500),
         SaveOutcome::Cancelled => {}
-        SaveOutcome::Failed(e) => toast(st, ui, &format!("{}{e}", t("Не удалось сохранить: ")), 5000),
+        SaveOutcome::Failed(e) => {
+            toast(st, ui, &format!("{}{e}", t("Не удалось сохранить: ")), 5000)
+        }
     });
 }
 
@@ -1058,7 +1182,11 @@ fn export_one(i: i32) {
         let f = usize::try_from(i).ok().and_then(|i| FORMATS.get(i))?;
         let r = ready(st, ui)?;
         match files::format_bytes(f, &r, &look(st, ui)) {
-            Ok(b) => Some((format!("{}.{}", files::base_name(&r.params), f.ext), files::mime_for(f.ext), b)),
+            Ok(b) => Some((
+                format!("{}.{}", files::base_name(&r.params), f.ext),
+                files::mime_for(f.ext),
+                b,
+            )),
             Err(e) => {
                 toast(st, ui, &format!("{}{e}", t("Ошибка экспорта: ")), 5000);
                 None
@@ -1106,10 +1234,22 @@ fn save_order() {
         } else {
             (pic.name.clone(), pic.bytes.as_slice())
         };
-        match files::order_bytes(&r, &src_name, src, sketch, &look(st, ui), &platform::now_iso()) {
+        match files::order_bytes(
+            &r,
+            &src_name,
+            src,
+            sketch,
+            &look(st, ui),
+            &platform::now_iso(),
+        ) {
             Ok(b) => Some((format!("{}.perfo", files::base_name(&r.params)), b)),
             Err(e) => {
-                toast(st, ui, &format!("{}{e}", t("Не удалось сохранить заказ: ")), 5000);
+                toast(
+                    st,
+                    ui,
+                    &format!("{}{e}", t("Не удалось сохранить заказ: ")),
+                    5000,
+                );
                 None
             }
         }

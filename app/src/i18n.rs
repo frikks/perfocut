@@ -133,7 +133,13 @@ pub fn fmt_time(min: f64) -> String {
         return format!("{} {}", fmt_n(min, d), t("мин"));
     }
     let h = (min / 60.0).floor();
-    format!("{} {} {} {}", fmt_n(h, 0), t("ч"), fmt_n((min - h * 60.0).round(), 0), t("мин"))
+    format!(
+        "{} {} {} {}",
+        fmt_n(h, 0),
+        t("ч"),
+        fmt_n((min - h * 60.0).round(), 0),
+        t("мин")
+    )
 }
 
 /// Число для поля ввода: точка, без лишних нулей.

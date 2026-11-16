@@ -164,7 +164,11 @@ impl B {
 
     fn oriented(&mut self, e: u32, same: bool) -> u32 {
         let i = self.next();
-        let _ = write!(self.o, "#{i}=ORIENTED_EDGE('',*,*,#{e},{}.);\r\n", sql(same));
+        let _ = write!(
+            self.o,
+            "#{i}=ORIENTED_EDGE('',*,*,#{e},{}.);\r\n",
+            sql(same)
+        );
         i
     }
 
@@ -184,7 +188,11 @@ impl B {
 
     fn bound(&mut self, lp: u32, outer: bool) -> u32 {
         let i = self.next();
-        let kind = if outer { "FACE_OUTER_BOUND" } else { "FACE_BOUND" };
+        let kind = if outer {
+            "FACE_OUTER_BOUND"
+        } else {
+            "FACE_BOUND"
+        };
         let _ = write!(self.o, "#{i}={kind}('',#{lp},.T.);\r\n");
         i
     }
@@ -226,23 +234,38 @@ fn header(b: &mut B) -> (u32, u32) {
     let pctx = b.next();
     let _ = write!(b.o, "#{pctx}=PRODUCT_CONTEXT('',#{ctx},'mechanical');\r\n");
     let prod = b.next();
-    let _ = write!(b.o, "#{prod}=PRODUCT('PerfoCut','PerfoCut','',(#{pctx}));\r\n");
+    let _ = write!(
+        b.o,
+        "#{prod}=PRODUCT('PerfoCut','PerfoCut','',(#{pctx}));\r\n"
+    );
     let pdf = b.next();
-    let _ = write!(b.o, "#{pdf}=PRODUCT_DEFINITION_FORMATION('','',#{prod});\r\n");
+    let _ = write!(
+        b.o,
+        "#{pdf}=PRODUCT_DEFINITION_FORMATION('','',#{prod});\r\n"
+    );
     let pdctx = b.next();
     let _ = write!(
         b.o,
         "#{pdctx}=PRODUCT_DEFINITION_CONTEXT('part definition',#{ctx},'design');\r\n"
     );
     let pd = b.next();
-    let _ = write!(b.o, "#{pd}=PRODUCT_DEFINITION('design','',#{pdf},#{pdctx});\r\n");
+    let _ = write!(
+        b.o,
+        "#{pd}=PRODUCT_DEFINITION('design','',#{pdf},#{pdctx});\r\n"
+    );
     let pds = b.next();
     let _ = write!(b.o, "#{pds}=PRODUCT_DEFINITION_SHAPE('','',#{pd});\r\n");
 
     let mm = b.next();
-    let _ = write!(b.o, "#{mm}=(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.));\r\n");
+    let _ = write!(
+        b.o,
+        "#{mm}=(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.));\r\n"
+    );
     let rad = b.next();
-    let _ = write!(b.o, "#{rad}=(NAMED_UNIT(*)PLANE_ANGLE_UNIT()SI_UNIT($,.RADIAN.));\r\n");
+    let _ = write!(
+        b.o,
+        "#{rad}=(NAMED_UNIT(*)PLANE_ANGLE_UNIT()SI_UNIT($,.RADIAN.));\r\n"
+    );
     let sr = b.next();
     let _ = write!(
         b.o,
@@ -266,9 +289,9 @@ fn clean_poly(pts: &[(f64, f64)]) -> Vec<(f64, f64)> {
     let mut out: Vec<(f64, f64)> = Vec::with_capacity(pts.len());
     for &p in pts {
         let q = (qf(qi(p.0)), qf(qi(p.1)));
-        let same = out
-            .last()
-            .map_or(false, |l| (l.0 - q.0).abs() < 1e-9 && (l.1 - q.1).abs() < 1e-9);
+        let same = out.last().map_or(false, |l| {
+            (l.0 - q.0).abs() < 1e-9 && (l.1 - q.1).abs() < 1e-9
+        });
         if !same {
             out.push(q);
         }
@@ -456,7 +479,8 @@ pub fn step(r: &GenResult) -> String {
                     }
                     let nrm = (-dy / len, dx / len, 0.0);
                     let pl = b.plane((x0, y0, 0.0), nrm);
-                    let lp = b.loop_of(&[(be[i], false), (ve[i], true), (te[i], true), (ve[j], false)]);
+                    let lp =
+                        b.loop_of(&[(be[i], false), (ve[i], true), (te[i], true), (ve[j], false)]);
                     let bd = b.bound(lp, true);
                     walls.push(b.face(&[bd], pl, true));
                 }
@@ -469,7 +493,12 @@ pub fn step(r: &GenResult) -> String {
     let plane_bot = b.plane((0.0, 0.0, 0.0), (0.0, 0.0, 1.0));
 
     let outer_top = b.loop_of(&[(et[0], true), (et[1], true), (et[2], true), (et[3], true)]);
-    let outer_bot = b.loop_of(&[(eb[0], false), (eb[3], false), (eb[2], false), (eb[1], false)]);
+    let outer_bot = b.loop_of(&[
+        (eb[0], false),
+        (eb[3], false),
+        (eb[2], false),
+        (eb[1], false),
+    ]);
 
     let mut top_bounds = Vec::with_capacity(1 + top_inner.len());
     top_bounds.push(b.bound(outer_top, true));
@@ -488,10 +517,26 @@ pub fn step(r: &GenResult) -> String {
     // --- Боковые грани листа (нормали наружу)
     let mut faces = vec![face_top, face_bot];
     let sides = [
-        ((0.0, 0.0, 0.0), (0.0, -1.0, 0.0), [(eb[0], true), (vv[1], true), (et[0], false), (vv[0], false)]),
-        ((w, 0.0, 0.0), (1.0, 0.0, 0.0), [(eb[1], true), (vv[2], true), (et[1], false), (vv[1], false)]),
-        ((0.0, h, 0.0), (0.0, 1.0, 0.0), [(eb[2], true), (vv[3], true), (et[2], false), (vv[2], false)]),
-        ((0.0, 0.0, 0.0), (-1.0, 0.0, 0.0), [(eb[3], true), (vv[0], true), (et[3], false), (vv[3], false)]),
+        (
+            (0.0, 0.0, 0.0),
+            (0.0, -1.0, 0.0),
+            [(eb[0], true), (vv[1], true), (et[0], false), (vv[0], false)],
+        ),
+        (
+            (w, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            [(eb[1], true), (vv[2], true), (et[1], false), (vv[1], false)],
+        ),
+        (
+            (0.0, h, 0.0),
+            (0.0, 1.0, 0.0),
+            [(eb[2], true), (vv[3], true), (et[2], false), (vv[2], false)],
+        ),
+        (
+            (0.0, 0.0, 0.0),
+            (-1.0, 0.0, 0.0),
+            [(eb[3], true), (vv[0], true), (et[3], false), (vv[3], false)],
+        ),
     ];
     for (p0, nrm, edges) in sides {
         let pl = b.plane(p0, nrm);
@@ -512,7 +557,10 @@ pub fn step(r: &GenResult) -> String {
     let shell = b.next();
     let _ = write!(b.o, "#{shell}=CLOSED_SHELL('',({list}));\r\n");
     let brep = b.next();
-    let _ = write!(b.o, "#{brep}=MANIFOLD_SOLID_BREP('PerfoCutSheet',#{shell});\r\n");
+    let _ = write!(
+        b.o,
+        "#{brep}=MANIFOLD_SOLID_BREP('PerfoCutSheet',#{shell});\r\n"
+    );
 
     // --- Представление формы
     let org = b.point((0.0, 0.0, 0.0));
@@ -551,8 +599,16 @@ mod tests {
         };
         GenResult {
             shapes: vec![
-                Shape::Circle { x: 20.0, y: 20.0, d: 10.0 },
-                Shape::Circle { x: 50.0, y: 30.0, d: 6.0 },
+                Shape::Circle {
+                    x: 20.0,
+                    y: 20.0,
+                    d: 10.0,
+                },
+                Shape::Circle {
+                    x: 50.0,
+                    y: 30.0,
+                    d: 6.0,
+                },
                 Shape::Poly {
                     pts: vec![(70.0, 10.0), (85.0, 12.0), (80.0, 30.0), (68.0, 26.0)],
                     size: 0.0,
@@ -610,7 +666,10 @@ mod tests {
         let m = entities(&s);
         for (id, (_, body)) in &m {
             for r in refs(body) {
-                assert!(m.contains_key(&r), "сущность #{id} ссылается на несуществующую #{r}");
+                assert!(
+                    m.contains_key(&r),
+                    "сущность #{id} ссылается на несуществующую #{r}"
+                );
             }
         }
     }
@@ -638,7 +697,10 @@ mod tests {
                 assert!(m.contains_key(&x), "сущность #{id} ссылается на #{x}");
             }
         }
-        let cyl = m.values().filter(|(k, _)| k == "CYLINDRICAL_SURFACE").count();
+        let cyl = m
+            .values()
+            .filter(|(k, _)| k == "CYLINDRICAL_SURFACE")
+            .count();
         assert_eq!(cyl, 2, "цилиндров: {cyl}");
 
         // То же самое без дублей и с чистыми точками даёт идентичный файл.

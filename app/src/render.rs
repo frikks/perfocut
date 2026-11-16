@@ -3,8 +3,8 @@
 use perfo_core::gen::Shape;
 use perfo_core::params::Params;
 use tiny_skia::{
-    Color, FillRule, FilterQuality, GradientStop, LinearGradient, Mask, Paint, PathBuilder, Pixmap, PixmapPaint,
-    Point, Rect, Shader, SpreadMode, Stroke, StrokeDash, Transform,
+    Color, FillRule, FilterQuality, GradientStop, LinearGradient, Mask, Paint, PathBuilder, Pixmap,
+    PixmapPaint, Point, Rect, Shader, SpreadMode, Stroke, StrokeDash, Transform,
 };
 
 /// Положение и масштаб листа на холсте (логические пиксели).
@@ -17,7 +17,11 @@ pub struct View {
 
 impl Default for View {
     fn default() -> Self {
-        View { z: 1.0, x: 0.0, y: 0.0 }
+        View {
+            z: 1.0,
+            x: 0.0,
+            y: 0.0,
+        }
     }
 }
 
@@ -32,9 +36,15 @@ pub struct Tf {
 impl Tf {
     pub fn fit(cw: f64, ch: f64, p: &Params, v: &View) -> Tf {
         let pad = if cw < 600.0 { 36.0 } else { 56.0 };
-        let base = ((cw - pad * 2.0) / p.sheet_w).min((ch - pad * 2.0) / p.sheet_h).max(1e-6);
+        let base = ((cw - pad * 2.0) / p.sheet_w)
+            .min((ch - pad * 2.0) / p.sheet_h)
+            .max(1e-6);
         let s = base * v.z;
-        Tf { s, ox: cw / 2.0 - p.sheet_w * s / 2.0 + v.x, oy: ch / 2.0 + p.sheet_h * s / 2.0 + v.y }
+        Tf {
+            s,
+            ox: cw / 2.0 - p.sheet_w * s / 2.0 + v.x,
+            oy: ch / 2.0 + p.sheet_h * s / 2.0 + v.y,
+        }
     }
 }
 
@@ -103,7 +113,10 @@ fn solid(c: Color) -> Paint<'static> {
 }
 
 fn stroke(w: f32) -> Stroke {
-    Stroke { width: w, ..Stroke::default() }
+    Stroke {
+        width: w,
+        ..Stroke::default()
+    }
 }
 
 /// Контуры всех отверстий одним путём. Отверстия вне холста пропускаются.
@@ -155,7 +168,12 @@ pub fn image_rect(p: &Params, iw: f64, ih: f64) -> (f64, f64, f64, f64) {
         }
     };
     let (dw, dh) = (iw * a * p.img_scale, ih * b * p.img_scale);
-    (w / 2.0 + p.img_dx - dw / 2.0, h / 2.0 - p.img_dy - dh / 2.0, dw, dh)
+    (
+        w / 2.0 + p.img_dx - dw / 2.0,
+        h / 2.0 - p.img_dy - dh / 2.0,
+        dw,
+        dh,
+    )
 }
 
 /// Рисует лист в режиме 0 «Металл», 1 «Контуры» или 2 «Оригинал».
@@ -174,23 +192,47 @@ pub fn paint_sheet(
     let sw = p.sheet_w * t.s;
     let sh = p.sheet_h * t.s;
     let top = t.oy - sh;
-    let Some(rect) = Rect::from_xywh(t.ox as f32, top as f32, sw as f32, sh as f32) else { return };
-    let inner = Rect::from_xywh((t.ox + 0.5) as f32, (top + 0.5) as f32, (sw - 1.0).max(0.5) as f32, (sh - 1.0).max(0.5) as f32);
+    let Some(rect) = Rect::from_xywh(t.ox as f32, top as f32, sw as f32, sh as f32) else {
+        return;
+    };
+    let inner = Rect::from_xywh(
+        (t.ox + 0.5) as f32,
+        (top + 0.5) as f32,
+        (sw - 1.0).max(0.5) as f32,
+        (sh - 1.0).max(0.5) as f32,
+    );
     match mode {
         1 => {
             pm.fill_rect(rect, &solid(look.card), ts, None);
             let b = p.border * t.s;
-            if let Some(fr) = Rect::from_xywh((t.ox + b + 0.5) as f32, (top + b + 0.5) as f32, (sw - 2.0 * b - 1.0) as f32, (sh - 2.0 * b - 1.0) as f32) {
+            if let Some(fr) = Rect::from_xywh(
+                (t.ox + b + 0.5) as f32,
+                (top + b + 0.5) as f32,
+                (sw - 2.0 * b - 1.0) as f32,
+                (sh - 2.0 * b - 1.0) as f32,
+            ) {
                 let mut st = stroke(1.0);
                 st.dash = StrokeDash::new(vec![4.0, 4.0], 0.0);
-                pm.stroke_path(&PathBuilder::from_rect(fr), &solid(look.frame), &st, ts, None);
+                pm.stroke_path(
+                    &PathBuilder::from_rect(fr),
+                    &solid(look.frame),
+                    &st,
+                    ts,
+                    None,
+                );
             }
             if let Some(path) = shapes_path(shapes, t, clip) {
                 let w = (t.s * 0.15).clamp(0.5, 1.0) as f32;
                 pm.stroke_path(&path, &solid(look.ink), &stroke(w), ts, None);
             }
             if let Some(r) = inner {
-                pm.stroke_path(&PathBuilder::from_rect(r), &solid(Color::from_rgba8(0xe8, 0x83, 0x3a, 255)), &stroke(1.0), ts, None);
+                pm.stroke_path(
+                    &PathBuilder::from_rect(r),
+                    &solid(Color::from_rgba8(0xe8, 0x83, 0x3a, 255)),
+                    &stroke(1.0),
+                    ts,
+                    None,
+                );
             }
         }
         2 => {
@@ -202,12 +244,28 @@ pub fn paint_sheet(
             if let Some(pic) = pic {
                 let (iw, ih) = (f64::from(pic.width()), f64::from(pic.height()));
                 let (l, tp, dw, dh) = image_rect(p, iw, ih);
-                let it = Transform::from_row((dw * t.s / iw) as f32, 0.0, 0.0, (dh * t.s / ih) as f32, (t.ox + l * t.s) as f32, (top + tp * t.s) as f32);
-                let paint = PixmapPaint { quality: FilterQuality::Bilinear, ..PixmapPaint::default() };
+                let it = Transform::from_row(
+                    (dw * t.s / iw) as f32,
+                    0.0,
+                    0.0,
+                    (dh * t.s / ih) as f32,
+                    (t.ox + l * t.s) as f32,
+                    (top + tp * t.s) as f32,
+                );
+                let paint = PixmapPaint {
+                    quality: FilterQuality::Bilinear,
+                    ..PixmapPaint::default()
+                };
                 pm.draw_pixmap(0, 0, pic.as_ref(), &paint, ts.pre_concat(it), mask.as_ref());
             }
             if let Some(path) = shapes_path(shapes, t, clip) {
-                pm.stroke_path(&path, &solid(Color::from_rgba8(0xe8, 0x83, 0x3a, 217)), &stroke(1.0), ts, mask.as_ref());
+                pm.stroke_path(
+                    &path,
+                    &solid(Color::from_rgba8(0xe8, 0x83, 0x3a, 217)),
+                    &stroke(1.0),
+                    ts,
+                    mask.as_ref(),
+                );
             }
         }
         _ => {
@@ -224,13 +282,29 @@ pub fn paint_sheet(
                 Transform::identity(),
             )
             .unwrap_or(Shader::SolidColor(look.sheet.color()));
-            let paint = Paint { shader, anti_alias: true, ..Paint::default() };
+            let paint = Paint {
+                shader,
+                anti_alias: true,
+                ..Paint::default()
+            };
             pm.fill_rect(rect, &paint, ts, None);
             if let Some(path) = shapes_path(shapes, t, clip) {
-                pm.fill_path(&path, &solid(look.back.color()), FillRule::Winding, ts, None);
+                pm.fill_path(
+                    &path,
+                    &solid(look.back.color()),
+                    FillRule::Winding,
+                    ts,
+                    None,
+                );
             }
             if let Some(r) = inner {
-                pm.stroke_path(&PathBuilder::from_rect(r), &solid(Color::from_rgba8(0, 0, 0, 89)), &stroke(1.0), ts, None);
+                pm.stroke_path(
+                    &PathBuilder::from_rect(r),
+                    &solid(Color::from_rgba8(0, 0, 0, 89)),
+                    &stroke(1.0),
+                    ts,
+                    None,
+                );
             }
         }
     }
@@ -269,52 +343,31 @@ pub fn metal_pixmap(p: &Params, shapes: &[Shape], look: &Look, max_side: f64) ->
     let w = (p.sheet_w * k).round().max(1.0);
     let h = (p.sheet_h * k).round().max(1.0);
     let mut pm = Pixmap::new(w as u32, h as u32)?;
-    let t = Tf { s: k, ox: 0.0, oy: h };
-    paint_sheet(&mut pm, Transform::identity(), &t, (w, h), p, shapes, 0, look, None);
+    let t = Tf {
+        s: k,
+        ox: 0.0,
+        oy: h,
+    };
+    paint_sheet(
+        &mut pm,
+        Transform::identity(),
+        &t,
+        (w, h),
+        p,
+        shapes,
+        0,
+        look,
+        None,
+    );
     Some(pm)
 }
 
-/// Пример для первого знакомства: градиент, тёмное пятно и светлая волна.
+/// Пример для первого знакомства: фотография, вшитая в сборку.
 pub fn sample_pixmap() -> Option<Pixmap> {
-    let (w, h) = (1200u32, 720u32);
-    let mut pm = Pixmap::new(w, h)?;
-    let lin = LinearGradient::new(
-        Point::from_xy(0.0, 0.0),
-        Point::from_xy(w as f32, 0.0),
-        vec![GradientStop::new(0.0, Color::from_rgba8(0xf4, 0xf4, 0xf4, 255)), GradientStop::new(1.0, Color::from_rgba8(0x3a, 0x3a, 0x3a, 255))],
-        SpreadMode::Pad,
-        Transform::identity(),
-    )?;
-    let bg = Rect::from_xywh(0.0, 0.0, w as f32, h as f32)?;
-    pm.fill_rect(bg, &Paint { shader: lin, anti_alias: true, ..Paint::default() }, Transform::identity(), None);
-    let rad = tiny_skia::RadialGradient::new(
-        Point::from_xy(380.0, 360.0),
-        Point::from_xy(380.0, 360.0),
-        300.0,
-        vec![
-            GradientStop::new(0.0, Color::from_rgba8(0, 0, 0, 255)),
-            GradientStop::new(0.7, Color::from_rgba8(0x22, 0x22, 0x22, 255)),
-            GradientStop::new(1.0, Color::from_rgba8(40, 40, 40, 0)),
-        ],
-        SpreadMode::Pad,
-        Transform::identity(),
-    )?;
-    let disc = PathBuilder::from_circle(380.0, 360.0, 300.0)?;
-    pm.fill_path(&disc, &Paint { shader: rad, anti_alias: true, ..Paint::default() }, FillRule::Winding, Transform::identity(), None);
-    let mut pb = PathBuilder::new();
-    let mut i = 0u32;
-    while i <= w {
-        let y = 560.0 + 70.0 * (f64::from(i) / 120.0).sin();
-        if i == 0 {
-            pb.move_to(i as f32, y as f32);
-        } else {
-            pb.line_to(i as f32, y as f32);
-        }
-        i += 8;
-    }
-    let wave = pb.finish()?;
-    pm.stroke_path(&wave, &solid(Color::WHITE), &stroke(46.0), Transform::identity(), None);
-    Some(pm)
+    let bytes = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/sample.jpg"));
+    let rgba = image::load_from_memory(bytes).ok()?.to_rgba8();
+    let (w, h) = rgba.dimensions();
+    Pixmap::from_vec(rgba.into_raw(), tiny_skia::IntSize::from_wh(w, h)?)
 }
 
 #[cfg(test)]
@@ -346,7 +399,11 @@ mod tests {
     #[test]
     fn png_view_has_holes_in_back_color() {
         let p = Params::default();
-        let shapes = vec![Shape::Circle { x: 500.0, y: 300.0, d: 100.0 }];
+        let shapes = vec![Shape::Circle {
+            x: 500.0,
+            y: 300.0,
+            d: 100.0,
+        }];
         let look = Look {
             sheet: Rgb(100, 100, 100),
             back: Rgb(255, 0, 0),

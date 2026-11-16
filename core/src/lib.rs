@@ -73,12 +73,30 @@ mod tests {
             assert!(s.size() >= dmin - 1e-6 && s.size() <= 10.0 + 1e-6);
         }
         // размер пропорционален тону: левый край (чёрный) около макс., правее меньше
-        let mut c: Vec<(f64, f64)> = r.shapes.iter().filter_map(|s| if let Shape::Circle { x, d, .. } = s { Some((*x, *d)) } else { None }).collect();
+        let mut c: Vec<(f64, f64)> = r
+            .shapes
+            .iter()
+            .filter_map(|s| {
+                if let Shape::Circle { x, d, .. } = s {
+                    Some((*x, *d))
+                } else {
+                    None
+                }
+            })
+            .collect();
         c.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         assert!(c.first().unwrap().1 > c.last().unwrap().1);
-        let p = Params { lang: "en".into(), d_min: 0.1, ..p };
+        let p = Params {
+            lang: "en".into(),
+            d_min: 0.1,
+            ..p
+        };
         let r2 = gen::generate(Some(&g), &p);
-        assert!(r2.stats.warnings.iter().any(|w| w.starts_with("Min size raised")));
+        assert!(r2
+            .stats
+            .warnings
+            .iter()
+            .any(|w| w.starts_with("Min size raised")));
         let mut lp = p.clone();
         lp.pattern = "lines".into();
         let r3 = gen::generate(Some(&g), &lp);
@@ -120,7 +138,13 @@ mod tests {
                     let c: Vec<(f64, f64, f64)> = r
                         .shapes
                         .iter()
-                        .filter_map(|s| if let Shape::Circle { x, y, d } = s { Some((*x, *y, *d)) } else { None })
+                        .filter_map(|s| {
+                            if let Shape::Circle { x, y, d } = s {
+                                Some((*x, *y, *d))
+                            } else {
+                                None
+                            }
+                        })
                         .collect();
                     for (i, a) in c.iter().enumerate().step_by(7) {
                         for b in c.iter().skip(i + 1) {
@@ -145,7 +169,10 @@ mod tests {
         };
         let r = gen::generate(Some(&g), &p);
         assert!(r.stats.count > 10);
-        for f in ["dxf", "svg", "nc", "plt", "eps", "pdf", "csv", "report", "stats", "settings", "stl", "step"] {
+        for f in [
+            "dxf", "svg", "nc", "plt", "eps", "pdf", "csv", "report", "stats", "settings", "stl",
+            "step",
+        ] {
             let b = export_format(&r, f).unwrap();
             assert!(b.len() > 50, "{f}");
         }
@@ -169,9 +196,27 @@ mod tests {
             ..Params::default()
         };
         let r = gen::generate(Some(&g), &p);
-        let w = r.stats.warnings.iter().find(|w| w.starts_with("Макс. ширина")).expect("warning");
-        assert!(w.contains("до 7,55 мм") && w.contains("не меньше 1,5 мм"), "{w}");
-        let r = gen::generate(Some(&g), &Params { lang: "en".into(), ..p });
-        assert!(r.stats.warnings.iter().any(|w| w.contains("to 7.55 mm")), "{:?}", r.stats.warnings);
+        let w = r
+            .stats
+            .warnings
+            .iter()
+            .find(|w| w.starts_with("Макс. ширина"))
+            .expect("warning");
+        assert!(
+            w.contains("до 7,55 мм") && w.contains("не меньше 1,5 мм"),
+            "{w}"
+        );
+        let r = gen::generate(
+            Some(&g),
+            &Params {
+                lang: "en".into(),
+                ..p
+            },
+        );
+        assert!(
+            r.stats.warnings.iter().any(|w| w.contains("to 7.55 mm")),
+            "{:?}",
+            r.stats.warnings
+        );
     }
 }

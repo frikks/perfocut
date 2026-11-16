@@ -6,10 +6,14 @@ use crate::{AppWindow, Prefs};
 use slint::ComponentHandle;
 use std::path::{Path, PathBuf};
 
-const OPEN_EXT: [&str; 10] = ["jpg", "jpeg", "png", "webp", "bmp", "gif", "tif", "tiff", "perfo", "zip"];
+const OPEN_EXT: [&str; 10] = [
+    "jpg", "jpeg", "png", "webp", "bmp", "gif", "tif", "tiff", "perfo", "zip",
+];
 
 fn file_name(p: &Path) -> String {
-    p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "file".into())
+    p.file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "file".into())
 }
 
 fn open_path(path: &Path) {
@@ -35,8 +39,14 @@ pub fn init(ui: &AppWindow) {
         EventResult::Propagate
     });
     // Файл из командной строки: так Windows открывает .perfo двойным щелчком
-    if let Some(path) = std::env::args_os().nth(1).map(PathBuf::from).filter(|p| p.is_file()) {
-        slint::Timer::single_shot(std::time::Duration::from_millis(30), move || open_path(&path));
+    if let Some(path) = std::env::args_os()
+        .nth(1)
+        .map(PathBuf::from)
+        .filter(|p| p.is_file())
+    {
+        slint::Timer::single_shot(std::time::Duration::from_millis(30), move || {
+            open_path(&path)
+        });
     }
 }
 
@@ -51,12 +61,17 @@ pub fn pick_file() {
 }
 
 pub fn save_file(name: &str, _mime: &str, bytes: Vec<u8>) -> SaveOutcome {
-    let ext = name.rsplit_once('.').map(|(_, e)| e.to_owned()).unwrap_or_default();
+    let ext = name
+        .rsplit_once('.')
+        .map(|(_, e)| e.to_owned())
+        .unwrap_or_default();
     let mut dlg = rfd::FileDialog::new().set_file_name(name);
     if !ext.is_empty() {
         dlg = dlg.add_filter(ext.to_uppercase(), &[ext.as_str()]);
     }
-    let Some(mut path) = dlg.save_file() else { return SaveOutcome::Cancelled };
+    let Some(mut path) = dlg.save_file() else {
+        return SaveOutcome::Cancelled;
+    };
     if path.extension().is_none() && !ext.is_empty() {
         path.set_extension(&ext);
     }
@@ -70,7 +85,9 @@ pub fn vibrate(_kind: &str) {}
 
 pub fn open_url(url: &str) {
     #[cfg(windows)]
-    let r = std::process::Command::new("rundll32").args(["url.dll,FileProtocolHandler", url]).spawn();
+    let r = std::process::Command::new("rundll32")
+        .args(["url.dll,FileProtocolHandler", url])
+        .spawn();
     #[cfg(target_os = "macos")]
     let r = std::process::Command::new("open").arg(url).spawn();
     #[cfg(not(any(windows, target_os = "macos")))]
@@ -143,7 +160,14 @@ pub fn download_update(_release_url: &str, version: &str) {
         let path = dir.join(format!("PerfoCut-{version}.exe"));
         let url = crate::update::asset_url(&version, "PerfoCut.exe");
         let mut cmd = std::process::Command::new("curl");
-        cmd.args(["-fL", "--max-time", "300", "-H", "User-Agent: PerfoCut", "-o"]);
+        cmd.args([
+            "-fL",
+            "--max-time",
+            "300",
+            "-H",
+            "User-Agent: PerfoCut",
+            "-o",
+        ]);
         cmd.arg(&path);
         cmd.arg(&url);
         #[cfg(windows)]
@@ -155,15 +179,18 @@ pub fn download_update(_release_url: &str, version: &str) {
         match cmd.output() {
             Ok(o) if o.status.success() => {
                 let shown = path.display().to_string();
-                let _ = slint::invoke_from_event_loop(move || crate::app::update_downloaded(&shown));
+                let _ =
+                    slint::invoke_from_event_loop(move || crate::app::update_downloaded(&shown));
             }
             Ok(o) => {
                 let err = format!("curl: {}", o.status);
-                let _ = slint::invoke_from_event_loop(move || crate::app::update_download_failed(&err));
+                let _ =
+                    slint::invoke_from_event_loop(move || crate::app::update_download_failed(&err));
             }
             Err(e) => {
                 let err = e.to_string();
-                let _ = slint::invoke_from_event_loop(move || crate::app::update_download_failed(&err));
+                let _ =
+                    slint::invoke_from_event_loop(move || crate::app::update_download_failed(&err));
             }
         }
     });

@@ -23,19 +23,23 @@ fn coarse_pointer() -> bool {
 fn read_file(f: web_sys::File) {
     let name = f.name();
     wasm_bindgen_futures::spawn_local(async move {
-        let Ok(buf) = JsFuture::from(f.array_buffer()).await else { return };
+        let Ok(buf) = JsFuture::from(f.array_buffer()).await else {
+            return;
+        };
         let bytes = js_sys::Uint8Array::new(&buf).to_vec();
         crate::app::open_bytes(name, bytes);
     });
 }
 
-// Окно всегда по размеру вкладки. Без этого Slint берёт preferred-width из app.slint
 fn fit_to_viewport(ui: &AppWindow) {
     let Some(w) = window() else { return };
-    let size = |v: Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue>| v.ok().and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let size = |v: Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue>| {
+        v.ok().and_then(|v| v.as_f64()).unwrap_or(0.0)
+    };
     let (width, height) = (size(w.inner_width()), size(w.inner_height()));
     if width > 0.0 && height > 0.0 {
-        ui.window().set_size(slint::LogicalSize::new(width as f32, height as f32));
+        ui.window()
+            .set_size(slint::LogicalSize::new(width as f32, height as f32));
     }
 }
 
@@ -57,13 +61,20 @@ pub fn init(ui: &AppWindow) {
     prefs.set_can_minimize(false);
     prefs.set_can_drop(!touch);
     ui.global::<Theme>().set_touch(touch);
-    let Some(doc) = window().and_then(|w| w.document()) else { return };
-    let over = Closure::<dyn FnMut(web_sys::DragEvent)>::new(|e: web_sys::DragEvent| e.prevent_default());
+    let Some(doc) = window().and_then(|w| w.document()) else {
+        return;
+    };
+    let over =
+        Closure::<dyn FnMut(web_sys::DragEvent)>::new(|e: web_sys::DragEvent| e.prevent_default());
     let _ = doc.add_event_listener_with_callback("dragover", over.as_ref().unchecked_ref());
     over.forget();
     let drop = Closure::<dyn FnMut(web_sys::DragEvent)>::new(|e: web_sys::DragEvent| {
         e.prevent_default();
-        if let Some(f) = e.data_transfer().and_then(|d| d.files()).and_then(|l| l.get(0)) {
+        if let Some(f) = e
+            .data_transfer()
+            .and_then(|d| d.files())
+            .and_then(|l| l.get(0))
+        {
             read_file(f);
         }
     });
@@ -72,8 +83,15 @@ pub fn init(ui: &AppWindow) {
 }
 
 pub fn pick_file() {
-    let Some(doc) = window().and_then(|w| w.document()) else { return };
-    let Ok(input) = doc.create_element("input").map(|e| e.unchecked_into::<web_sys::HtmlInputElement>()) else { return };
+    let Some(doc) = window().and_then(|w| w.document()) else {
+        return;
+    };
+    let Ok(input) = doc
+        .create_element("input")
+        .map(|e| e.unchecked_into::<web_sys::HtmlInputElement>())
+    else {
+        return;
+    };
     input.set_type("file");
     input.set_accept(".jpg,.jpeg,.png,.webp,.bmp,.gif,.tif,.tiff,.perfo,.zip,image/*");
     let inp = input.clone();
@@ -98,17 +116,23 @@ pub fn save_file(name: &str, mime: &str, bytes: Vec<u8>) -> SaveOutcome {
         opts.set_type(mime);
         let blob = web_sys::Blob::new_with_u8_array_sequence_and_options(&parts, &opts).ok()?;
         let url = web_sys::Url::create_object_url_with_blob(&blob).ok()?;
-        let a = doc.create_element("a").ok()?.unchecked_into::<web_sys::HtmlAnchorElement>();
+        let a = doc
+            .create_element("a")
+            .ok()?
+            .unchecked_into::<web_sys::HtmlAnchorElement>();
         a.set_href(&url);
         a.set_download(name);
         doc.body()?.append_child(&a).ok()?;
         a.click();
         a.remove();
-        // Ссылку освобождаем позже: браузеру нужно время, чтобы начать скачивание
+        // Увеличенный таймаут (30 сек), чтобы мобильные браузеры успели скачать тяжелый STEP/DXF
         let cb = Closure::once(move || {
             let _ = web_sys::Url::revoke_object_url(&url);
         });
-        let _ = w.set_timeout_with_callback_and_timeout_and_arguments_0(cb.as_ref().unchecked_ref(), 5000);
+        let _ = w.set_timeout_with_callback_and_timeout_and_arguments_0(
+            cb.as_ref().unchecked_ref(),
+            30_000,
+        );
         cb.forget();
         Some(())
     };
@@ -120,7 +144,9 @@ pub fn save_file(name: &str, mime: &str, bytes: Vec<u8>) -> SaveOutcome {
 
 pub fn vibrate(kind: &str) {
     if let Some(w) = window() {
-        let _ = w.navigator().vibrate_with_duration(if kind == "tick" { 4 } else { 10 });
+        let _ = w
+            .navigator()
+            .vibrate_with_duration(if kind == "tick" { 4 } else { 10 });
     }
 }
 
@@ -130,7 +156,6 @@ pub fn open_url(url: &str) {
     }
 }
 
-/// Скачивание не повторяем в браузере: открываем страницу релиза, файл выбирает человек.
 pub fn download_update(url: &str, _version: &str) {
     open_url(url);
     crate::app::update_page_opened();
@@ -138,7 +163,6 @@ pub fn download_update(url: &str, _version: &str) {
 
 pub fn minimize(_ui: &AppWindow) {}
 
-/// В браузере холст занимает всю вкладку, отдельного полноэкранного окна нет.
 pub fn set_full_canvas(_ui: &AppWindow, _on: bool) {}
 
 fn storage() -> Option<web_sys::Storage> {
@@ -156,15 +180,15 @@ pub fn store_settings(s: &str) {
 }
 
 pub fn system_locale() -> String {
-    window().and_then(|w| w.navigator().language()).unwrap_or_default()
+    window()
+        .and_then(|w| w.navigator().language())
+        .unwrap_or_default()
 }
 
 pub fn set_bars(_bg: slint::Color, _light: bool) {}
 
-/// Проверка обновлений запросом к GitHub из браузера: fetch с CORS.
 pub fn check_update() {
     let Some(w) = window() else { return };
-    // Страховка: fetch может ждать ответа бесконечно — через 15 с показываем ошибку
     let done = std::rc::Rc::new(std::cell::Cell::new(false));
     let d = done.clone();
     let late = Closure::once(move || {
@@ -172,7 +196,10 @@ pub fn check_update() {
             crate::app::update_failed("");
         }
     });
-    let _ = w.set_timeout_with_callback_and_timeout_and_arguments_0(late.as_ref().unchecked_ref(), 15_000);
+    let _ = w.set_timeout_with_callback_and_timeout_and_arguments_0(
+        late.as_ref().unchecked_ref(),
+        15_000,
+    );
     late.forget();
     wasm_bindgen_futures::spawn_local(async move {
         let text = match JsFuture::from(w.fetch_with_str(crate::update::API)).await {
@@ -189,7 +216,6 @@ pub fn check_update() {
                 }
                 Err(_) => None,
             },
-            // Сеть недоступна или запрос заблокирован: подробностей браузер не даёт
             Err(_) => None,
         };
         if done.replace(true) {
@@ -211,5 +237,8 @@ pub fn now_ms() -> f64 {
 }
 
 pub fn now_iso() -> String {
-    js_sys::Date::new_0().to_iso_string().as_string().unwrap_or_default()
+    js_sys::Date::new_0()
+        .to_iso_string()
+        .as_string()
+        .unwrap_or_default()
 }

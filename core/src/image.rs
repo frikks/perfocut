@@ -13,7 +13,12 @@ impl Gray {
             for x in 0..w {
                 let i = (y * w + x) * 4;
                 let (r, g, b, a) = if i + 3 < data.len() {
-                    (data[i] as f64, data[i + 1] as f64, data[i + 2] as f64, data[i + 3] as f64 / 255.0)
+                    (
+                        data[i] as f64,
+                        data[i + 1] as f64,
+                        data[i + 2] as f64,
+                        data[i + 3] as f64 / 255.0,
+                    )
                 } else {
                     (255.0, 255.0, 255.0, 1.0)
                 };
