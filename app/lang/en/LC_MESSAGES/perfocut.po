@@ -258,11 +258,17 @@ msgstr "Min size"
 msgid "Мин. ширина"
 msgstr "Min width"
 
+msgid "Материал"
+msgstr "Material"
+
 msgid "Настройки"
 msgstr "Settings"
 
 msgid "Настройки сброшены"
 msgstr "Settings reset"
+
+msgid "Название пресета"
+msgstr "Preset name"
 
 msgid "Начало программы"
 msgstr "Program start"
@@ -372,6 +378,12 @@ msgstr "Threshold: lighter means no holes"
 msgid "Пример"
 msgstr "Sample"
 
+msgid "Пресет удалён"
+msgstr "Preset deleted"
+
+msgid "Пресет сохранён"
+msgstr "Preset saved"
+
 msgid "Проверка под лазер"
 msgstr "Laser check"
 
@@ -465,6 +477,9 @@ msgstr "Building the archive…"
 msgid "Сохранено:"
 msgstr "Saved:"
 
+msgid "Сохранить"
+msgstr "Save"
+
 msgid "Сохранить заказ .perfo"
 msgstr "Save .perfo order"
 
@@ -506,6 +521,9 @@ msgstr "Triang."
 
 msgid "Треуг. 2"
 msgstr "Triang. 2"
+
+msgid "Удалить"
+msgstr "Delete"
 
 msgid "Узор"
 msgstr "Pattern"

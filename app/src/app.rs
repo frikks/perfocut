@@ -7,7 +7,7 @@ use crate::files::{self, Format, FORMATS};
 use crate::i18n::{self, fmt_n, fmt_time, t, tf};
 use crate::platform::{self, SaveOutcome};
 use crate::render::{self, Look, Rgb, Tf, View};
-use crate::saved::{self, Saved};
+use crate::saved::{self, Preset, Saved};
 use crate::{AppWindow, Bridge, Fmt, Prefs, SizeRow, StatsUI, Store, Theme, KV};
 use perfo_core::gen::{self, GenResult};
 use perfo_core::image::Gray;
@@ -168,6 +168,7 @@ pub fn run() -> Result<(), slint::PlatformError> {
     store.set_brush_tone(saved.brush_tone as f32);
     let formats = Rc::new(VecModel::from(format_rows(&saved)));
     store.set_formats(ModelRc::from(formats.clone()));
+    refresh_presets(&saved, &store);
 
     bind(&ui);
     let st = State {
@@ -280,6 +281,15 @@ fn bind(ui: &AppWindow) {
     });
     s.on_set_holes(|v| {
         with(|st, ui| set_holes(st, ui, f64::from(v)));
+    });
+    s.on_apply_preset(|i| {
+        with(|st, ui| apply_preset(st, ui, i));
+    });
+    s.on_save_preset(|| {
+        with(|st, ui| save_preset(st, ui));
+    });
+    s.on_delete_preset(|| {
+        with(|st, ui| delete_preset(st, ui));
     });
     s.on_open(platform::pick_file);
     s.on_sample(|| match files::sample_png() {
@@ -680,6 +690,96 @@ fn trace(st: &mut State, ui: &AppWindow) {
         &t("Как в SVG tracing: квадратная сетка, круги, диаметр пропорционален тону"),
         4000,
     );
+}
+
+/// Обновляет кнопки пресетов в интерфейсе.
+fn refresh_presets(saved: &Saved, store: &Store) {
+    let names: Vec<SharedString> = saved
+        .presets
+        .iter()
+        .map(|x| x.name.clone().into())
+        .collect();
+    store.set_preset_names(Rc::new(VecModel::from(names)).into());
+}
+
+/// Выбор пресета: металл, kerf, режим резки и цены применяются целиком.
+fn apply_preset(st: &mut State, ui: &AppWindow, i: i32) {
+    let Some(pr) = st.saved.presets.get(i as usize) else {
+        return;
+    };
+    let mut p = st.p.clone();
+    p.thickness = pr.thickness;
+    p.min_k = pr.min_k;
+    p.bridge = pr.bridge;
+    p.kerf = pr.kerf;
+    p.density = pr.density;
+    p.cut_speed = pr.cut_speed;
+    p.rapid_speed = pr.rapid_speed;
+    p.pierce_time = pr.pierce_time;
+    p.price_m = pr.price_m;
+    p.price_pierce = pr.price_pierce;
+    p.price_m2 = pr.price_m2;
+    p.price_fixed = pr.price_fixed;
+    p.currency = pr.currency.clone();
+    ui.global::<Store>().set_preset_current(i);
+    set_params(st, ui, p, true);
+}
+
+/// Сохраняет текущие металл/лазер/цены под именем из поля; одноимённый перезаписывается.
+fn save_preset(st: &mut State, ui: &AppWindow) {
+    let store = ui.global::<Store>();
+    let typed = store.get_preset_name().trim().to_string();
+    let name = if typed.is_empty() {
+        format!("{} {}", t("Материал"), fmt_n(st.p.thickness, 1))
+    } else {
+        typed
+    };
+    let p = st.p.clone();
+    let pr = Preset {
+        name: name.clone(),
+        thickness: p.thickness,
+        min_k: p.min_k,
+        bridge: p.bridge,
+        kerf: p.kerf,
+        density: p.density,
+        cut_speed: p.cut_speed,
+        rapid_speed: p.rapid_speed,
+        pierce_time: p.pierce_time,
+        price_m: p.price_m,
+        price_pierce: p.price_pierce,
+        price_m2: p.price_m2,
+        price_fixed: p.price_fixed,
+        currency: p.currency.clone(),
+    };
+    match st.saved.presets.iter().position(|x| x.name == name) {
+        Some(pos) => st.saved.presets[pos] = pr,
+        None => st.saved.presets.push(pr),
+    }
+    let idx = st
+        .saved
+        .presets
+        .iter()
+        .position(|x| x.name == name)
+        .unwrap_or(0) as i32;
+    st.saved.store();
+    refresh_presets(&st.saved, &store);
+    store.set_preset_current(idx);
+    store.set_preset_name(name.into());
+    toast(st, ui, &t("Пресет сохранён"), 2000);
+}
+
+/// Удаляет выбранный пресет.
+fn delete_preset(st: &mut State, ui: &AppWindow) {
+    let store = ui.global::<Store>();
+    let cur = store.get_preset_current();
+    if cur < 0 || (cur as usize) >= st.saved.presets.len() {
+        return;
+    }
+    st.saved.presets.remove(cur as usize);
+    st.saved.store();
+    refresh_presets(&st.saved, &store);
+    store.set_preset_current(-1);
+    toast(st, ui, &t("Пресет удалён"), 2000);
 }
 
 fn reset(st: &mut State, ui: &AppWindow) {

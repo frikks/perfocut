@@ -26,6 +26,66 @@ pub struct Saved {
     pub update_check: f64,
     /// Последняя известная версия релиза: точка на шестерёнке видна сразу при запуске
     pub update_version: String,
+    /// Пресеты техпроцесса: материал, толщина, kerf, скорости, врезки и цены
+    pub presets: Vec<Preset>,
+}
+
+/// Пресет техпроцесса: применяется к «Металл и лазер» и ценам одним выбором.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct Preset {
+    pub name: String,
+    pub thickness: f64,
+    pub min_k: f64,
+    pub bridge: f64,
+    pub kerf: f64,
+    pub density: f64,
+    pub cut_speed: f64,
+    pub rapid_speed: f64,
+    pub pierce_time: f64,
+    pub price_m: f64,
+    pub price_pierce: f64,
+    pub price_m2: f64,
+    pub price_fixed: f64,
+    pub currency: String,
+}
+
+impl Default for Preset {
+    fn default() -> Self {
+        Preset {
+            name: String::new(),
+            thickness: 1.0,
+            min_k: 1.0,
+            bridge: 1.5,
+            kerf: 0.0,
+            density: 7.85,
+            cut_speed: 4000.0,
+            rapid_speed: 30000.0,
+            pierce_time: 0.3,
+            price_m: 25.0,
+            price_pierce: 1.5,
+            price_m2: 0.0,
+            price_fixed: 0.0,
+            currency: "₽".into(),
+        }
+    }
+}
+
+/// Штатные пресеты при первом запуске: стартовая точка, свои сохраняются поверх.
+pub fn default_presets() -> Vec<Preset> {
+    let base = |name: &str, thickness: f64, kerf: f64, cut: f64, pierce: f64| Preset {
+        name: name.into(),
+        thickness,
+        kerf,
+        cut_speed: cut,
+        pierce_time: pierce,
+        ..Preset::default()
+    };
+    vec![
+        base("Сталь 1 мм", 1.0, 0.08, 4000.0, 0.3),
+        base("Сталь 2 мм", 2.0, 0.1, 2500.0, 0.5),
+        base("Нерж. 1,5 мм", 1.5, 0.1, 3000.0, 0.4),
+    ]
 }
 
 impl Default for Saved {
@@ -46,6 +106,7 @@ impl Default for Saved {
             brush_tone: 1.0,
             update_check: 0.0,
             update_version: String::new(),
+            presets: default_presets(),
         }
     }
 }
@@ -87,5 +148,29 @@ mod tests {
         assert_eq!(s.params.map(|p| p.pitch), Some(9.0));
         assert_eq!(lang_from_locale("ru-RU"), "ru");
         assert_eq!(lang_from_locale("en_US"), "en");
+        // У старого файла пресетов нет — приходят штатные (поле заполнится из Default).
+        assert_eq!(s.presets.len(), default_presets().len());
+    }
+
+    #[test]
+    fn presets_survive_roundtrip() {
+        let mut s = Saved::default();
+        assert!(!s.presets.is_empty());
+        let mut pr = s.presets[0].clone();
+        pr.kerf = 0.17;
+        pr.name = "Мой".into();
+        s.presets.push(pr);
+        let txt = serde_json::to_string(&s).expect("json");
+        let back: Saved = serde_json::from_str(&txt).expect("load");
+        assert_eq!(back.presets.len(), s.presets.len());
+        let back_pr = back.presets.last().expect("preset");
+        assert_eq!(back_pr.kerf, 0.17);
+        assert_eq!(back_pr.name, "Мой");
+        // Старый файл без поля пресетов: список наполняется штатными.
+        let old: Saved = serde_json::from_str(r#"{"theme":0}"#).expect("json");
+        assert_eq!(old.presets.len(), default_presets().len());
+        // А явно пустой список сохраняется пустым: удаление пресетов не откатывается.
+        let empty: Saved = serde_json::from_str(r#"{"presets":[]}"#).expect("json");
+        assert!(empty.presets.is_empty());
     }
 }

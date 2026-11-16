@@ -34,6 +34,14 @@ export global Store {
     in property <string> sheet-meta;
     in property <string> metal-meta;
 
+    // Пресеты техпроцесса
+    in-out property <[string]> preset-names;
+    in-out property <int> preset-current: -1;
+    in-out property <string> preset-name;
+    callback apply-preset(int);
+    callback save-preset();
+    callback delete-preset();
+
     // Картинка
     in property <bool> has-image;
     in property <string> img-name;

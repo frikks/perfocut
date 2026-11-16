@@ -662,6 +662,36 @@ export component SettingsPanel inherits VerticalLayout {
         title: @tr("Металл и лазер");
         meta: Store.metal-meta;
         open: false;
+        if Store.preset-names.length > 0: Seg {
+            columns: 2;
+            items: Store.preset-names;
+            current: Store.preset-current;
+            select(i) => {
+                Store.apply-preset(i);
+            }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            TextField {
+                value: Store.preset-name;
+                placeholder: @tr("Название пресета");
+                edited(t) => {
+                    Store.preset-name = t;
+                }
+            }
+            Btn {
+                text: @tr("Сохранить");
+                clicked => {
+                    Store.save-preset();
+                }
+            }
+            if Store.preset-current >= 0: Btn {
+                text: @tr("Удалить");
+                clicked => {
+                    Store.delete-preset();
+                }
+            }
+        }
         FieldRow {
             label: @tr("Толщина металла");
             NumField {
