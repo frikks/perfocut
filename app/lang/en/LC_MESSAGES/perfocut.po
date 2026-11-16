@@ -234,6 +234,9 @@ msgstr "Min hole, × thickness"
 msgid "Мин. перемычка"
 msgstr "Min bridge"
 
+msgid "Компенсация реза (kerf)"
+msgstr "Kerf compensation"
+
 msgid "Мин. размер"
 msgstr "Min size"
 

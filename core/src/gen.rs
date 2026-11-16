@@ -437,10 +437,14 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                                 } else {
                                     wmin + (wmax - wmin) * tt
                                 };
-                                let l = (x + nx * ww / 2.0, y + ny * ww / 2.0);
-                                let r = (x - nx * ww / 2.0, y - ny * ww / 2.0);
-                                if ww >= wmin - 1e-9 && inside(l.0, l.1) && inside(r.0, r.1) {
-                                    ok = Some((l, r));
+                                // Ширина траектории меньше номинала на kerf (отрицательный — шире).
+                                let half = (ww - p.kerf) / 2.0;
+                                if ww >= wmin - 1e-9 && half > 0.005 {
+                                    let l = (x + nx * half, y + ny * half);
+                                    let r = (x - nx * half, y - ny * half);
+                                    if inside(l.0, l.1) && inside(r.0, r.1) {
+                                        ok = Some((l, r));
+                                    }
                                 }
                             }
                         }
@@ -468,7 +472,8 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                 let runs_len = runs.len();
                 for idx in 0..runs_len.saturating_sub(1) {
                     let gap_steps = runs[idx + 1].0 - runs[idx].1;
-                    let gap_mm = gap_steps as f64 * p.step;
+                    // Мост металла между прорезями меньше зазора траекторий на kerf.
+                    let gap_mm = (gap_steps as f64 * p.step - p.kerf).max(0.0);
                     let trim = ((p.bridge - gap_mm) / p.step / 2.0).ceil() as usize;
                     if trim > 0 {
                         let keep_left = runs[idx].2.len().saturating_sub(trim);
@@ -668,6 +673,11 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                         continue;
                     }
                     let d = if fixed.is_empty() { round2(d) } else { d };
+                    // Компенсация реза: траектория меньше номинала на kerf (отрицательный — раздувает).
+                    let d = round2(d - p.kerf);
+                    if d <= 0.01 {
+                        continue;
+                    }
                     let sh = match p.shape.as_str() {
                         "square" => {
                             let hs = d / 2.0;

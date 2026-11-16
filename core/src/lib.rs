@@ -186,6 +186,57 @@ mod tests {
     }
 
     #[test]
+    fn kerf_shifts_toolpath_sizes() {
+        let g = gradient(200, 120);
+        let base = gen::generate(Some(&g), &Params::default());
+        let k = gen::generate(
+            Some(&g),
+            &Params {
+                kerf: 0.6,
+                ..Params::default()
+            },
+        );
+        assert!(!k.shapes.is_empty());
+        assert!((k.stats.size_min - (base.stats.size_min - 0.6)).abs() < 1e-9);
+        assert!((k.stats.size_max - (base.stats.size_max - 0.6)).abs() < 1e-9);
+        // Отрицательный kerf расширяет
+        let neg = gen::generate(
+            Some(&g),
+            &Params {
+                kerf: -0.4,
+                ..Params::default()
+            },
+        );
+        assert!((neg.stats.size_max - (base.stats.size_max + 0.4)).abs() < 1e-9);
+        // Линии: ширина прорези тоже с учётом kerf
+        let lb = gen::generate(
+            Some(&g),
+            &Params {
+                pattern: "lines".into(),
+                ..Params::default()
+            },
+        );
+        let lk = gen::generate(
+            Some(&g),
+            &Params {
+                pattern: "lines".into(),
+                kerf: 0.5,
+                ..Params::default()
+            },
+        );
+        assert!((lk.stats.size_min - (lb.stats.size_min - 0.5)).abs() < 1e-9);
+        // Слишком большой kerf убирает фигуры совсем
+        let zero = gen::generate(
+            Some(&g),
+            &Params {
+                kerf: 50.0,
+                ..Params::default()
+            },
+        );
+        assert!(zero.shapes.is_empty());
+    }
+
+    #[test]
     fn warnings_use_locale_decimals() {
         let g = gradient(200, 120);
         let p = Params {

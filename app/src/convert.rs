@@ -41,7 +41,7 @@ macro_rules! par_conv {
 par_conv!(
     num: sheet_w, sheet_h, border, img_scale, img_dx, img_dy, brightness, contrast, gamma, tone_cut,
         pitch, angle, offset_x, offset_y, d_min, d_max, quant, line_pitch, line_angle, w_min, w_max,
-        wave_len, wave_amp, step, thickness, min_k, bridge, density, cut_speed, rapid_speed, pierce_time,
+        wave_len, wave_amp, step, thickness, min_k, bridge, kerf, density, cut_speed, rapid_speed, pierce_time,
         price_m, price_pierce, price_m2, price_fixed;
     text: fit, pattern, grid, shape, size_mode, fixed_sizes, currency, gc_on, gc_off, gc_header, gc_footer,
         origin, name, order_no, client, phone, email, comment;

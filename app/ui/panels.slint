@@ -614,6 +614,17 @@ export component SettingsPanel inherits VerticalLayout {
             }
         }
         FieldRow {
+            label: @tr("Компенсация реза (kerf)");
+            NumField {
+                value: Store.p.kerf;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.p.kerf = v;
+                    Store.changed();
+                }
+            }
+        }
+        FieldRow {
             label: @tr("Плотность");
             NumField {
                 value: Store.p.density;

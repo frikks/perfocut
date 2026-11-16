@@ -46,6 +46,9 @@ pub struct Params {
     pub thickness: f64,
     pub min_k: f64,
     pub bridge: f64,
+    /// Ширина реза (kerf), мм: диаметры и ширина прорезей в файле меньше номинала на это значение.
+    /// Отрицательное значение расширяет фигуры. 0 — без компенсации.
+    pub kerf: f64,
     pub density: f64,
     // Резка и стоимость
     pub cut_speed: f64,
@@ -118,6 +121,7 @@ impl Default for Params {
             thickness: 1.5,
             min_k: 1.0,
             bridge: 1.5,
+            kerf: 0.0,
             density: 7.85,
             cut_speed: 4000.0,
             rapid_speed: 30000.0,
@@ -174,6 +178,8 @@ impl Params {
         p.thickness = fin(p.thickness, 1.0).clamp(0.0, 100.0);
         p.min_k = fin(p.min_k, 1.0).clamp(0.0, 10.0);
         p.bridge = fin(p.bridge, 1.0).clamp(0.0, 100.0);
+        // kerf допускает отрицательные значения: они «раздувают» фигуры.
+        p.kerf = fin(p.kerf, 0.0).clamp(-50.0, 50.0);
         p.density = fin(p.density, 7.85).clamp(0.0, 30.0);
         p.cut_speed = fin(p.cut_speed, 4000.0).clamp(1.0, 1e6);
         p.rapid_speed = fin(p.rapid_speed, 30000.0).clamp(1.0, 1e7);
