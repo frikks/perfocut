@@ -132,6 +132,9 @@ msgstr "Replace"
 msgid "Заполнить"
 msgstr "Fill"
 
+msgid "Звезда"
+msgstr "Star"
+
 msgid "Знаков после точки"
 msgstr "Decimal places"
 
@@ -156,7 +159,7 @@ msgstr "System"
 msgid "Картинка для перфорации"
 msgstr "Image for perforation"
 
-msgid "Квадрат"
+msgid "Квадр."
 msgstr "Square"
 
 msgid "Квадратная"
@@ -279,6 +282,9 @@ msgstr "Line numbers N"
 msgid "О программе"
 msgstr "About"
 
+msgid "Овал"
+msgstr "Oval"
+
 msgid "Одна врезка"
 msgstr "Per pierce"
 
@@ -359,6 +365,9 @@ msgstr "Laser check"
 
 msgid "Пропорционально"
 msgstr "Proportional"
+
+msgid "Пропорция (высота/ширина)"
+msgstr "Aspect (height/width)"
 
 msgid "Работает на телефоне"
 msgstr "Works on a phone"

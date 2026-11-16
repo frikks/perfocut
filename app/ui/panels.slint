@@ -335,11 +335,32 @@ export component SettingsPanel inherits VerticalLayout {
                 text: @tr("Форма");
             }
             Seg {
-                items: [@tr("Круг"), @tr("Квадрат"), @tr("Ромб")];
-                current: Store.p.shape == "square" ? 1 : Store.p.shape == "diamond" ? 2 : 0;
+                items: [@tr("Круг"), @tr("Квадр."), @tr("Ромб"), @tr("Овал"), @tr("Звезда"), @tr("Треуг.")];
+                current: Store.p.shape == "square" ? 1
+                    : Store.p.shape == "diamond" ? 2
+                    : Store.p.shape == "oval" ? 3
+                    : Store.p.shape == "star" ? 4
+                    : Store.p.shape == "triangle" ? 5
+                    : 0;
                 select(i) => {
-                    Store.p.shape = i == 1 ? "square" : i == 2 ? "diamond" : "circle";
+                    Store.p.shape = i == 1 ? "square"
+                        : i == 2 ? "diamond"
+                        : i == 3 ? "oval"
+                        : i == 4 ? "star"
+                        : i == 5 ? "triangle"
+                        : "circle";
                     Store.changed();
+                }
+            }
+            if Store.p.shape == "oval" || Store.p.shape == "triangle": FieldRow {
+                label: @tr("Пропорция (высота/ширина)");
+                NumField {
+                    value: Store.p.shape-aspect;
+                    unit: "×";
+                    edited(v) => {
+                        Store.p.shape-aspect = v;
+                        Store.changed();
+                    }
                 }
             }
             FieldRow {

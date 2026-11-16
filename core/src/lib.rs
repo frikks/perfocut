@@ -107,7 +107,7 @@ mod tests {
     fn bridges_and_edges_hold() {
         let g = gradient(200, 120);
         for grid in ["square", "tri", "tri90"] {
-            for shape in ["circle", "square", "diamond"] {
+            for shape in ["circle", "square", "diamond", "oval", "star", "triangle"] {
                 let p = Params {
                     grid: grid.into(),
                     shape: shape.into(),
@@ -234,6 +234,48 @@ mod tests {
             },
         );
         assert!(zero.shapes.is_empty());
+    }
+
+    #[test]
+    fn new_shapes_build_and_export() {
+        let g = gradient(200, 120);
+        for (shape, pts_expected) in [("oval", 12usize), ("star", 10), ("triangle", 3)] {
+            let r = gen::generate(
+                Some(&g),
+                &Params {
+                    shape: shape.into(),
+                    d_max: 8.0,
+                    ..Params::default()
+                },
+            );
+            assert!(r.stats.count > 10, "{shape}: {}", r.stats.count);
+            for s in &r.shapes {
+                match s {
+                    gen::Shape::Poly { pts, .. } => {
+                        assert!(pts.len() >= pts_expected, "{shape}: {}", pts.len());
+                        if shape != "oval" {
+                            assert_eq!(pts.len(), pts_expected, "{shape}");
+                        }
+                    }
+                    _ => panic!("{shape}: ожидался полигон"),
+                }
+            }
+            // Все экспорты работают с новыми фигурами.
+            for f in ["dxf", "svg", "nc", "plt", "eps", "pdf", "stl", "step"] {
+                let b = export_format(&r, f).unwrap();
+                assert!(b.len() > 50, "{shape}/{f}");
+            }
+            // Имя фигуры попадает в отчёт.
+            let rep = String::from_utf8(export_format(&r, "report").unwrap()).unwrap();
+            let name = if shape == "oval" {
+                "овал"
+            } else if shape == "star" {
+                "звезда"
+            } else {
+                "треугольник"
+            };
+            assert!(rep.contains(name), "{shape}: отчёт без имени фигуры");
+        }
     }
 
     #[test]

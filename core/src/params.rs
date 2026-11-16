@@ -27,7 +27,9 @@ pub struct Params {
     pub angle: f64,
     pub offset_x: f64,
     pub offset_y: f64,
-    pub shape: String, // circle | square | diamond
+    pub shape: String, // circle | square | diamond | oval | star | triangle
+    /// Пропорция (высота/ширина) для овала и треугольника.
+    pub shape_aspect: f64,
     pub d_min: f64,
     pub d_max: f64,
     pub size_mode: String, // range | prop (как SVG tracing: размер пропорционален тону)
@@ -104,6 +106,7 @@ impl Default for Params {
             offset_x: 0.0,
             offset_y: 0.0,
             shape: "circle".into(),
+            shape_aspect: 0.5,
             d_min: 2.0,
             d_max: 10.0,
             size_mode: "range".into(),
@@ -174,6 +177,7 @@ impl Params {
         p.wave_len = fin(p.wave_len, 80.0).clamp(1.0, 100000.0);
         p.wave_amp = fin(p.wave_amp, 0.0).clamp(0.0, 10000.0);
         p.quant = fin(p.quant, 0.0).clamp(0.0, 100.0);
+        p.shape_aspect = fin(p.shape_aspect, 0.5).clamp(0.1, 5.0);
         p.step = fin(p.step, 1.0).clamp(0.1, 100.0);
         p.thickness = fin(p.thickness, 1.0).clamp(0.0, 100.0);
         p.min_k = fin(p.min_k, 1.0).clamp(0.0, 10.0);

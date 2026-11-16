@@ -605,19 +605,6 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
             };
             let nj = (reach / row_h).ceil() as i64 + 1;
             let ni = (reach / col_w).ceil() as i64 + 1;
-            let ext = |d: f64| -> (f64, f64) {
-                match p.shape.as_str() {
-                    "square" => {
-                        let e = d / 2.0 * (ca.abs() + sa.abs());
-                        (e, e)
-                    }
-                    "diamond" => {
-                        let e = d / 2.0 * ca.abs().max(sa.abs());
-                        (e, e)
-                    }
-                    _ => (d / 2.0, d / 2.0),
-                }
-            };
             for j in -nj..=nj {
                 let mut row: Vec<Shape> = Vec::new();
                 for i in -ni..=ni {
@@ -663,45 +650,97 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                             .min_by(|a, b2| (*a - d).abs().partial_cmp(&(*b2 - d).abs()).unwrap())
                             .unwrap();
                     }
-                    let (ex, ey) = ext(d);
-                    if x - ex < b - 1e-9
-                        || x + ex > w - b + 1e-9
-                        || y - ey < b - 1e-9
-                        || y + ey > h - b + 1e-9
-                    {
-                        removed_edge += 1;
-                        continue;
-                    }
                     let d = if fixed.is_empty() { round2(d) } else { d };
                     // Компенсация реза: траектория меньше номинала на kerf (отрицательный — раздувает).
                     let d = round2(d - p.kerf);
                     if d <= 0.01 {
                         continue;
                     }
-                    let sh = match p.shape.as_str() {
+                    // Локальные точки фигуры до поворота и переноса. Круг — особый случай:
+                    // остаётся окружностью (дуги G02, цилиндры в STEP), остальное — полигон.
+                    let poly: Option<Vec<(f64, f64)>> = match p.shape.as_str() {
                         "square" => {
                             let hs = d / 2.0;
-                            let c = [(hs, hs), (-hs, hs), (-hs, -hs), (hs, -hs)];
-                            Shape::Poly {
-                                pts: c
-                                    .iter()
-                                    .map(|q| (x + q.0 * ca - q.1 * sa, y + q.0 * sa + q.1 * ca))
-                                    .collect(),
-                                size: d,
-                            }
+                            Some(vec![(hs, hs), (-hs, hs), (-hs, -hs), (hs, -hs)])
                         }
                         "diamond" => {
                             let hs = d / 2.0;
-                            let c = [(hs, 0.0), (0.0, hs), (-hs, 0.0), (0.0, -hs)];
+                            Some(vec![(hs, 0.0), (0.0, hs), (-hs, 0.0), (0.0, -hs)])
+                        }
+                        "oval" => {
+                            let (rx, ry) = (d / 2.0, d / 2.0 * p.shape_aspect);
+                            let r = rx.max(ry);
+                            // Столько же вершин, сколько у круга с допуском по хорде.
+                            let n = if r > 0.02 {
+                                (PI / (1.0 - 0.02 / r).acos()).ceil() as usize
+                            } else {
+                                8
+                            };
+                            let n = n.clamp(12, 720);
+                            Some(
+                                (0..n)
+                                    .map(|i| {
+                                        let a = 2.0 * PI * i as f64 / n as f64;
+                                        (rx * a.cos(), ry * a.sin())
+                                    })
+                                    .collect(),
+                            )
+                        }
+                        "triangle" => {
+                            let hh = d * p.shape_aspect / 2.0;
+                            Some(vec![(0.0, hh), (-d / 2.0, -hh), (d / 2.0, -hh)])
+                        }
+                        "star" => {
+                            let r = d / 2.0;
+                            Some(
+                                (0..10)
+                                    .map(|i| {
+                                        let rr = if i % 2 == 0 { r } else { r * 0.4 };
+                                        let a = PI / 2.0 + PI * i as f64 / 5.0;
+                                        (rr * a.cos(), rr * a.sin())
+                                    })
+                                    .collect(),
+                            )
+                        }
+                        _ => None,
+                    };
+                    let sh = match poly {
+                        None => {
+                            let e = d / 2.0;
+                            if x - e < b - 1e-9
+                                || x + e > w - b + 1e-9
+                                || y - e < b - 1e-9
+                                || y + e > h - b + 1e-9
+                            {
+                                removed_edge += 1;
+                                continue;
+                            }
+                            Shape::Circle { x, y, d }
+                        }
+                        Some(local) => {
+                            // Габариты после поворота — точная проверка кромки для любого угла.
+                            let (mut ex, mut ey) = (0.0f64, 0.0f64);
+                            for &(px, py) in &local {
+                                let (rx, ry) = (px * ca - py * sa, px * sa + py * ca);
+                                ex = ex.max(rx.abs());
+                                ey = ey.max(ry.abs());
+                            }
+                            if x - ex < b - 1e-9
+                                || x + ex > w - b + 1e-9
+                                || y - ey < b - 1e-9
+                                || y + ey > h - b + 1e-9
+                            {
+                                removed_edge += 1;
+                                continue;
+                            }
                             Shape::Poly {
-                                pts: c
+                                pts: local
                                     .iter()
                                     .map(|q| (x + q.0 * ca - q.1 * sa, y + q.0 * sa + q.1 * ca))
                                     .collect(),
                                 size: d,
                             }
                         }
-                        _ => Shape::Circle { x, y, d },
                     };
                     row.push(sh);
                 }

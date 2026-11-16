@@ -643,6 +643,9 @@ pub fn report(r: &GenResult) -> String {
         let s = match p.shape.as_str() {
             "square" => t("квадрат", "square"),
             "diamond" => t("ромб", "diamond"),
+            "oval" => t("овал", "oval"),
+            "star" => t("звезда", "star"),
+            "triangle" => t("треугольник", "triangle"),
             _ => t("круг", "circle"),
         };
         format!(
