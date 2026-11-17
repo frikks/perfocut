@@ -346,17 +346,18 @@ fn optimize_path(shapes: Vec<Shape>, cell_size: f64) -> Vec<Shape> {
         .collect()
 }
 
-/// Строит отверстие в точке листа: тон → размер (диапазон или пропорция, квант,
+/// Строит отверстие в точке листа: размер (диапазон или пропорция, квант,
 /// заданные размеры, случайный разброс) → компенсация реза → полигон.
-/// None — точка не режется (тон мимо или не влезает до кромки).
+/// Тон передаётся снаружи: None — точка мимо картинки, не режется.
+/// None в результате — точка не режется (тон мимо или не влезает до кромки).
 #[allow(clippy::too_many_arguments)]
 fn dot_shape(
     x: f64,
     y: f64,
     ca: f64,
     sa: f64,
+    t: Option<f64>,
     p: &Params,
-    sampler: &Sampler,
     prop: bool,
     dmin: f64,
     dmax: f64,
@@ -364,7 +365,7 @@ fn dot_shape(
     fixed: &[f64],
     removed_edge: &mut usize,
 ) -> Option<Shape> {
-    let t = sampler.tone(x, y, p.pitch / 2.0)?;
+    let t = t?;
     if t < p.tone_cut {
         return None;
     }
@@ -711,9 +712,11 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
     } else {
         let pch = p.pitch;
         let ring_mode = p.pattern == "rings";
+        // «По плотности» (только для отверстий): размер постоянный, шаг сжимается в тёмных местах.
+        let dense = p.size_mode == "dense" && !ring_mode;
         // Кольца: расстояние между центрами соседних отверстий не меньше шага
         // (по хорде кольца и по радиусу между кольцами), как у квадратной сетки.
-        let cap = if ring_mode {
+        let cap = if ring_mode || dense {
             pch - p.bridge
         } else {
             match (p.shape.as_str(), p.grid.as_str()) {
@@ -740,7 +743,7 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
             });
             dmax = cap;
         }
-        let dmin = p.d_min.max(min_allowed);
+        let mut dmin = p.d_min.max(min_allowed);
         if p.d_min < min_allowed {
             warnings.push(if en {
                 format!(
@@ -756,7 +759,30 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                 )
             });
         }
-        let mut fixed = if p.fixed { p.fixed_list() } else { vec![] };
+        if dense && dmin > cap {
+            // Постоянный размер ограничен: иначе перемычка рвётся даже в светлых местах.
+            warnings.push(if en {
+                format!(
+                    "Hole size limited to {} mm to keep the bridge at least {} mm",
+                    dec(cap.max(0.0), en),
+                    dec(p.bridge, en)
+                )
+            } else {
+                format!(
+                    "Размер отверстий ограничен до {} мм, чтобы перемычка была не меньше {} мм",
+                    dec(cap.max(0.0), en),
+                    dec(p.bridge, en)
+                )
+            });
+            dmin = cap.max(0.0);
+        }
+        // В плотностном режиме размер постоянный: минимум и максимум совпадают.
+        let dmax = if dense { dmin } else { dmax };
+        let mut fixed = if p.fixed && !dense {
+            p.fixed_list()
+        } else {
+            vec![]
+        };
         if p.fixed {
             let before = fixed.len();
             fixed.retain(|d| *d >= dmin - 1e-9 && *d <= dmax + 1e-9);
@@ -775,7 +801,12 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                 ));
             }
         }
-        let est = if ring_mode {
+        let est = if dense {
+            // Худший случай: весь лист в тёмных местах с минимальным шагом
+            // (размер + перемычка). Светлые места режутся реже этого.
+            let step_min = (dmin + p.bridge).max(0.1);
+            (w * h) / (step_min * step_min)
+        } else if ring_mode {
             // Все кольца до дальнего угла листа: объём итераций совпадает с оценкой.
             let reach = (w * w + h * h).sqrt() / 2.0 + p.offset_x.abs() + p.offset_y.abs() + pch;
             PI * reach * reach / (pch * pch)
@@ -786,6 +817,11 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
             warnings.push(if en {
                 format!(
                     "Pitch is too small: about {} holes. Increase the pitch",
+                    count(est, en)
+                )
+            } else if dense {
+                format!(
+                    "Размер отверстий слишком мал для такого листа: около {} отверстий. Увеличьте размер",
                     count(est, en)
                 )
             } else {
@@ -800,11 +836,52 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                 "Шаг слишком мал для заданной перемычки и мин. размера",
                 "Pitch is too small for this bridge and min size",
             ));
-        } else if img.is_some() && !(p.fixed && fixed.is_empty()) {
+        } else if img.is_some() && (dense || !(p.fixed && fixed.is_empty())) {
             let (cx, cy) = (w / 2.0, h / 2.0);
             let rad = p.angle.to_radians();
             let (ca, sa) = (rad.cos(), rad.sin());
-            if ring_mode {
+            if dense {
+                // Плотностной халфтон: отверстия одного размера, шаг зависит от тона —
+                // в тёмных местах стоят вплотную по перемычке, в светлых — на полный шаг.
+                // Перемычка держится сама: минимальный шаг равен размеру плюс перемычка.
+                let step_min = (dmin + p.bridge).max(0.1);
+                // Шаг от тона: тёмный (t) → к минимальному, светлый → к полному шагу.
+                let step_by = |tv: f64| {
+                    let tt = ((tv - p.tone_cut) / (1.0 - p.tone_cut)).clamp(0.0, 1.0);
+                    step_min + (pch - step_min) * (1.0 - tt)
+                };
+                let mut y = b + dmin / 2.0;
+                while y < h - b + 1e-9 {
+                    // Высота строки — по среднему тону строки (широкий замер по центру).
+                    let tr = sampler.tone(w / 2.0 + p.offset_x, y + p.offset_y, (w / 4.0).max(1.0));
+                    let y_next = y + tr.map(step_by).unwrap_or(pch);
+                    let mut row: Vec<Shape> = Vec::new();
+                    let mut x = b + dmin / 2.0;
+                    while x < w - b + 1e-9 {
+                        let (hx, hy) = (x + p.offset_x, y + p.offset_y);
+                        let t = sampler.tone(hx, hy, pch / 2.0);
+                        x += t.map(step_by).unwrap_or(pch);
+                        if let Some(sh) = dot_shape(
+                            hx,
+                            hy,
+                            ca,
+                            sa,
+                            t,
+                            &p,
+                            prop,
+                            dmin,
+                            dmin,
+                            dmin,
+                            &[],
+                            &mut removed_edge,
+                        ) {
+                            row.push(sh);
+                        }
+                    }
+                    shapes.extend(row);
+                    y = y_next;
+                }
+            } else if ring_mode {
                 // Кольцевой узор: отверстия на концентрических кольцах от центра листа.
                 // Шаг между кольцами и по хорде кольца — один и тот же `pitch`;
                 // соседние кольца сдвинуты на полшага, чтобы не было радиальных «спиц».
@@ -824,13 +901,14 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                         if x < b || x > w - b || y < b || y > h - b {
                             continue;
                         }
+                        let t = sampler.tone(x, y, pch / 2.0);
                         if let Some(sh) = dot_shape(
                             x,
                             y,
                             ca,
                             sa,
+                            t,
                             &p,
-                            &sampler,
                             prop,
                             dmin,
                             dmax,
@@ -875,13 +953,14 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                         if x < b || x > w - b || y < b || y > h - b {
                             continue;
                         }
+                        let t = sampler.tone(x, y, pch / 2.0);
                         if let Some(sh) = dot_shape(
                             x,
                             y,
                             ca,
                             sa,
+                            t,
                             &p,
-                            &sampler,
                             prop,
                             dmin,
                             dmax,

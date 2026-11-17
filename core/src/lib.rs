@@ -245,6 +245,67 @@ mod tests {
     }
 
     #[test]
+    fn density_mode_packs_dark_areas() {
+        let g = gradient(200, 120);
+        let p = Params {
+            size_mode: "dense".into(),
+            tone_cut: 0.0,
+            d_min: 3.0,
+            d_max: 50.0, // в плотностном режиме не должен влиять
+            ..Params::default()
+        };
+        let r = gen::generate(Some(&g), &p);
+        assert!(r.stats.count > 100, "{}", r.stats.count);
+        // все отверстия одного размера: постоянный диаметр без kerf
+        let first = r.shapes[0].size();
+        assert!(r.shapes.iter().all(|s| (s.size() - first).abs() < 1e-9));
+        // тёмный левый край плотнее светлого правого: шаг растёт от перемычки до полного
+        let dark = r.shapes.iter().filter(|s| s.start().0 < 250.0).count();
+        let light = r.shapes.iter().filter(|s| s.start().0 > 750.0).count();
+        assert!(dark > light * 2, "dark {dark} vs light {light}");
+        // перемычка и кромка
+        for s in &r.shapes {
+            assert!((s.size() - first).abs() < 1e-9);
+        }
+        let c: Vec<(f64, f64, f64)> = r
+            .shapes
+            .iter()
+            .filter_map(|s| {
+                if let Shape::Circle { x, y, d } = s {
+                    Some((*x, *y, *d))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for (i, a) in c.iter().enumerate().step_by(7) {
+            for b2 in c.iter().skip(i + 1) {
+                let dist = ((a.0 - b2.0).powi(2) + (a.1 - b2.1).powi(2)).sqrt();
+                if dist < 3.0 * p.pitch {
+                    assert!(
+                        dist - a.2 / 2.0 - b2.2 / 2.0 >= p.bridge - 1e-6,
+                        "bridge {dist:.3} {} {}",
+                        a.2,
+                        b2.2
+                    );
+                }
+            }
+        }
+        // заданные размеры в плотностном режиме не применяются
+        let pf = Params {
+            fixed: true,
+            fixed_sizes: "7.0".into(),
+            ..p.clone()
+        };
+        let rf = gen::generate(Some(&g), &pf);
+        assert!(rf.shapes.iter().all(|s| (s.size() - first).abs() < 1e-9));
+        // экспорт работает
+        for fmt in ["svg", "dxf", "gcode"] {
+            assert!(super::export_format(&r, fmt).is_some(), "{fmt}");
+        }
+    }
+
+    #[test]
     fn lines_and_exports() {
         let g = gradient(200, 120);
         let p = Params {

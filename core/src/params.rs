@@ -40,7 +40,7 @@ pub struct Params {
     pub seed: u64,
     pub d_min: f64,
     pub d_max: f64,
-    pub size_mode: String, // range | prop (как SVG tracing: размер пропорционален тону)
+    pub size_mode: String, // range | prop | dense (как SVG tracing: размер пропорционален тону; плотность — постоянный размер, шаг от тона)
     pub fixed: bool,
     pub fixed_sizes: String,
     pub quant: f64,

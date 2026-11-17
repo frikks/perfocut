@@ -327,6 +327,9 @@ msgstr "Holes along length"
 msgid "Отверстия"
 msgstr "Holes"
 
+msgid "Отверстия одного размера: шаг сжимается в тёмных местах до перемычки, в светлых — полный шаг."
+msgstr "Holes of one size: the pitch tightens up to the bridge in dark areas and opens to the full pitch in light ones."
+
 msgid "Отверстия по размерам"
 msgstr "Holes by size"
 
@@ -356,6 +359,9 @@ msgstr "Open area"
 
 msgid "Плотность"
 msgstr "Density"
+
+msgid "По плотности"
+msgstr "By density"
 
 msgid "Поворот"
 msgstr "Rotation"
@@ -410,6 +416,9 @@ msgstr "Size spread"
 
 msgid "Размер от тона"
 msgstr "Size from tone"
+
+msgid "Размер отверстий"
+msgstr "Hole size"
 
 msgid "Размеры от {a} до {b} мм, перемычка не меньше {c} мм"
 msgstr "Sizes from {a} to {b} mm, bridge at least {c} mm"

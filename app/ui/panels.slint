@@ -457,7 +457,7 @@ export component SettingsPanel inherits VerticalLayout {
                 }
             }
             FieldRow {
-                label: @tr("Мин. размер");
+                label: Store.p.size-mode == "dense" ? @tr("Размер отверстий") : @tr("Мин. размер");
                 NumField {
                     value: Store.p.d-min;
                     unit: @tr("мм");
@@ -467,7 +467,7 @@ export component SettingsPanel inherits VerticalLayout {
                     }
                 }
             }
-            FieldRow {
+            if Store.p.size-mode != "dense": FieldRow {
                 label: @tr("Макс. размер");
                 NumField {
                     value: Store.p.d-max;
@@ -478,7 +478,7 @@ export component SettingsPanel inherits VerticalLayout {
                     }
                 }
             }
-            Btn {
+            if Store.p.size-mode != "dense": Btn {
                 text: @tr("Макс. размер по шагу и перемычке");
                 clicked => {
                     Store.fit-dmax();
@@ -487,7 +487,15 @@ export component SettingsPanel inherits VerticalLayout {
             Caption {
                 text: @tr("Размер от тона");
             }
-            Seg {
+            if Store.p.pattern == "dots": Seg {
+                items: [@tr("От мин. до макс."), @tr("Пропорционально"), @tr("По плотности")];
+                current: Store.p.size-mode == "prop" ? 1 : Store.p.size-mode == "dense" ? 2 : 0;
+                select(i) => {
+                    Store.p.size-mode = i == 1 ? "prop" : i == 2 ? "dense" : "range";
+                    Store.changed();
+                }
+            }
+            if Store.p.pattern != "dots": Seg {
                 items: [@tr("От мин. до макс."), @tr("Пропорционально")];
                 current: Store.p.size-mode == "prop" ? 1 : 0;
                 select(i) => {
@@ -497,6 +505,9 @@ export component SettingsPanel inherits VerticalLayout {
             }
             if Store.p.size-mode == "prop": Hint {
                 text: @tr("Диаметр растёт от нуля вместе с темнотой, как в SVG tracing. Отверстия меньше мин. размера не режутся.");
+            }
+            if Store.p.size-mode == "dense": Hint {
+                text: @tr("Отверстия одного размера: шаг сжимается в тёмных местах до перемычки, в светлых — полный шаг.");
             }
             Btn {
                 text: @tr("Как в SVG tracing");
