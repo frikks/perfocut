@@ -245,7 +245,7 @@ pub fn run() -> Result<(), slint::PlatformError> {
         ui.set_splash(true);
         let ui = ui.as_weak();
         Timer::single_shot(Duration::from_millis(2400), move || {
-            if let Some(ui) = ui {
+            if let Some(ui) = ui.upgrade() {
                 ui.set_splash(false);
             }
         });
