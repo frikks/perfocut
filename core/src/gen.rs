@@ -659,11 +659,7 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
     let mut shapes: Vec<Shape> = Vec::new();
     let max_allowed;
 
-    if p.pattern != "lines"
-        && p.pattern != "dots"
-        && p.pattern != "rings"
-        && p.pattern != "stipple"
-        && p.pattern != "rays"
+    if p.pattern != "lines" && p.pattern != "dots" && p.pattern != "rings" && p.pattern != "stipple"
     {
         max_allowed = 0.0;
         warnings.push(tr(en, "Неизвестный тип узора", "Unknown pattern type"));
@@ -810,114 +806,6 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                     line_shapes.reverse();
                 }
                 shapes.extend(line_shapes);
-            }
-        }
-    } else if p.pattern == "rays" {
-        // Лучи от центра: прорези веером, ширина от тона. Угловой шаг выбран так,
-        // чтобы у дальнего угла листа соседние лучи расходились не дальше «Шага линий».
-        // Перемычка между соседними лучами — локальным пределом ширины: на радиусе r
-        // оси соседей расходятся на 2r·sin(Δφ/2), ширина луча не превосходит этого
-        // минус перемычка, поэтому у центра лучи заканчиваются сами.
-        let lp = p.line_pitch;
-        let wmin = p.w_min.max(min_allowed);
-        let wmax = p.w_max;
-        let reach = (w * w + h * h).sqrt() / 2.0 + p.offset_x.abs() + p.offset_y.abs();
-        let dphi_max = 2.0 * (lp / 2.0 / reach).clamp(-1.0, 1.0).asin();
-        let n = ((2.0 * PI / dphi_max).floor() as i64).max(2);
-        let dphi = 2.0 * PI / n as f64;
-        // Максимальная ширина луча — у дальнего угла, где соседи расходятся шире всего
-        max_allowed = 2.0 * reach * (dphi / 2.0).sin() - p.bridge;
-        if p.w_min < min_allowed {
-            warnings.push(if en {
-                format!(
-                    "Min width raised to {} mm: a slot in {} mm metal cannot be narrower",
-                    dec(min_allowed, en),
-                    dec(p.thickness, en)
-                )
-            } else {
-                format!(
-                    "Мин. ширина поднята до {} мм: для металла {} мм прорезь не может быть уже",
-                    dec(min_allowed, en),
-                    dec(p.thickness, en)
-                )
-            });
-        }
-        let reach = (w * w + h * h).sqrt() / 2.0 + p.offset_x.abs() + p.offset_y.abs();
-        let dphi_max = 2.0 * (lp / 2.0 / reach).clamp(-1.0, 1.0).asin();
-        let n = ((2.0 * PI / dphi_max).floor() as i64).max(2);
-        let est = n as f64 * (reach / p.step);
-        if est > MAX_SHAPES * 4.0 {
-            warnings.push(tr(
-                en,
-                "Слишком мелкий шаг лучей или выборки для такого листа",
-                "Ray pitch or sampling step is too small for this sheet",
-            ));
-        } else if p.w_max < wmin {
-            warnings.push(tr(
-                en,
-                "Макс. ширина меньше мин. ширины",
-                "Max width is less than min width",
-            ));
-        } else if img.is_some() {
-            let half_sin = (dphi / 2.0).sin();
-            let rad = p.line_angle.to_radians();
-            let (cxr, cyr) = (w / 2.0 + p.offset_x, h / 2.0 + p.offset_y);
-            let n_steps = (reach / p.step).ceil() as i64;
-            let inside = |x: f64, y: f64| x >= b && x <= w - b && y >= b && y <= h - b;
-            for k in 0..n {
-                let phi = rad + k as f64 * dphi;
-                let (dx, dy) = (phi.cos(), phi.sin());
-                let (nx, ny) = (-dy, dx);
-                let mut runs: Vec<(i64, i64, Vec<Segment>)> = Vec::new();
-                let mut cur: Vec<Segment> = Vec::new();
-                let mut cur_start = 0i64;
-                for s in 0..=n_steps {
-                    let u = s as f64 * p.step;
-                    let x = cxr + u * dx;
-                    let y = cyr + u * dy;
-                    // Локальный предел ширины: перемычка между соседними лучами
-                    let cap_u = 2.0 * u * half_sin - p.bridge;
-                    let mut ok = None;
-                    if cap_u >= wmin - 1e-9 && x > -lp && x < w + lp && y > -lp && y < h + lp {
-                        if let Some(t) = sampler.tone(x, y, lp / 2.0) {
-                            if t >= p.tone_cut {
-                                let tt = ((t - p.tone_cut) / (1.0 - p.tone_cut)).clamp(0.0, 1.0);
-                                let mut ww = if prop {
-                                    wmax * t
-                                } else {
-                                    wmin + (wmax - wmin) * tt
-                                };
-                                ww = ww.min(cap_u);
-                                // Ширина траектории меньше номинала на kerf (отрицательный — шире).
-                                let half = (ww - p.kerf) / 2.0;
-                                if ww >= wmin - 1e-9 && half > 0.005 {
-                                    let l = (x + nx * half, y + ny * half);
-                                    let r = (x - nx * half, y - ny * half);
-                                    if inside(l.0, l.1) && inside(r.0, r.1) {
-                                        ok = Some((l, r));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    match ok {
-                        Some(pair) => {
-                            if cur.is_empty() {
-                                cur_start = s;
-                            }
-                            cur.push(pair);
-                        }
-                        None => {
-                            if !cur.is_empty() {
-                                runs.push((cur_start, s - 1, std::mem::take(&mut cur)));
-                            }
-                        }
-                    }
-                }
-                if !cur.is_empty() {
-                    runs.push((cur_start, n_steps, cur));
-                }
-                shapes.extend(runs_to_shapes(runs, p.step, p.bridge, p.kerf, wmin));
             }
         }
     } else {
@@ -1205,9 +1093,8 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         }
     }
 
-    // У узоров «линии» и «лучи» порядок задан при построении (серпантин и веер) —
-    // оптимизация только ломает его.
-    let shapes = if p.pattern == "lines" || p.pattern == "rays" {
+    // У узора «линии» порядок уже задан построчно серпантином — оптимизация только ломает его.
+    let shapes = if p.pattern == "lines" {
         shapes
     } else {
         optimize_path(shapes, p.pitch * 2.0)

@@ -653,7 +653,7 @@ export component AppWindow inherits Window {
     // Холст во всю ширину окна: вырез экрана учитывается отступами панелей, а не краем холста
     property <length> area-w: self.width;
     property <length> area-h: (kb-open ? Math.min(self.height - self.safe-area-insets.bottom, self.virtual-keyboard-position.y) : self.height - self.safe-area-insets.bottom) - inset-top;
-    property <length> head-h: wide ? 56px : (Theme.touch ? 56px : 48px);
+    property <length> head-h: wide ? 56px : 48px;
     property <length> left-w: Theme.touch ? 340px : 316px;
     property <length> right-w: Theme.touch ? 320px : 300px;
     // На телефоне рисование занимает весь экран под шапкой: нижние вкладки спрятаны
@@ -861,7 +861,7 @@ export component AppWindow inherits Window {
                     padding-left: root.inset-left;
                     padding-right: root.inset-right;
                     if !root.kb-open: Rectangle {
-                        height: Theme.row + 16px;
+                        height: Theme.row + 12px;
                         Rectangle {
                             y: 0;
                             height: 1px;
@@ -1115,8 +1115,9 @@ export component AppWindow inherits Window {
         }
 
         // Сплэш при запуске: арт на весь экран, закрывается тапом или сама.
-        // Слой cover позади закрывает полосы на вытянутых экранах, contain спереди
-        // показывает весь арт целиком: логотип не обрезается ни на каких пропорциях.
+        // Слой cover позади закрывает полосы на вытянутых экранах (без полосы загрузки,
+        // иначе в нижней полосе просвечивает вторая), contain спереди показывает весь
+        // арт целиком: логотип не обрезается ни на каких пропорциях.
         Rectangle {
             visible: self.opacity > 0.01;
             opacity: root.splash ? 1 : 0;
@@ -1137,7 +1138,7 @@ export component AppWindow inherits Window {
                 y: 0;
                 width: parent.width;
                 height: parent.height;
-                source: @image-url("splash.png");
+                source: @image-url("splash_bg.jpg");
                 image-fit: cover;
             }
             Image {

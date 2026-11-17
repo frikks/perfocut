@@ -311,15 +311,13 @@ export component SettingsPanel inherits VerticalLayout {
     Section {
         title: @tr("Узор");
         Seg {
-            items: [@tr("Отверстия"), @tr("Кольца"), @tr("Стиппл"), @tr("Лучи"), @tr("Линии")];
-            current: Store.p.pattern == "lines" ? 4
-                : Store.p.pattern == "rays" ? 3
+            items: [@tr("Отверстия"), @tr("Кольца"), @tr("Стиппл"), @tr("Линии")];
+            current: Store.p.pattern == "lines" ? 3
                 : Store.p.pattern == "stipple" ? 2
                 : Store.p.pattern == "rings" ? 1
                 : 0;
             select(i) => {
-                Store.p.pattern = i == 4 ? "lines"
-                    : i == 3 ? "rays"
+                Store.p.pattern = i == 3 ? "lines"
                     : i == 2 ? "stipple"
                     : i == 1 ? "rings"
                     : "dots";
@@ -327,7 +325,7 @@ export component SettingsPanel inherits VerticalLayout {
             }
         }
         if Store.p.pattern != "lines": VerticalLayout {
-            spacing: Theme.touch ? 10px : 8px;
+            spacing: Theme.touch ? 7px : 8px;
             if Store.p.pattern == "dots": Caption {
                 text: @tr("Сетка");
             }
@@ -579,10 +577,10 @@ export component SettingsPanel inherits VerticalLayout {
                 }
             }
         }
-        if Store.p.pattern == "lines" || Store.p.pattern == "rays": VerticalLayout {
-            spacing: Theme.touch ? 10px : 8px;
+        if Store.p.pattern == "lines": VerticalLayout {
+            spacing: Theme.touch ? 7px : 8px;
             FieldRow {
-                label: Store.p.pattern == "rays" ? @tr("Шаг лучей") : @tr("Шаг линий");
+                label: @tr("Шаг линий");
                 NumField {
                     value: Store.p.line-pitch;
                     unit: @tr("мм");

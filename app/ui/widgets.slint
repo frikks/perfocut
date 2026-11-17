@@ -123,7 +123,7 @@ export component Check inherits Rectangle {
         VerticalLayout {
             alignment: center;
             Rectangle {
-                width: Theme.touch ? 22px : 16px;
+                width: Theme.touch ? 20px : 16px;
                 height: self.width;
                 border-radius: 4px;
                 background: root.checked ? Theme.acc : Theme.raised;
@@ -325,7 +325,7 @@ export component TextField inherits Rectangle {
 // Строка «подпись — поле»
 export component FieldRow inherits Rectangle {
     in property <string> label;
-    in property <length> field-w: Theme.touch ? 156px : 116px;
+    in property <length> field-w: Theme.touch ? 132px : 116px;
     min-height: Theme.row;
     HorizontalLayout {
         spacing: 12px;
@@ -355,7 +355,7 @@ export component Slide inherits Rectangle {
     in property <string> shown;
     callback edited(float);
     property <float> frac: Math.clamp((value - minv) / (maxv - minv), 0, 1);
-    property <length> knob: Theme.touch ? 22px : 16px;
+    property <length> knob: Theme.touch ? 20px : 16px;
     min-height: lay.preferred-height;
     function set-from(px: length) {
         let f = Math.clamp((px - knob / 2) / Math.max(1px, track.width - knob), 0, 1);
@@ -387,8 +387,8 @@ export component Slide inherits Rectangle {
             spacing: 6px;
             // Кнопка уменьшения на шаг (-)
             Rectangle {
-                width: Theme.touch ? 36px : 24px;
-                height: Theme.touch ? 36px : 24px;
+                width: Theme.touch ? 32px : 24px;
+                height: Theme.touch ? 32px : 24px;
                 background: ta-minus.pressed ? Theme.t3 : Theme.bar;
                 border-radius: 4px;
                 Text {
@@ -409,7 +409,7 @@ export component Slide inherits Rectangle {
             }
             track := Rectangle {
                 horizontal-stretch: 1;
-                height: Theme.touch ? 36px : 24px;
+                height: Theme.touch ? 32px : 24px;
             Rectangle {
                 x: root.knob / 2;
                 width: parent.width - root.knob;
@@ -451,8 +451,8 @@ export component Slide inherits Rectangle {
           }
             // Кнопка увеличения на шаг (+)
             Rectangle {
-                width: Theme.touch ? 36px : 24px;
-                height: Theme.touch ? 36px : 24px;
+                width: Theme.touch ? 32px : 24px;
+                height: Theme.touch ? 32px : 24px;
                 background: ta-plus.pressed ? Theme.t3 : Theme.bar;
                 border-radius: 4px;
                 Text {
@@ -483,7 +483,7 @@ export component Section inherits Rectangle {
     min-height: lay.preferred-height;
     lay := VerticalLayout {
         Rectangle {
-            height: Theme.touch ? 56px : 44px;
+            height: Theme.touch ? 46px : 44px;
             HorizontalLayout {
                 padding-left: 16px;
                 padding-right: 16px;
@@ -527,8 +527,8 @@ export component Section inherits Rectangle {
             body := VerticalLayout {
                 padding-left: 16px;
                 padding-right: 16px;
-                padding-bottom: 16px;
-                spacing: Theme.touch ? 10px : 8px;
+                padding-bottom: 10px;
+                spacing: Theme.touch ? 7px : 8px;
                 @children
             }
         }
@@ -544,7 +544,7 @@ export component Caption inherits Text {
     color: Theme.t3;
     font-size: Theme.fs-s;
     vertical-alignment: bottom;
-    min-height: Theme.touch ? 28px : 22px;
+    min-height: 22px;
 }
 
 export component Hint inherits Text {
