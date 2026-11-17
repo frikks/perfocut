@@ -177,6 +177,9 @@ msgstr "Square"
 msgid "Клиент"
 msgstr "Client"
 
+msgid "Кольца"
+msgstr "Rings"
+
 msgid "Команды лазера"
 msgstr "Laser commands"
 
@@ -564,6 +567,9 @@ msgstr "Centre"
 msgid "Шаг выборки"
 msgstr "Sampling step"
 
+msgid "Шаг колец"
+msgstr "Ring pitch"
+
 msgid "Шаг линий"
 msgstr "Line pitch"
 
@@ -599,6 +605,9 @@ msgstr "g/cm³"
 
 msgid "кг"
 msgstr "kg"
+
+msgid "кольца, шаг"
+msgstr "rings, pitch"
 
 msgid "м"
 msgstr "m"

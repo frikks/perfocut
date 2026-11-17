@@ -286,10 +286,10 @@ fn bind(ui: &AppWindow) {
         with(|st, ui| apply_preset(st, ui, i));
     });
     s.on_save_preset(|| {
-        with(|st, ui| save_preset(st, ui));
+        with(save_preset);
     });
     s.on_delete_preset(|| {
-        with(|st, ui| delete_preset(st, ui));
+        with(delete_preset);
     });
     s.on_open(platform::pick_file);
     s.on_sample(|| match files::sample_png() {

@@ -628,27 +628,34 @@ pub fn report(r: &GenResult) -> String {
             num(p.thickness, 2)
         ),
     );
+    let s = match p.shape.as_str() {
+        "square" => t("квадрат", "square"),
+        "diamond" => t("ромб", "diamond"),
+        "oval" => t("овал", "oval"),
+        "star" => t("звезда", "star"),
+        "triangle" => t("треугольник", "triangle"),
+        "hex" => t("шестиугольник", "hexagon"),
+        "slot" => t("прорезь", "slot"),
+        _ => t("круг", "circle"),
+    };
     let pat = if p.pattern == "lines" {
         format!(
             "{} {} {mm}",
             t("линии, шаг", "lines, pitch"),
             num(p.line_pitch, 2)
         )
+    } else if p.pattern == "rings" {
+        format!(
+            "{}, {} {} {mm}",
+            s,
+            t("кольца, шаг", "rings, pitch"),
+            num(p.pitch, 2)
+        )
     } else {
         let g = match p.grid.as_str() {
             "square" => t("квадратная", "square"),
             "tri90" => t("треугольная 2", "triangular 2"),
             _ => t("треугольная", "triangular"),
-        };
-        let s = match p.shape.as_str() {
-            "square" => t("квадрат", "square"),
-            "diamond" => t("ромб", "diamond"),
-            "oval" => t("овал", "oval"),
-            "star" => t("звезда", "star"),
-            "triangle" => t("треугольник", "triangle"),
-            "hex" => t("шестиугольник", "hexagon"),
-            "slot" => t("прорезь", "slot"),
-            _ => t("круг", "circle"),
         };
         format!(
             "{}, {} {}, {} {} {mm}",

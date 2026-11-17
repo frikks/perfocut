@@ -162,6 +162,89 @@ mod tests {
     }
 
     #[test]
+    fn rings_pattern_works() {
+        let g = gradient(200, 120);
+        let p = Params {
+            pattern: "rings".into(),
+            angle: 15.0,
+            d_max: 50.0,
+            ..Params::default()
+        };
+        let r = gen::generate(Some(&g), &p);
+        assert!(r.stats.count > 100, "{}", r.stats.count);
+        // кап по перемычке — как у квадратной сетки: шаг минус перемычка
+        assert!((r.stats.max_allowed - (p.pitch - p.bridge)).abs() < 1e-9);
+        for s in &r.shapes {
+            let sz = s.size();
+            assert!(sz >= p.thickness * p.min_k - 1e-6);
+            assert!(sz <= r.stats.max_allowed + 1e-6);
+        }
+        // кромка: все точки внутри поля
+        for s in &r.shapes {
+            let pts = match s {
+                Shape::Circle { x, y, d } => export::circle_pts(*x, *y, *d, 0.01),
+                Shape::Poly { pts, .. } => pts.clone(),
+            };
+            for q in pts {
+                assert!(q.0 >= p.border - 0.02 && q.0 <= p.sheet_w - p.border + 0.02);
+                assert!(q.1 >= p.border - 0.02 && q.1 <= p.sheet_h - p.border + 0.02);
+            }
+        }
+        // перемычка для кругов: соседи на своём кольце и на соседних
+        let c: Vec<(f64, f64, f64)> = r
+            .shapes
+            .iter()
+            .filter_map(|s| {
+                if let Shape::Circle { x, y, d } = s {
+                    Some((*x, *y, *d))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert!(c.len() > 100);
+        for (i, a) in c.iter().enumerate().step_by(7) {
+            for b in c.iter().skip(i + 1) {
+                let dist = ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt();
+                if dist < 3.0 * p.pitch {
+                    assert!(
+                        dist - a.2 / 2.0 - b.2 / 2.0 >= p.bridge - 1e-6,
+                        "bridge {dist:.3} {} {}",
+                        a.2,
+                        b.2
+                    );
+                }
+            }
+        }
+        // отверстие в центре листа на месте (первое кольцо — одна точка)
+        let center = c
+            .iter()
+            .min_by(|a, b| {
+                let da = (a.0 - 500.0).powi(2) + (a.1 - 300.0).powi(2);
+                let db = (b.0 - 500.0).powi(2) + (b.1 - 300.0).powi(2);
+                da.partial_cmp(&db).unwrap()
+            })
+            .expect("center hole");
+        assert!((center.0 - 500.0).abs() < 1e-6 && (center.1 - 300.0).abs() < 1e-6);
+        // все формы строятся и экспортируются
+        for shape in [
+            "circle", "square", "diamond", "oval", "star", "triangle", "hex", "slot",
+        ] {
+            let p = Params {
+                pattern: "rings".into(),
+                shape: shape.into(),
+                d_max: 50.0,
+                ..Params::default()
+            };
+            let r = gen::generate(Some(&g), &p);
+            assert!(r.stats.count > 10, "{shape}: {}", r.stats.count);
+            for fmt in ["svg", "dxf", "gcode", "step"] {
+                assert!(super::export_format(&r, fmt).is_some(), "{shape} {fmt}");
+            }
+        }
+    }
+
+    #[test]
     fn lines_and_exports() {
         let g = gradient(200, 120);
         let p = Params {

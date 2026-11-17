@@ -21,7 +21,7 @@ pub struct Params {
     pub negative: bool,
     pub tone_cut: f64,
     // Узор
-    pub pattern: String, // dots | lines
+    pub pattern: String, // dots | rings | lines
     pub grid: String,    // square | tri | tri90
     pub pitch: f64,
     pub angle: f64,

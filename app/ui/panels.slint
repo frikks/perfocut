@@ -311,19 +311,19 @@ export component SettingsPanel inherits VerticalLayout {
     Section {
         title: @tr("Узор");
         Seg {
-            items: [@tr("Отверстия"), @tr("Линии")];
-            current: Store.p.pattern == "lines" ? 1 : 0;
+            items: [@tr("Отверстия"), @tr("Кольца"), @tr("Линии")];
+            current: Store.p.pattern == "lines" ? 2 : Store.p.pattern == "rings" ? 1 : 0;
             select(i) => {
-                Store.p.pattern = i == 1 ? "lines" : "dots";
+                Store.p.pattern = i == 2 ? "lines" : i == 1 ? "rings" : "dots";
                 Store.changed();
             }
         }
         if Store.p.pattern != "lines": VerticalLayout {
             spacing: Theme.touch ? 10px : 8px;
-            Caption {
+            if Store.p.pattern == "dots": Caption {
                 text: @tr("Сетка");
             }
-            Seg {
+            if Store.p.pattern == "dots": Seg {
                 items: [@tr("Квадратная"), @tr("Треуг."), @tr("Треуг. 2")];
                 current: Store.p.grid == "square" ? 0 : Store.p.grid == "tri90" ? 2 : 1;
                 select(i) => {
@@ -403,7 +403,7 @@ export component SettingsPanel inherits VerticalLayout {
                 }
             }
             FieldRow {
-                label: @tr("Шаг сетки");
+                label: Store.p.pattern == "rings" ? @tr("Шаг колец") : @tr("Шаг сетки");
                 NumField {
                     value: Store.p.pitch;
                     unit: @tr("мм");

@@ -197,6 +197,16 @@ fn jitter_u01(seed: u64, x: f64, y: f64) -> f64 {
     (z >> 11) as f64 / (1u64 << 53) as f64
 }
 
+/// Сколько отверстий умещается на кольце радиуса `r` при шаге `pitch`:
+/// максимум n, при котором хорда между соседями не меньше шага.
+/// Близко к центру — одно отверстие, дальше — примерно 2πr/pitch.
+fn ring_holes(r: f64, pitch: f64) -> i64 {
+    if r * 2.0 < pitch {
+        return 1;
+    }
+    (PI / (pitch / (2.0 * r)).asin()).floor().max(1.0) as i64
+}
+
 fn dist_to_seg(p: (f64, f64), a: (f64, f64), b: (f64, f64)) -> f64 {
     let (dx, dy) = (b.0 - a.0, b.1 - a.1);
     let ll = dx * dx + dy * dy;
@@ -336,6 +346,169 @@ fn optimize_path(shapes: Vec<Shape>, cell_size: f64) -> Vec<Shape> {
         .collect()
 }
 
+/// Строит отверстие в точке листа: тон → размер (диапазон или пропорция, квант,
+/// заданные размеры, случайный разброс) → компенсация реза → полигон.
+/// None — точка не режется (тон мимо или не влезает до кромки).
+#[allow(clippy::too_many_arguments)]
+fn dot_shape(
+    x: f64,
+    y: f64,
+    ca: f64,
+    sa: f64,
+    p: &Params,
+    sampler: &Sampler,
+    prop: bool,
+    dmin: f64,
+    dmax: f64,
+    cap: f64,
+    fixed: &[f64],
+    removed_edge: &mut usize,
+) -> Option<Shape> {
+    let t = sampler.tone(x, y, p.pitch / 2.0)?;
+    if t < p.tone_cut {
+        return None;
+    }
+    let tt = ((t - p.tone_cut) / (1.0 - p.tone_cut)).clamp(0.0, 1.0);
+    let mut d = if prop {
+        let dp = dmax * t;
+        if dp < dmin - 1e-9 {
+            return None;
+        }
+        dp
+    } else {
+        dmin + (dmax - dmin) * tt
+    };
+    if fixed.is_empty() && p.quant > 0.0 {
+        d = ((d / p.quant + 1e-9).floor() * p.quant).max(dmin);
+    }
+    if !fixed.is_empty() {
+        d = *fixed
+            .iter()
+            .min_by(|a, b2| (*a - d).abs().partial_cmp(&(*b2 - d).abs()).unwrap())
+            .unwrap();
+    }
+    let d = if fixed.is_empty() { round2(d) } else { d };
+    // Случайный разброс: диаметр гуляет на ±jitter % по зерну,
+    // детерминированно от координат. Крупные не превышают каплю по перемычке.
+    let d = if p.jitter > 0.0 && fixed.is_empty() {
+        let u = jitter_u01(p.seed, x, y) * 2.0 - 1.0;
+        (d * (1.0 + u * p.jitter / 100.0)).min(cap)
+    } else {
+        d
+    };
+    // Компенсация реза: траектория меньше номинала на kerf (отрицательный — раздувает).
+    let d = round2(d - p.kerf);
+    if d <= 0.01 {
+        return None;
+    }
+    // Локальные точки фигуры до поворота и переноса. Круг — особый случай:
+    // остаётся окружностью (дуги G02, цилиндры в STEP), остальное — полигон.
+    let poly: Option<Vec<(f64, f64)>> = match p.shape.as_str() {
+        "square" => {
+            let hs = d / 2.0;
+            Some(vec![(hs, hs), (-hs, hs), (-hs, -hs), (hs, -hs)])
+        }
+        "diamond" => {
+            let hs = d / 2.0;
+            Some(vec![(hs, 0.0), (0.0, hs), (-hs, 0.0), (0.0, -hs)])
+        }
+        "oval" => {
+            let (rx, ry) = (d / 2.0, d / 2.0 * p.shape_aspect);
+            let n = chord_circle_n(rx.max(ry));
+            Some(
+                (0..n)
+                    .map(|i| {
+                        let a = 2.0 * PI * i as f64 / n as f64;
+                        (rx * a.cos(), ry * a.sin())
+                    })
+                    .collect(),
+            )
+        }
+        "triangle" => {
+            let hh = d * p.shape_aspect / 2.0;
+            Some(vec![(0.0, hh), (-d / 2.0, -hh), (d / 2.0, -hh)])
+        }
+        "star" => {
+            let r = d / 2.0;
+            let n = p.star_points as usize;
+            Some(
+                (0..2 * n)
+                    .map(|i| {
+                        let rr = if i % 2 == 0 { r } else { r * p.star_inner };
+                        let a = PI / 2.0 + PI * i as f64 / n as f64;
+                        (rr * a.cos(), rr * a.sin())
+                    })
+                    .collect(),
+            )
+        }
+        "hex" => Some(
+            (0..6)
+                .map(|i| {
+                    let a = PI / 3.0 * i as f64;
+                    (d / 2.0 * a.cos(), d / 2.0 * a.sin())
+                })
+                .collect(),
+        ),
+        "slot" => {
+            let r = d / 2.0;
+            // Длина задаётся пропорцией (длина/ширина); меньше ширины не бывает,
+            // при пропорции 1 и ниже получается круг.
+            let c = (d * p.shape_aspect.max(1.0) - d) / 2.0;
+            let n = (chord_circle_n(r) / 2).max(6);
+            let mut pts: Vec<(f64, f64)> = Vec::with_capacity(2 * n + 2);
+            // Правый торец: от -90° до +90° через 0°.
+            for i in 0..=n {
+                let a = -PI / 2.0 + PI * i as f64 / n as f64;
+                pts.push((c + r * a.cos(), r * a.sin()));
+            }
+            // Левый торец: от 90° до 270° через 180°.
+            for i in 0..=n {
+                let a = PI / 2.0 + PI * i as f64 / n as f64;
+                pts.push((-c + r * a.cos(), r * a.sin()));
+            }
+            Some(pts)
+        }
+        _ => None,
+    };
+    let (w, h) = (p.sheet_w, p.sheet_h);
+    let b = p.border;
+    match poly {
+        None => {
+            let e = d / 2.0;
+            if x - e < b - 1e-9 || x + e > w - b + 1e-9 || y - e < b - 1e-9 || y + e > h - b + 1e-9
+            {
+                *removed_edge += 1;
+                return None;
+            }
+            Some(Shape::Circle { x, y, d })
+        }
+        Some(local) => {
+            // Габариты после поворота — точная проверка кромки для любого угла.
+            let (mut ex, mut ey) = (0.0f64, 0.0f64);
+            for &(px, py) in &local {
+                let (rx, ry) = (px * ca - py * sa, px * sa + py * ca);
+                ex = ex.max(rx.abs());
+                ey = ey.max(ry.abs());
+            }
+            if x - ex < b - 1e-9
+                || x + ex > w - b + 1e-9
+                || y - ey < b - 1e-9
+                || y + ey > h - b + 1e-9
+            {
+                *removed_edge += 1;
+                return None;
+            }
+            Some(Shape::Poly {
+                pts: local
+                    .iter()
+                    .map(|q| (x + q.0 * ca - q.1 * sa, y + q.0 * sa + q.1 * ca))
+                    .collect(),
+                size: d,
+            })
+        }
+    }
+}
+
 pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
     let p = params.sanitized();
     let en = p.lang == "en";
@@ -349,7 +522,7 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
     let mut shapes: Vec<Shape> = Vec::new();
     let max_allowed;
 
-    if p.pattern != "lines" && p.pattern != "dots" {
+    if p.pattern != "lines" && p.pattern != "dots" && p.pattern != "rings" {
         max_allowed = 0.0;
         warnings.push(tr(en, "Неизвестный тип узора", "Unknown pattern type"));
         return finish(shapes, warnings, removed_edge, min_allowed, max_allowed, p);
@@ -537,10 +710,17 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         }
     } else {
         let pch = p.pitch;
-        let cap = match (p.shape.as_str(), p.grid.as_str()) {
-            ("square", "square") => pch - p.bridge,
-            ("square", _) => (pch - p.bridge) / std::f64::consts::SQRT_2,
-            _ => pch - p.bridge,
+        let ring_mode = p.pattern == "rings";
+        // Кольца: расстояние между центрами соседних отверстий не меньше шага
+        // (по хорде кольца и по радиусу между кольцами), как у квадратной сетки.
+        let cap = if ring_mode {
+            pch - p.bridge
+        } else {
+            match (p.shape.as_str(), p.grid.as_str()) {
+                ("square", "square") => pch - p.bridge,
+                ("square", _) => (pch - p.bridge) / std::f64::consts::SQRT_2,
+                _ => pch - p.bridge,
+            }
         };
         max_allowed = cap;
         let mut dmax = p.d_max;
@@ -595,7 +775,13 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                 ));
             }
         }
-        let est = (w * h) / (pch * pch);
+        let est = if ring_mode {
+            // Все кольца до дальнего угла листа: объём итераций совпадает с оценкой.
+            let reach = (w * w + h * h).sqrt() / 2.0 + p.offset_x.abs() + p.offset_y.abs() + pch;
+            PI * reach * reach / (pch * pch)
+        } else {
+            (w * h) / (pch * pch)
+        };
         if est > MAX_SHAPES {
             warnings.push(if en {
                 format!(
@@ -618,187 +804,99 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
             let (cx, cy) = (w / 2.0, h / 2.0);
             let rad = p.angle.to_radians();
             let (ca, sa) = (rad.cos(), rad.sin());
-            let reach = (w * w + h * h).sqrt() / 2.0 + p.offset_x.abs() + p.offset_y.abs() + pch;
-            let s3 = 3f64.sqrt() / 2.0;
-            let (row_h, col_w) = match p.grid.as_str() {
-                "tri" => (pch * s3, pch),
-                "tri90" => (pch, pch * s3),
-                _ => (pch, pch),
-            };
-            let nj = (reach / row_h).ceil() as i64 + 1;
-            let ni = (reach / col_w).ceil() as i64 + 1;
-            for j in -nj..=nj {
-                let mut row: Vec<Shape> = Vec::new();
-                for i in -ni..=ni {
-                    let (lx, ly) = match p.grid.as_str() {
-                        "tri" => (
-                            i as f64 * col_w + if j.rem_euclid(2) == 1 { pch / 2.0 } else { 0.0 },
-                            j as f64 * row_h,
-                        ),
-                        "tri90" => (
-                            i as f64 * col_w,
-                            j as f64 * row_h + if i.rem_euclid(2) == 1 { pch / 2.0 } else { 0.0 },
-                        ),
-                        _ => (i as f64 * col_w, j as f64 * row_h),
-                    };
-                    let x = cx + lx * ca - ly * sa + p.offset_x;
-                    let y = cy + lx * sa + ly * ca + p.offset_y;
-                    if x < b || x > w - b || y < b || y > h - b {
-                        continue;
-                    }
-                    let t = match sampler.tone(x, y, pch / 2.0) {
-                        Some(t) => t,
-                        None => continue,
-                    };
-                    if t < p.tone_cut {
-                        continue;
-                    }
-                    let tt = ((t - p.tone_cut) / (1.0 - p.tone_cut)).clamp(0.0, 1.0);
-                    let mut d = if prop {
-                        let dp = dmax * t;
-                        if dp < dmin - 1e-9 {
+            if ring_mode {
+                // Кольцевой узор: отверстия на концентрических кольцах от центра листа.
+                // Шаг между кольцами и по хорде кольца — один и тот же `pitch`;
+                // соседние кольца сдвинуты на полшага, чтобы не было радиальных «спиц».
+                let (cxr, cyr) = (cx + p.offset_x, cy + p.offset_y);
+                let reach =
+                    (w * w + h * h).sqrt() / 2.0 + p.offset_x.abs() + p.offset_y.abs() + pch;
+                let m = (reach / pch).ceil() as i64;
+                for k in 0..=m {
+                    let r = k as f64 * pch;
+                    let n = ring_holes(r, pch);
+                    let base = rad + if k % 2 == 1 { PI / n as f64 } else { 0.0 };
+                    let mut row: Vec<Shape> = Vec::new();
+                    for i in 0..n {
+                        let phi = base + 2.0 * PI * i as f64 / n as f64;
+                        let x = cxr + r * phi.cos();
+                        let y = cyr + r * phi.sin();
+                        if x < b || x > w - b || y < b || y > h - b {
                             continue;
                         }
-                        dp
-                    } else {
-                        dmin + (dmax - dmin) * tt
-                    };
-                    if fixed.is_empty() && p.quant > 0.0 {
-                        d = ((d / p.quant + 1e-9).floor() * p.quant).max(dmin);
+                        if let Some(sh) = dot_shape(
+                            x,
+                            y,
+                            ca,
+                            sa,
+                            &p,
+                            &sampler,
+                            prop,
+                            dmin,
+                            dmax,
+                            cap,
+                            &fixed,
+                            &mut removed_edge,
+                        ) {
+                            row.push(sh);
+                        }
                     }
-                    if !fixed.is_empty() {
-                        d = *fixed
-                            .iter()
-                            .min_by(|a, b2| (*a - d).abs().partial_cmp(&(*b2 - d).abs()).unwrap())
-                            .unwrap();
-                    }
-                    let d = if fixed.is_empty() { round2(d) } else { d };
-                    // Случайный разброс: диаметр гуляет на ±jitter % по зерну,
-                    // детерминированно от координат. Крупные не превышают каплю по перемычке.
-                    let d = if p.jitter > 0.0 && fixed.is_empty() {
-                        let u = jitter_u01(p.seed, x, y) * 2.0 - 1.0;
-                        (d * (1.0 + u * p.jitter / 100.0)).min(max_allowed)
-                    } else {
-                        d
-                    };
-                    // Компенсация реза: траектория меньше номинала на kerf (отрицательный — раздувает).
-                    let d = round2(d - p.kerf);
-                    if d <= 0.01 {
-                        continue;
-                    }
-                    // Локальные точки фигуры до поворота и переноса. Круг — особый случай:
-                    // остаётся окружностью (дуги G02, цилиндры в STEP), остальное — полигон.
-                    let poly: Option<Vec<(f64, f64)>> = match p.shape.as_str() {
-                        "square" => {
-                            let hs = d / 2.0;
-                            Some(vec![(hs, hs), (-hs, hs), (-hs, -hs), (hs, -hs)])
-                        }
-                        "diamond" => {
-                            let hs = d / 2.0;
-                            Some(vec![(hs, 0.0), (0.0, hs), (-hs, 0.0), (0.0, -hs)])
-                        }
-                        "oval" => {
-                            let (rx, ry) = (d / 2.0, d / 2.0 * p.shape_aspect);
-                            let n = chord_circle_n(rx.max(ry));
-                            Some(
-                                (0..n)
-                                    .map(|i| {
-                                        let a = 2.0 * PI * i as f64 / n as f64;
-                                        (rx * a.cos(), ry * a.sin())
-                                    })
-                                    .collect(),
-                            )
-                        }
-                        "triangle" => {
-                            let hh = d * p.shape_aspect / 2.0;
-                            Some(vec![(0.0, hh), (-d / 2.0, -hh), (d / 2.0, -hh)])
-                        }
-                        "star" => {
-                            let r = d / 2.0;
-                            let n = p.star_points as usize;
-                            Some(
-                                (0..2 * n)
-                                    .map(|i| {
-                                        let rr = if i % 2 == 0 { r } else { r * p.star_inner };
-                                        let a = PI / 2.0 + PI * i as f64 / n as f64;
-                                        (rr * a.cos(), rr * a.sin())
-                                    })
-                                    .collect(),
-                            )
-                        }
-                        "hex" => Some(
-                            (0..6)
-                                .map(|i| {
-                                    let a = PI / 3.0 * i as f64;
-                                    (d / 2.0 * a.cos(), d / 2.0 * a.sin())
-                                })
-                                .collect(),
-                        ),
-                        "slot" => {
-                            let r = d / 2.0;
-                            // Длина задаётся пропорцией (длина/ширина); меньше ширины не бывает,
-                            // при пропорции 1 и ниже получается круг.
-                            let c = (d * p.shape_aspect.max(1.0) - d) / 2.0;
-                            let n = (chord_circle_n(r) / 2).max(6);
-                            let mut pts: Vec<(f64, f64)> = Vec::with_capacity(2 * n + 2);
-                            // Правый торец: от -90° до +90° через 0°.
-                            for i in 0..=n {
-                                let a = -PI / 2.0 + PI * i as f64 / n as f64;
-                                pts.push((c + r * a.cos(), r * a.sin()));
-                            }
-                            // Левый торец: от 90° до 270° через 180°.
-                            for i in 0..=n {
-                                let a = PI / 2.0 + PI * i as f64 / n as f64;
-                                pts.push((-c + r * a.cos(), r * a.sin()));
-                            }
-                            Some(pts)
-                        }
-                        _ => None,
-                    };
-                    let sh = match poly {
-                        None => {
-                            let e = d / 2.0;
-                            if x - e < b - 1e-9
-                                || x + e > w - b + 1e-9
-                                || y - e < b - 1e-9
-                                || y + e > h - b + 1e-9
-                            {
-                                removed_edge += 1;
-                                continue;
-                            }
-                            Shape::Circle { x, y, d }
-                        }
-                        Some(local) => {
-                            // Габариты после поворота — точная проверка кромки для любого угла.
-                            let (mut ex, mut ey) = (0.0f64, 0.0f64);
-                            for &(px, py) in &local {
-                                let (rx, ry) = (px * ca - py * sa, px * sa + py * ca);
-                                ex = ex.max(rx.abs());
-                                ey = ey.max(ry.abs());
-                            }
-                            if x - ex < b - 1e-9
-                                || x + ex > w - b + 1e-9
-                                || y - ey < b - 1e-9
-                                || y + ey > h - b + 1e-9
-                            {
-                                removed_edge += 1;
-                                continue;
-                            }
-                            Shape::Poly {
-                                pts: local
-                                    .iter()
-                                    .map(|q| (x + q.0 * ca - q.1 * sa, y + q.0 * sa + q.1 * ca))
-                                    .collect(),
-                                size: d,
-                            }
-                        }
-                    };
-                    row.push(sh);
+                    shapes.extend(row);
                 }
-                if j.rem_euclid(2) == 1 {
-                    row.reverse();
+            } else {
+                let reach =
+                    (w * w + h * h).sqrt() / 2.0 + p.offset_x.abs() + p.offset_y.abs() + pch;
+                let s3 = 3f64.sqrt() / 2.0;
+                let (row_h, col_w) = match p.grid.as_str() {
+                    "tri" => (pch * s3, pch),
+                    "tri90" => (pch, pch * s3),
+                    _ => (pch, pch),
+                };
+                let nj = (reach / row_h).ceil() as i64 + 1;
+                let ni = (reach / col_w).ceil() as i64 + 1;
+                for j in -nj..=nj {
+                    let mut row: Vec<Shape> = Vec::new();
+                    for i in -ni..=ni {
+                        let (lx, ly) = match p.grid.as_str() {
+                            "tri" => (
+                                i as f64 * col_w
+                                    + if j.rem_euclid(2) == 1 { pch / 2.0 } else { 0.0 },
+                                j as f64 * row_h,
+                            ),
+                            "tri90" => (
+                                i as f64 * col_w,
+                                j as f64 * row_h
+                                    + if i.rem_euclid(2) == 1 { pch / 2.0 } else { 0.0 },
+                            ),
+                            _ => (i as f64 * col_w, j as f64 * row_h),
+                        };
+                        let x = cx + lx * ca - ly * sa + p.offset_x;
+                        let y = cy + lx * sa + ly * ca + p.offset_y;
+                        if x < b || x > w - b || y < b || y > h - b {
+                            continue;
+                        }
+                        if let Some(sh) = dot_shape(
+                            x,
+                            y,
+                            ca,
+                            sa,
+                            &p,
+                            &sampler,
+                            prop,
+                            dmin,
+                            dmax,
+                            cap,
+                            &fixed,
+                            &mut removed_edge,
+                        ) {
+                            row.push(sh);
+                        }
+                    }
+                    if j.rem_euclid(2) == 1 {
+                        row.reverse();
+                    }
+                    shapes.extend(row);
                 }
-                shapes.extend(row);
             }
         }
     }
