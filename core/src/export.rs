@@ -49,6 +49,67 @@ fn sheet_outline(w: f64, h: f64) -> Vec<(f64, f64)> {
     vec![(0.0, 0.0), (w, 0.0), (w, h), (0.0, h)]
 }
 
+/// Контур листа с усиками (мостиками): периметр разбит на открытые отрезки,
+/// напротив каждого усика — разрыв, лист держится на усиках при резке.
+/// Без усиков возвращается замкнутый периметр (четыре угла) — экспортёры
+/// рисуют его как замкнутый путь. Усики стоят равномерно по периметру.
+pub fn sheet_paths(w: f64, h: f64, tab_n: i64, tab_w: f64) -> Vec<Vec<(f64, f64)>> {
+    let corners = sheet_outline(w, h);
+    let per = 2.0 * (w + h);
+    let n = tab_n.max(0) as usize;
+    if n == 0 || per <= 0.0 {
+        return vec![corners];
+    }
+    // Ширина усика не больше половины интервала между усиками
+    let tw = tab_w.clamp(0.01, per / (2.0 * n as f64));
+    // Центры усиков по дуге периметра, со сдвигом на полшага — чтобы не попадать на углы
+    let centers: Vec<f64> = (0..n)
+        .map(|i| per * (2 * i + 1) as f64 / (2 * n) as f64)
+        .collect();
+    let in_tab = |s: f64| {
+        centers
+            .iter()
+            .any(|&c| ((s - c + per / 2.0).rem_euclid(per) - per / 2.0).abs() < tw / 2.0)
+    };
+    // Точка на периметре по длине дуги от (0,0) против часовой (по обходу углов)
+    let at = |s: f64| -> (f64, f64) {
+        let s = s.rem_euclid(per);
+        if s < w {
+            (s, 0.0)
+        } else if s < w + h {
+            (w, s - w)
+        } else if s < 2.0 * w + h {
+            (w - (s - w - h), h)
+        } else {
+            (0.0, per - s)
+        }
+    };
+    let mut marks: Vec<f64> = vec![0.0, w, w + h, per - h];
+    for &c in &centers {
+        marks.push((c - tw / 2.0).rem_euclid(per));
+        marks.push((c + tw / 2.0).rem_euclid(per));
+    }
+    marks.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    marks.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
+    let mut paths = Vec::new();
+    for i in 0..marks.len() {
+        let sa = marks[i];
+        let sb = if i + 1 < marks.len() {
+            marks[i + 1]
+        } else {
+            per
+        };
+        if sb - sa < 1e-9 {
+            continue;
+        }
+        if in_tab((sa + sb) / 2.0) {
+            continue;
+        }
+        paths.push(vec![at(sa), at(sb)]);
+    }
+    paths
+}
+
 // ---------------- DXF (R12, AC1009) ----------------
 pub fn dxf(r: &GenResult) -> String {
     let p = &r.params;
@@ -122,14 +183,14 @@ pub fn dxf(r: &GenResult) -> String {
     g(0, "ENDSEC");
     g(0, "SECTION");
     g(2, "ENTITIES");
-    let poly = |g: &mut dyn FnMut(i32, &str), layer: &str, pts: &[(f64, f64)]| {
+    let poly = |g: &mut dyn FnMut(i32, &str), layer: &str, pts: &[(f64, f64)], closed: bool| {
         g(0, "POLYLINE");
         g(8, layer);
         g(66, "1");
         g(10, "0.0");
         g(20, "0.0");
         g(30, "0.0");
-        g(70, "1");
+        g(70, if closed { "1" } else { "0" });
         for q in pts {
             g(0, "VERTEX");
             g(8, layer);
@@ -151,11 +212,17 @@ pub fn dxf(r: &GenResult) -> String {
                 g(30, "0.0");
                 g(40, &n4(d / 2.0));
             }
-            Shape::Poly { pts, .. } => poly(&mut g, &l, pts),
+            Shape::Poly { pts, .. } => poly(&mut g, &l, pts, true),
         }
     }
     if p.outline {
-        poly(&mut g, "CONTOUR", &sheet_outline(w, h));
+        if p.tab_n > 0 {
+            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w) {
+                poly(&mut g, "CONTOUR", seg, false);
+            }
+        } else {
+            poly(&mut g, "CONTOUR", &sheet_outline(w, h), true);
+        }
     }
     g(0, "ENDSEC");
     g(0, "EOF");
@@ -175,12 +242,26 @@ pub fn svg(r: &GenResult) -> String {
         h = n4(h)
     );
     if p.outline {
-        let _ = writeln!(
-            o,
-            "<rect id=\"contour\" x=\"0\" y=\"0\" width=\"{}\" height=\"{}\"/>",
-            n4(w),
-            n4(h)
-        );
+        if p.tab_n > 0 {
+            let mut d = String::new();
+            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w) {
+                if !d.is_empty() {
+                    d.push(' ');
+                }
+                let _ = write!(d, "M{} {}", n4(seg[0].0), n4(h - seg[0].1));
+                for q in seg.iter().skip(1) {
+                    let _ = write!(d, " L{} {}", n4(q.0), n4(h - q.1));
+                }
+            }
+            let _ = writeln!(o, "<path id=\"contour\" d=\"{d}\"/>");
+        } else {
+            let _ = writeln!(
+                o,
+                "<rect id=\"contour\" x=\"0\" y=\"0\" width=\"{}\" height=\"{}\"/>",
+                n4(w),
+                n4(h)
+            );
+        }
     }
     o.push_str("<g id=\"holes\">\n");
     for s in &r.shapes {
@@ -270,7 +351,16 @@ pub fn gcode(r: &GenResult) -> String {
             "(PerfoCut: {} x {} mm, contours {})",
             f(w),
             f(h),
-            r.shapes.len() + p.outline as usize
+            r.shapes.len()
+                + if p.outline {
+                    if p.tab_n > 0 {
+                        sheet_paths(w, h, p.tab_n, p.tab_w).len()
+                    } else {
+                        1
+                    }
+                } else {
+                    0
+                },
         ),
     );
     for l in p.gc_header.lines() {
@@ -280,7 +370,8 @@ pub fn gcode(r: &GenResult) -> String {
     let cut_poly = |o: &mut String,
                     line: &mut dyn FnMut(&mut String, &str),
                     pts: &[(f64, f64)],
-                    center_pierce: bool| {
+                    center_pierce: bool,
+                    close: bool| {
         let s = pts[0];
         if center_pierce && pts.len() >= 3 {
             let (cx, cy) = area_centroid(pts).unwrap_or_else(|| {
@@ -310,7 +401,9 @@ pub fn gcode(r: &GenResult) -> String {
                 line(o, &format!("G01 X{} Y{}", f(q.0 - ox), f(q.1 - oy)));
             }
         }
-        line(o, &format!("G01 X{} Y{}", f(s.0 - ox), f(s.1 - oy)));
+        if close {
+            line(o, &format!("G01 X{} Y{}", f(s.0 - ox), f(s.1 - oy)));
+        }
         line(o, &p.gc_off);
     };
 
@@ -336,18 +429,24 @@ pub fn gcode(r: &GenResult) -> String {
                     line(&mut o, &p.gc_off);
                 } else {
                     let pts = circle_pts(*x, *y, *d, 0.02);
-                    cut_poly(&mut o, &mut line, &pts, true);
+                    cut_poly(&mut o, &mut line, &pts, true, true);
                 }
             }
             Shape::Poly { pts, .. } => {
                 let is_hole = p.pattern != "lines";
-                cut_poly(&mut o, &mut line, pts, is_hole);
+                cut_poly(&mut o, &mut line, pts, is_hole, true);
             }
         }
     }
     if p.outline {
         line(&mut o, "(contour)");
-        cut_poly(&mut o, &mut line, &sheet_outline(w, h), false);
+        if p.tab_n > 0 {
+            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w) {
+                cut_poly(&mut o, &mut line, seg, false, false);
+            }
+        } else {
+            cut_poly(&mut o, &mut line, &sheet_outline(w, h), false, true);
+        }
     }
     line(&mut o, &format!("G00 X{} Y{}", f(-ox), f(-oy)));
     for l in p.gc_footer.lines() {
@@ -364,22 +463,36 @@ pub fn plt(r: &GenResult) -> String {
     let mut o = String::with_capacity(r.shapes.len() * 200);
     o.push_str("IN;PA;SP1;");
     o.push_str(NL);
-    let put = |pts: &[(f64, f64)], o: &mut String| {
+    let put = |pts: &[(f64, f64)], o: &mut String, closed: bool| {
         let _ = write!(o, "PU{},{};PD", c(pts[0].0), c(pts[0].1));
         for q in pts.iter().skip(1) {
             let _ = write!(o, "{},{},", c(q.0), c(q.1));
         }
-        let _ = write!(o, "{},{};", c(pts[0].0), c(pts[0].1));
+        if closed {
+            let _ = write!(o, "{},{};", c(pts[0].0), c(pts[0].1));
+        } else {
+            // открытый отрезок: снимаем хвостовую запятую и закрываем команду
+            while o.ends_with(',') {
+                o.pop();
+            }
+            o.push(';');
+        }
         o.push_str(NL);
     };
     for s in &r.shapes {
         match s {
-            Shape::Circle { x, y, d } => put(&circle_pts(*x, *y, *d, 0.02), &mut o),
-            Shape::Poly { pts, .. } => put(pts, &mut o),
+            Shape::Circle { x, y, d } => put(&circle_pts(*x, *y, *d, 0.02), &mut o, true),
+            Shape::Poly { pts, .. } => put(pts, &mut o, true),
         }
     }
     if p.outline {
-        put(&sheet_outline(p.sheet_w, p.sheet_h), &mut o);
+        if p.tab_n > 0 {
+            for seg in &sheet_paths(p.sheet_w, p.sheet_h, p.tab_n, p.tab_w) {
+                put(seg, &mut o, false);
+            }
+        } else {
+            put(&sheet_outline(p.sheet_w, p.sheet_h), &mut o, true);
+        }
     }
     o.push_str("PU0,0;SP0;");
     o.push_str(NL);
@@ -406,23 +519,33 @@ pub fn eps(r: &GenResult) -> String {
         n4(k),
         n4(k)
     );
-    let poly = |o: &mut String, pts: &[(f64, f64)]| {
+    let poly = |o: &mut String, pts: &[(f64, f64)], closed: bool| {
         let _ = write!(o, "newpath {} {} moveto", n4(pts[0].0), n4(pts[0].1));
         for q in pts.iter().skip(1) {
             let _ = write!(o, " {} {} lineto", n4(q.0), n4(q.1));
         }
-        o.push_str(" closepath stroke\n");
+        o.push_str(if closed {
+            " closepath stroke\n"
+        } else {
+            " stroke\n"
+        });
     };
     for s in &r.shapes {
         match s {
             Shape::Circle { x, y, d } => {
                 let _ = writeln!(o, "{} {} {} c", n4(*x), n4(*y), n4(d / 2.0));
             }
-            Shape::Poly { pts, .. } => poly(&mut o, pts),
+            Shape::Poly { pts, .. } => poly(&mut o, pts, true),
         }
     }
     if p.outline {
-        poly(&mut o, &sheet_outline(w, h));
+        if p.tab_n > 0 {
+            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w) {
+                poly(&mut o, seg, false);
+            }
+        } else {
+            poly(&mut o, &sheet_outline(w, h), true);
+        }
     }
     o.push_str("showpage\n%%EOF\n");
     o
@@ -462,7 +585,17 @@ pub fn pdf(r: &GenResult) -> Vec<u8> {
         }
     }
     if p.outline {
-        let _ = writeln!(c, "0 0 {} {} re S", f(w), f(h));
+        if p.tab_n > 0 {
+            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w) {
+                let _ = write!(c, "{} {} m", f(seg[0].0), f(seg[0].1));
+                for q in seg.iter().skip(1) {
+                    let _ = write!(c, " {} {} l", f(q.0), f(q.1));
+                }
+                c.push_str(" S\n");
+            }
+        } else {
+            let _ = writeln!(c, "0 0 {} {} re S", f(w), f(h));
+        }
     }
     let mut out: Vec<u8> = Vec::with_capacity(c.len() + 1000);
     let mut offs = Vec::new();

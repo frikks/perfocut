@@ -299,11 +299,44 @@ export component SettingsPanel inherits VerticalLayout {
                 Store.changed();
             }
         }
+        if Store.p.outline: FieldRow {
+            label: @tr("Усиков");
+            NumField {
+                value: Store.p.tab-n;
+                edited(v) => {
+                    Store.p.tab-n = Math.clamp(Math.round(v), 0, 9999);
+                    Store.changed();
+                }
+            }
+        }
+        if Store.p.outline && Store.p.tab-n > 0: FieldRow {
+            label: @tr("Ширина усика");
+            NumField {
+                value: Store.p.tab-w;
+                decimals: 1;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.p.tab-w = v;
+                    Store.changed();
+                }
+            }
+        }
         Btn {
             text: @tr("Высота по пропорциям картинки");
             enabled: Store.has-image;
             clicked => {
                 Store.aspect();
+            }
+        }
+        FieldRow {
+            label: @tr("Мин. перемычка");
+            NumField {
+                value: Store.p.bridge;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.p.bridge = v;
+                    Store.changed();
+                }
             }
         }
     }
@@ -492,8 +525,25 @@ export component SettingsPanel inherits VerticalLayout {
                     Store.fit-dmax();
                 }
             }
-            if Store.p.pattern != "stipple": Caption {
-                text: @tr("Размер от тона");
+            if Store.p.pattern != "stipple": HorizontalLayout {
+                spacing: 8px;
+                VerticalLayout {
+                    alignment: center;
+                    Caption {
+                        text: @tr("Размер от тона");
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Btn {
+                        text: "SVG_t";
+                        kind: 2;
+                        min-height: 30px;
+                        clicked => {
+                            Store.trace();
+                        }
+                    }
+                }
             }
             if Store.p.pattern == "dots": Seg {
                 items: [@tr("От мин. до макс."), @tr("Пропорционально"), @tr("По плотности")];
@@ -504,10 +554,10 @@ export component SettingsPanel inherits VerticalLayout {
                 }
             }
             if Store.p.pattern == "rings": Seg {
-                items: [@tr("От мин. до макс."), @tr("Пропорционально")];
-                current: Store.p.size-mode == "prop" ? 1 : 0;
+                items: [@tr("От мин. до макс."), @tr("Пропорционально"), @tr("По плотности")];
+                current: Store.p.size-mode == "prop" ? 1 : Store.p.size-mode == "dense" ? 2 : 0;
                 select(i) => {
-                    Store.p.size-mode = i == 1 ? "prop" : "range";
+                    Store.p.size-mode = i == 1 ? "prop" : i == 2 ? "dense" : "range";
                     Store.changed();
                 }
             }
@@ -519,12 +569,6 @@ export component SettingsPanel inherits VerticalLayout {
             }
             if Store.p.size-mode == "dense": Hint {
                 text: @tr("Отверстия одного размера: шаг сжимается в тёмных местах до перемычки, в светлых — полный шаг.");
-            }
-            Btn {
-                text: @tr("Как в SVG tracing");
-                clicked => {
-                    Store.trace();
-                }
             }
             if Store.p.size-mode != "dense" && Store.p.pattern != "stipple": FieldRow {
                 label: @tr("Шаг размеров");
@@ -732,17 +776,6 @@ export component SettingsPanel inherits VerticalLayout {
                 unit: "×";
                 edited(v) => {
                     Store.p.min-k = v;
-                    Store.changed();
-                }
-            }
-        }
-        FieldRow {
-            label: @tr("Мин. перемычка");
-            NumField {
-                value: Store.p.bridge;
-                unit: @tr("мм");
-                edited(v) => {
-                    Store.p.bridge = v;
                     Store.changed();
                 }
             }

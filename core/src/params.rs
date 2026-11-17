@@ -10,6 +10,11 @@ pub struct Params {
     pub sheet_h: f64,
     pub border: f64,
     pub outline: bool,
+    /// Число усиков (мостиков) на контуре листа: контур режется с разрывами,
+    /// лист держится на усиках. 0 — контур режется целиком.
+    pub tab_n: i64,
+    /// Ширина одного усика, мм.
+    pub tab_w: f64,
     // Изображение
     pub fit: String, // cover | contain | stretch
     pub img_scale: f64,
@@ -98,6 +103,8 @@ impl Default for Params {
             sheet_h: 600.0,
             border: 20.0,
             outline: true,
+            tab_n: 0,
+            tab_w: 5.0,
             fit: "cover".into(),
             img_scale: 1.0,
             img_dx: 0.0,
@@ -175,6 +182,8 @@ impl Params {
         p.sheet_h = fin(p.sheet_h, 600.0).clamp(10.0, 20000.0);
         let half = p.sheet_w.min(p.sheet_h) / 2.0 - 1.0;
         p.border = fin(p.border, 0.0).clamp(0.0, half.max(0.0));
+        p.tab_n = p.tab_n.clamp(0, 9999);
+        p.tab_w = fin(p.tab_w, 5.0).clamp(0.1, 1000.0);
         p.img_scale = fin(p.img_scale, 1.0).clamp(0.05, 20.0);
         p.brightness = fin(p.brightness, 0.0).clamp(-1.0, 1.0);
         p.contrast = fin(p.contrast, 0.0).clamp(-1.0, 3.0);

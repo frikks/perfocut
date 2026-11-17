@@ -239,17 +239,6 @@ pub fn run() -> Result<(), slint::PlatformError> {
         show_stats(st, ui);
         bars(ui);
     });
-    // Сплэш при запуске: только на Android, держится пару секунд или до тапа
-    #[cfg(target_os = "android")]
-    {
-        ui.set_splash(true);
-        let ui = ui.as_weak();
-        Timer::single_shot(Duration::from_millis(2400), move || {
-            if let Some(ui) = ui.upgrade() {
-                ui.set_splash(false);
-            }
-        });
-    }
     ui.run()
 }
 
@@ -698,7 +687,7 @@ fn trace(st: &mut State, ui: &AppWindow) {
     toast(
         st,
         ui,
-        &t("Как в SVG tracing: квадратная сетка, круги, диаметр пропорционален тону"),
+        &t("SVG_t: квадратная сетка, круги, диаметр пропорционален тону"),
         4000,
     );
 }

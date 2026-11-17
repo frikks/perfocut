@@ -25,6 +25,7 @@ macro_rules! par_conv {
                 gc_decimals: par.gc_decimals.clamp(1, 6) as u32,
                 star_points: par.star_points.clamp(3.0, 12.0).round() as u32,
                 seed: par.seed.max(0.0) as u64,
+                tab_n: par.tab_n.clamp(0, 9999) as i64,
                 lang: prev.lang.clone(),
             }
         }
@@ -37,6 +38,7 @@ macro_rules! par_conv {
                 gc_decimals: p.gc_decimals as i32,
                 star_points: p.star_points as f32,
                 seed: p.seed as f32,
+                tab_n: p.tab_n.clamp(0, 9999) as i32,
             }
         }
     };
@@ -46,7 +48,7 @@ par_conv!(
     num: sheet_w, sheet_h, border, img_scale, img_dx, img_dy, brightness, contrast, gamma, tone_cut,
         pitch, angle, offset_x, offset_y, d_min, d_max, quant, line_pitch, line_angle, w_min, w_max,
         wave_len, wave_amp, step, thickness, min_k, bridge, kerf, shape_aspect, star_inner, jitter, density, cut_speed, rapid_speed, pierce_time,
-        price_m, price_pierce, price_m2, price_fixed;
+        price_m, price_pierce, price_m2, price_fixed, tab_w;
     text: fit, pattern, grid, shape, size_mode, fixed_sizes, currency, gc_on, gc_off, gc_header, gc_footer,
         origin, name, order_no, client, phone, email, comment;
     flag: outline, negative, fixed, wave, gc_arcs, gc_numbers, dxf_layers;
@@ -61,6 +63,8 @@ mod tests {
         let p = Params {
             sheet_w: 1234.5678,
             name: "Тест".into(),
+            tab_n: 4,
+            tab_w: 7.5,
             ..Params::default()
         };
         let mut par = to_par(&p);
@@ -69,6 +73,8 @@ mod tests {
         assert_eq!(back.sheet_w, 1234.5678);
         assert_eq!(back.pitch, 0.1);
         assert_eq!(back.name, "Тест");
+        assert_eq!(back.tab_n, 4);
+        assert_eq!(back.tab_w, 7.5);
         assert_eq!(back.lang, p.lang);
     }
 }

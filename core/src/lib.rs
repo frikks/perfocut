@@ -630,4 +630,126 @@ mod tests {
             r.stats.warnings
         );
     }
+
+    #[test]
+    fn rings_dense_mode() {
+        let g = gradient(200, 120);
+        let p = Params {
+            pattern: "rings".into(),
+            size_mode: "dense".into(),
+            tone_cut: 0.0,
+            d_min: 3.0,
+            d_max: 10.0, // в плотностном режиме не должен влиять
+            ..Params::default()
+        };
+        let r = gen::generate(Some(&g), &p);
+        assert!(r.stats.count > 100, "{}", r.stats.count);
+        // все отверстия одного размера: постоянный диаметр без kerf
+        let first = r.shapes[0].size();
+        assert!(r.shapes.iter().all(|s| (s.size() - first).abs() < 1e-9));
+        // тёмный левый край плотнее светлого правого
+        let dark = r.shapes.iter().filter(|s| s.start().0 < 250.0).count();
+        let light = r.shapes.iter().filter(|s| s.start().0 > 750.0).count();
+        assert!(dark > light * 2, "dark {dark} vs light {light}");
+        // отверстие в центре листа на месте
+        let c: Vec<(f64, f64, f64)> = r
+            .shapes
+            .iter()
+            .filter_map(|s| {
+                if let Shape::Circle { x, y, d } = s {
+                    Some((*x, *y, *d))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let center = c
+            .iter()
+            .min_by(|a, b| {
+                let da = (a.0 - 500.0).powi(2) + (a.1 - 300.0).powi(2);
+                let db = (b.0 - 500.0).powi(2) + (b.1 - 300.0).powi(2);
+                da.partial_cmp(&db).unwrap()
+            })
+            .expect("center hole");
+        assert!((center.0 - 500.0).abs() < 1e-6 && (center.1 - 300.0).abs() < 1e-6);
+        // перемычка для кругов: соседи по своему кольцу и по соседним
+        for (i, a) in c.iter().enumerate().step_by(7) {
+            for b2 in c.iter().skip(i + 1) {
+                let dist = ((a.0 - b2.0).powi(2) + (a.1 - b2.1).powi(2)).sqrt();
+                if dist < 3.0 * p.pitch {
+                    assert!(
+                        dist - a.2 / 2.0 - b2.2 / 2.0 >= p.bridge - 1e-6,
+                        "bridge {dist:.3} {} {}",
+                        a.2,
+                        b2.2
+                    );
+                }
+            }
+        }
+        // детерминизм: то же зерно и настройки — тот же рисунок
+        let r2 = gen::generate(Some(&g), &p);
+        assert_eq!(r.shapes.len(), r2.shapes.len());
+        for (a, b2) in r.shapes.iter().zip(r2.shapes.iter()) {
+            assert_eq!(a.start(), b2.start());
+            assert!((a.size() - b2.size()).abs() < 1e-9);
+        }
+        // экспорт работает
+        for fmt in ["svg", "dxf", "gcode", "step"] {
+            assert!(super::export_format(&r, fmt).is_some(), "{fmt}");
+        }
+    }
+
+    #[test]
+    fn tabs_cut_contour_in_segments() {
+        let g = gradient(200, 120);
+        let p = Params {
+            outline: true,
+            tab_n: 4,
+            tab_w: 5.0,
+            ..Params::default()
+        };
+        // Хелпер: 4 усика — 8 открытых отрезков, суммарно 3200 − 4·5 мм
+        let paths = export::sheet_paths(1000.0, 600.0, 4, 5.0);
+        assert_eq!(paths.len(), 8);
+        for s in &paths {
+            assert_eq!(s.len(), 2);
+        }
+        let total: f64 = paths
+            .iter()
+            .map(|s| ((s[1].0 - s[0].0).powi(2) + (s[1].1 - s[0].1).powi(2)).sqrt())
+            .sum();
+        assert!((total - (2.0 * (1000.0 + 600.0) - 4.0 * 5.0)).abs() < 1e-9);
+        // усик, севший на угол листа, рвёт обе смежные кромки: 3 усика — 6 отрезков
+        assert_eq!(export::sheet_paths(1000.0, 600.0, 3, 5.0).len(), 6);
+        let r = gen::generate(Some(&g), &p);
+        // без усиков — цельный контур: на 15 мм длиннее и один пирс
+        let r0 = gen::generate(
+            Some(&g),
+            &Params {
+                tab_n: 0,
+                ..p.clone()
+            },
+        );
+        assert!((r0.stats.cut_len_m - r.stats.cut_len_m - 0.020).abs() < 1e-6);
+        assert_eq!(r0.stats.pierces, r0.stats.count + 1);
+        // с усиками: пирсов — по числу отрезков контура
+        assert_eq!(r.stats.pierces, r.stats.count + 8);
+        // SVG: контур одним путём из подпутей, без rect и без Z
+        let svg = String::from_utf8(super::export_format(&r, "svg").unwrap()).unwrap();
+        assert!(!svg.contains("<rect"));
+        let contour = svg.lines().find(|l| l.contains("id=\"contour\"")).unwrap();
+        assert_eq!(contour.matches("M").count(), 8);
+        assert!(!contour.contains("Z"));
+        // DXF: восемь незамкнутых полилиний контура (флаг 70 = 0)
+        let dxf = String::from_utf8(super::export_format(&r, "dxf").unwrap()).unwrap();
+        assert_eq!(dxf.matches("POLYLINE").count(), 8);
+        assert!(dxf.contains(" 70\r\n0"));
+        // остальные форматы строятся
+        for fmt in ["gcode", "plt", "eps", "pdf", "step", "stl"] {
+            assert!(super::export_format(&r, fmt).is_some(), "{fmt}");
+        }
+        // без усиков SVG рисует замкнутый rect, как раньше
+        let svg0 = String::from_utf8(super::export_format(&r0, "svg").unwrap()).unwrap();
+        assert!(svg0.contains("<rect id=\"contour\""));
+    }
 }

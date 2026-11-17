@@ -812,8 +812,8 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         let pch = p.pitch;
         let ring_mode = p.pattern == "rings";
         let stipple = p.pattern == "stipple";
-        // «По плотности» (только для отверстий): размер постоянный, шаг сжимается в тёмных местах.
-        let dense = p.size_mode == "dense" && !ring_mode && !stipple;
+        // «По плотности» (отверстия и кольца): размер постоянный, шаг сжимается в тёмных местах.
+        let dense = p.size_mode == "dense" && !stipple;
         // Кольца: расстояние между центрами соседних отверстий не меньше шага
         // (по хорде кольца и по радиусу между кольцами), как у квадратной сетки.
         // У стиппла и плотностного режима шаг никогда не меньше размера плюс перемычки.
@@ -902,7 +902,13 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                 ));
             }
         }
-        let est = if dense || stipple {
+        let est = if dense && ring_mode {
+            // Кольца по плотности: идём по всем кольцам до дальнего угла листа,
+            // шаг между кольцами не меньше минимального. Оценка — объём обхода.
+            let step_min = (dmin + p.bridge).max(0.1);
+            let reach = (w * w + h * h).sqrt() / 2.0 + p.offset_x.abs() + p.offset_y.abs() + pch;
+            PI * reach * reach / (step_min * step_min)
+        } else if dense || stipple {
             // Худший случай: весь лист в тёмных местах с минимальным шагом
             // (размер + перемычка). Светлые места режутся реже этого.
             let step_min = (dmin + p.bridge).max(0.1);
@@ -953,7 +959,7 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                     sa,
                     &mut removed_edge,
                 ));
-            } else if dense {
+            } else if dense && !ring_mode {
                 // Плотностной халфтон: отверстия одного размера, шаг зависит от тона —
                 // в тёмных местах стоят вплотную по перемычке, в светлых — на полный шаг.
                 // Перемычка держится сама: минимальный шаг равен размеру плюс перемычка.
@@ -1001,38 +1007,138 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                 let (cxr, cyr) = (cx + p.offset_x, cy + p.offset_y);
                 let reach =
                     (w * w + h * h).sqrt() / 2.0 + p.offset_x.abs() + p.offset_y.abs() + pch;
-                let m = (reach / pch).ceil() as i64;
-                for k in 0..=m {
-                    let r = k as f64 * pch;
-                    let n = ring_holes(r, pch);
-                    let base = rad + if k % 2 == 1 { PI / n as f64 } else { 0.0 };
-                    let mut row: Vec<Shape> = Vec::new();
-                    for i in 0..n {
-                        let phi = base + 2.0 * PI * i as f64 / n as f64;
-                        let x = cxr + r * phi.cos();
-                        let y = cyr + r * phi.sin();
-                        if x < b || x > w - b || y < b || y > h - b {
-                            continue;
+                if dense {
+                    // Кольца по плотности: размер постоянный, радиус растёт шагом от среднего
+                    // тона кольца, отверстия по кольцу — шагом от местного тона. Перемычка
+                    // держится сама: минимальный шаг равен размеру плюс перемычка.
+                    let step_min = (dmin + p.bridge).max(0.1);
+                    let step_by = |tv: f64| {
+                        let tt = ((tv - p.tone_cut) / (1.0 - p.tone_cut)).clamp(0.0, 1.0);
+                        step_min + (pch - step_min) * (1.0 - tt)
+                    };
+                    // Средний тон кольца по восьми пробам: им задаётся шаг до следующего кольца.
+                    let ring_tone = |r: f64| -> Option<f64> {
+                        let mut acc = 0.0;
+                        let mut cnt = 0;
+                        for j in 0..8 {
+                            let a = std::f64::consts::FRAC_PI_4 * j as f64;
+                            if let Some(tv) =
+                                sampler.tone(cxr + r * a.cos(), cyr + r * a.sin(), r.max(pch) / 2.0)
+                            {
+                                acc += tv;
+                                cnt += 1;
+                            }
                         }
-                        let t = sampler.tone(x, y, pch / 2.0);
-                        if let Some(sh) = dot_shape(
-                            x,
-                            y,
-                            ca,
-                            sa,
-                            t,
-                            &p,
-                            prop,
-                            dmin,
-                            dmax,
-                            cap,
-                            &fixed,
-                            &mut removed_edge,
-                        ) {
-                            row.push(sh);
+                        (cnt > 0).then(|| acc / cnt as f64)
+                    };
+                    let mut r = 0.0f64;
+                    let mut k = 0i64;
+                    loop {
+                        if r < 1e-9 {
+                            // Центр листа: одно отверстие
+                            let t = sampler.tone(cxr, cyr, pch / 2.0);
+                            if cxr >= b && cxr <= w - b && cyr >= b && cyr <= h - b {
+                                if let Some(sh) = dot_shape(
+                                    cxr,
+                                    cyr,
+                                    ca,
+                                    sa,
+                                    t,
+                                    &p,
+                                    prop,
+                                    dmin,
+                                    dmin,
+                                    dmin,
+                                    &[],
+                                    &mut removed_edge,
+                                ) {
+                                    shapes.push(sh);
+                                }
+                            }
+                        } else {
+                            let base = rad
+                                + if k % 2 == 1 {
+                                    PI / ring_holes(r, pch) as f64
+                                } else {
+                                    0.0
+                                };
+                            let mut row: Vec<Shape> = Vec::new();
+                            let mut phi = base;
+                            loop {
+                                let (x, y) = (cxr + r * phi.cos(), cyr + r * phi.sin());
+                                let t = sampler.tone(x, y, pch / 2.0);
+                                let c = t.map(step_by).unwrap_or(pch);
+                                if x >= b && x <= w - b && y >= b && y <= h - b {
+                                    if let Some(sh) = dot_shape(
+                                        x,
+                                        y,
+                                        ca,
+                                        sa,
+                                        t,
+                                        &p,
+                                        prop,
+                                        dmin,
+                                        dmin,
+                                        dmin,
+                                        &[],
+                                        &mut removed_edge,
+                                    ) {
+                                        row.push(sh);
+                                    }
+                                }
+                                // Шаг по хорде; шаг больше диаметра — кольцу хватает одной точки
+                                if c >= 2.0 * r {
+                                    break;
+                                }
+                                let next = phi + 2.0 * (c / (2.0 * r)).asin();
+                                // Шов: до первой точки кольца хорда не меньше минимального шага
+                                if 2.0 * r * (((base + 2.0 * PI - next) / 2.0).sin()) < step_min {
+                                    break;
+                                }
+                                phi = next;
+                            }
+                            shapes.extend(row);
+                        }
+                        r += ring_tone(r).map(step_by).unwrap_or(pch);
+                        k += 1;
+                        if r > reach {
+                            break;
                         }
                     }
-                    shapes.extend(row);
+                } else {
+                    let m = (reach / pch).ceil() as i64;
+                    for k in 0..=m {
+                        let r = k as f64 * pch;
+                        let n = ring_holes(r, pch);
+                        let base = rad + if k % 2 == 1 { PI / n as f64 } else { 0.0 };
+                        let mut row: Vec<Shape> = Vec::new();
+                        for i in 0..n {
+                            let phi = base + 2.0 * PI * i as f64 / n as f64;
+                            let x = cxr + r * phi.cos();
+                            let y = cyr + r * phi.sin();
+                            if x < b || x > w - b || y < b || y > h - b {
+                                continue;
+                            }
+                            let t = sampler.tone(x, y, pch / 2.0);
+                            if let Some(sh) = dot_shape(
+                                x,
+                                y,
+                                ca,
+                                sa,
+                                t,
+                                &p,
+                                prop,
+                                dmin,
+                                dmax,
+                                cap,
+                                &fixed,
+                                &mut removed_edge,
+                            ) {
+                                row.push(sh);
+                            }
+                        }
+                        shapes.extend(row);
+                    }
                 }
             } else {
                 let reach =
@@ -1137,8 +1243,20 @@ fn finish(
         smax = smax.max(sz);
         sizes.push(sz);
     }
+    // Контур листа: с усиками режется отрезками между разрывами
+    let contour_paths = if p.outline && p.tab_n > 0 {
+        crate::export::sheet_paths(w, h, p.tab_n, p.tab_w)
+    } else {
+        Vec::new()
+    };
     if p.outline {
-        cut += 2.0 * (w + h);
+        if contour_paths.is_empty() {
+            cut += 2.0 * (w + h);
+        } else {
+            for seg in &contour_paths {
+                cut += ((seg[1].0 - seg[0].0).powi(2) + (seg[1].1 - seg[0].1).powi(2)).sqrt();
+            }
+        }
         travel += (last.0.powi(2) + last.1.powi(2)).sqrt();
     }
     if p.pattern != "lines" {
@@ -1161,7 +1279,12 @@ fn finish(
     st.open_area_pct = area / (w * h) * 100.0;
     st.cut_len_m = cut / 1000.0;
     st.travel_m = travel / 1000.0;
-    st.pierces = shapes.len() + if p.outline { 1 } else { 0 };
+    st.pierces = shapes.len()
+        + if contour_paths.is_empty() {
+            p.outline as usize
+        } else {
+            contour_paths.len()
+        };
     st.time_min =
         cut / p.cut_speed + travel / p.rapid_speed + st.pierces as f64 * p.pierce_time / 60.0;
     st.cost_cut = st.cut_len_m * p.price_m;
