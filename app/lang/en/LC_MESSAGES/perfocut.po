@@ -225,6 +225,9 @@ msgstr "Max size"
 msgid "Макс. размер по шагу и перемычке"
 msgstr "Max size from pitch and bridge"
 
+msgid "Макс. шаг"
+msgstr "Max pitch"
+
 msgid "Макс. ширина"
 msgstr "Max width"
 
@@ -326,6 +329,9 @@ msgstr "Holes along length"
 
 msgid "Отверстия"
 msgstr "Holes"
+
+msgid "Отверстия одного размера, расставлены случайно: плотность выше в тёмных местах."
+msgstr "Holes of one size, placed at random: the density is higher in dark areas."
 
 msgid "Отверстия одного размера: шаг сжимается в тёмных местах до перемычки, в светлых — полный шаг."
 msgstr "Holes of one size: the pitch tightens up to the bridge in dark areas and opens to the full pitch in light ones."
@@ -504,6 +510,9 @@ msgstr "Keep proportions"
 msgid "Стоимость"
 msgstr "Cost"
 
+msgid "Стиппл"
+msgstr "Stipple"
+
 msgid "Стоимость резки"
 msgstr "Cutting cost"
 
@@ -638,6 +647,9 @@ msgstr "slot"
 
 msgid "с"
 msgstr "s"
+
+msgid "стипл, макс. шаг"
+msgstr "stipple, max pitch"
 
 msgid "формат не поддерживается"
 msgstr "format is not supported"

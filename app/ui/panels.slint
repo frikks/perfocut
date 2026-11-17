@@ -311,10 +311,16 @@ export component SettingsPanel inherits VerticalLayout {
     Section {
         title: @tr("Узор");
         Seg {
-            items: [@tr("Отверстия"), @tr("Кольца"), @tr("Линии")];
-            current: Store.p.pattern == "lines" ? 2 : Store.p.pattern == "rings" ? 1 : 0;
+            items: [@tr("Отверстия"), @tr("Кольца"), @tr("Стиппл"), @tr("Линии")];
+            current: Store.p.pattern == "lines" ? 3
+                : Store.p.pattern == "stipple" ? 2
+                : Store.p.pattern == "rings" ? 1
+                : 0;
             select(i) => {
-                Store.p.pattern = i == 2 ? "lines" : i == 1 ? "rings" : "dots";
+                Store.p.pattern = i == 3 ? "lines"
+                    : i == 2 ? "stipple"
+                    : i == 1 ? "rings"
+                    : "dots";
                 Store.changed();
             }
         }
@@ -403,7 +409,9 @@ export component SettingsPanel inherits VerticalLayout {
                 }
             }
             FieldRow {
-                label: Store.p.pattern == "rings" ? @tr("Шаг колец") : @tr("Шаг сетки");
+                label: Store.p.pattern == "rings" ? @tr("Шаг колец")
+                    : Store.p.pattern == "stipple" ? @tr("Макс. шаг")
+                    : @tr("Шаг сетки");
                 NumField {
                     value: Store.p.pitch;
                     unit: @tr("мм");
@@ -457,7 +465,7 @@ export component SettingsPanel inherits VerticalLayout {
                 }
             }
             FieldRow {
-                label: Store.p.size-mode == "dense" ? @tr("Размер отверстий") : @tr("Мин. размер");
+                label: Store.p.size-mode == "dense" || Store.p.pattern == "stipple" ? @tr("Размер отверстий") : @tr("Мин. размер");
                 NumField {
                     value: Store.p.d-min;
                     unit: @tr("мм");
@@ -467,7 +475,7 @@ export component SettingsPanel inherits VerticalLayout {
                     }
                 }
             }
-            if Store.p.size-mode != "dense": FieldRow {
+            if Store.p.size-mode != "dense" && Store.p.pattern != "stipple": FieldRow {
                 label: @tr("Макс. размер");
                 NumField {
                     value: Store.p.d-max;
@@ -478,13 +486,13 @@ export component SettingsPanel inherits VerticalLayout {
                     }
                 }
             }
-            if Store.p.size-mode != "dense": Btn {
+            if Store.p.size-mode != "dense" && Store.p.pattern != "stipple": Btn {
                 text: @tr("Макс. размер по шагу и перемычке");
                 clicked => {
                     Store.fit-dmax();
                 }
             }
-            Caption {
+            if Store.p.pattern != "stipple": Caption {
                 text: @tr("Размер от тона");
             }
             if Store.p.pattern == "dots": Seg {
@@ -495,7 +503,7 @@ export component SettingsPanel inherits VerticalLayout {
                     Store.changed();
                 }
             }
-            if Store.p.pattern != "dots": Seg {
+            if Store.p.pattern == "rings": Seg {
                 items: [@tr("От мин. до макс."), @tr("Пропорционально")];
                 current: Store.p.size-mode == "prop" ? 1 : 0;
                 select(i) => {
@@ -503,7 +511,10 @@ export component SettingsPanel inherits VerticalLayout {
                     Store.changed();
                 }
             }
-            if Store.p.size-mode == "prop": Hint {
+            if Store.p.pattern == "stipple": Hint {
+                text: @tr("Отверстия одного размера, расставлены случайно: плотность выше в тёмных местах.");
+            }
+            if Store.p.size-mode == "prop" && Store.p.pattern != "stipple": Hint {
                 text: @tr("Диаметр растёт от нуля вместе с темнотой, как в SVG tracing. Отверстия меньше мин. размера не режутся.");
             }
             if Store.p.size-mode == "dense": Hint {
@@ -515,7 +526,7 @@ export component SettingsPanel inherits VerticalLayout {
                     Store.trace();
                 }
             }
-            FieldRow {
+            if Store.p.size-mode != "dense" && Store.p.pattern != "stipple": FieldRow {
                 label: @tr("Шаг размеров");
                 NumField {
                     value: Store.p.quant;
@@ -548,7 +559,7 @@ export component SettingsPanel inherits VerticalLayout {
                     }
                 }
             }
-            Check {
+            if !(Store.p.pattern == "dots" && Store.p.size-mode == "dense") && Store.p.pattern != "stipple": Check {
                 text: @tr("Только заданные размеры");
                 checked: Store.p.fixed;
                 toggled(b) => {
@@ -556,7 +567,7 @@ export component SettingsPanel inherits VerticalLayout {
                     Store.changed();
                 }
             }
-            if Store.p.fixed: TextField {
+            if Store.p.fixed && !(Store.p.pattern == "dots" && Store.p.size-mode == "dense") && Store.p.pattern != "stipple": TextField {
                 value: Store.p.fixed-sizes;
                 placeholder: "3, 5, 7, 9";
                 mono: true;

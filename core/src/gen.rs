@@ -207,6 +207,95 @@ fn ring_holes(r: f64, pitch: f64) -> i64 {
     (PI / (pitch / (2.0 * r)).asin()).floor().max(1.0) as i64
 }
 
+/// Стиппл: случайное размещение отверстий по плотности тона (dart throwing).
+/// Кандидат из зерна принимается, если ни один сосед не ближе суммы радиусов —
+/// минимальный шаг равен размеру плюс перемычка, поэтому перемычка не рвётся.
+/// Тёмные места просят плотной посадки, светлые — редкой. Детерминировано от зерна.
+#[allow(clippy::too_many_arguments)]
+fn stipple_fill(
+    w: f64,
+    h: f64,
+    b: f64,
+    p: &Params,
+    sampler: &Sampler,
+    dmin: f64,
+    ca: f64,
+    sa: f64,
+    removed_edge: &mut usize,
+) -> Vec<Shape> {
+    let step_min = (dmin + p.bridge).max(0.1);
+    // Желаемый шаг в точке: как в плотностном режиме — тёмный тон прижимает к минимуму.
+    let step_by = |tv: f64| {
+        let tt = ((tv - p.tone_cut) / (1.0 - p.tone_cut)).clamp(0.0, 1.0);
+        step_min + (p.pitch - step_min) * (1.0 - tt)
+    };
+    // Пространственный хэш с ячейкой размером с максимальный шаг.
+    let cell = p.pitch.max(step_min);
+    let max_r = cell / 2.0;
+    let mut hash: std::collections::HashMap<(i64, i64), Vec<usize>> =
+        std::collections::HashMap::new();
+    // x, y, радиус дистанции (половина желаемого шага), тон
+    let mut pts: Vec<(f64, f64, f64, f64)> = Vec::new();
+    // Бюджет попыток с запасом к числу мест, но ограничен сверху.
+    let budget = ((w - 2.0 * b) * (h - 2.0 * b) / (step_min * step_min) * 40.0) as usize;
+    let budget = budget.min(2_000_000);
+    for i in 0..budget {
+        let x = b + jitter_u01(p.seed, i as f64, 1.0) * (w - 2.0 * b) + p.offset_x;
+        let y = b + jitter_u01(p.seed, i as f64, 2.0) * (h - 2.0 * b) + p.offset_y;
+        let Some(t) = sampler.tone(x, y, p.pitch / 2.0) else {
+            continue;
+        };
+        if t < p.tone_cut {
+            continue;
+        }
+        let r = step_by(t) / 2.0;
+        // Соседи вокруг: дистанция не меньше суммы радиусов (шагов пополам).
+        let (gx, gy) = ((x / cell).floor() as i64, (y / cell).floor() as i64);
+        let rad = ((r + max_r) / cell).ceil() as i64;
+        let mut ok = true;
+        'outer: for dy in -rad..=rad {
+            for dx in -rad..=rad {
+                if let Some(list) = hash.get(&(gx + dx, gy + dy)) {
+                    for &idx in list {
+                        let (qx, qy, qr, _) = pts[idx];
+                        let dist2 = (x - qx).powi(2) + (y - qy).powi(2);
+                        let need = r + qr;
+                        if dist2 < need * need - 1e-12 {
+                            ok = false;
+                            break 'outer;
+                        }
+                    }
+                }
+            }
+        }
+        if !ok {
+            continue;
+        }
+        hash.entry((gx, gy)).or_default().push(pts.len());
+        pts.push((x, y, r, t));
+    }
+    let mut out = Vec::with_capacity(pts.len());
+    for (x, y, _, t) in pts {
+        if let Some(sh) = dot_shape(
+            x,
+            y,
+            ca,
+            sa,
+            Some(t),
+            p,
+            false,
+            dmin,
+            dmin,
+            dmin,
+            &[],
+            removed_edge,
+        ) {
+            out.push(sh);
+        }
+    }
+    out
+}
+
 fn dist_to_seg(p: (f64, f64), a: (f64, f64), b: (f64, f64)) -> f64 {
     let (dx, dy) = (b.0 - a.0, b.1 - a.1);
     let ll = dx * dx + dy * dy;
@@ -523,7 +612,8 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
     let mut shapes: Vec<Shape> = Vec::new();
     let max_allowed;
 
-    if p.pattern != "lines" && p.pattern != "dots" && p.pattern != "rings" {
+    if p.pattern != "lines" && p.pattern != "dots" && p.pattern != "rings" && p.pattern != "stipple"
+    {
         max_allowed = 0.0;
         warnings.push(tr(en, "Неизвестный тип узора", "Unknown pattern type"));
         return finish(shapes, warnings, removed_edge, min_allowed, max_allowed, p);
@@ -712,11 +802,13 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
     } else {
         let pch = p.pitch;
         let ring_mode = p.pattern == "rings";
+        let stipple = p.pattern == "stipple";
         // «По плотности» (только для отверстий): размер постоянный, шаг сжимается в тёмных местах.
-        let dense = p.size_mode == "dense" && !ring_mode;
+        let dense = p.size_mode == "dense" && !ring_mode && !stipple;
         // Кольца: расстояние между центрами соседних отверстий не меньше шага
         // (по хорде кольца и по радиусу между кольцами), как у квадратной сетки.
-        let cap = if ring_mode || dense {
+        // У стиппла и плотностного режима шаг никогда не меньше размера плюс перемычки.
+        let cap = if ring_mode || dense || stipple {
             pch - p.bridge
         } else {
             match (p.shape.as_str(), p.grid.as_str()) {
@@ -776,9 +868,9 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
             });
             dmin = cap.max(0.0);
         }
-        // В плотностном режиме размер постоянный: минимум и максимум совпадают.
-        let dmax = if dense { dmin } else { dmax };
-        let mut fixed = if p.fixed && !dense {
+        // В плотностном режиме и стиппле размер постоянный: минимум и максимум совпадают.
+        let dmax = if dense || stipple { dmin } else { dmax };
+        let mut fixed = if p.fixed && !dense && !stipple {
             p.fixed_list()
         } else {
             vec![]
@@ -801,7 +893,7 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                 ));
             }
         }
-        let est = if dense {
+        let est = if dense || stipple {
             // Худший случай: весь лист в тёмных местах с минимальным шагом
             // (размер + перемычка). Светлые места режутся реже этого.
             let step_min = (dmin + p.bridge).max(0.1);
@@ -836,11 +928,23 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                 "Шаг слишком мал для заданной перемычки и мин. размера",
                 "Pitch is too small for this bridge and min size",
             ));
-        } else if img.is_some() && (dense || !(p.fixed && fixed.is_empty())) {
+        } else if img.is_some() && (dense || stipple || !(p.fixed && fixed.is_empty())) {
             let (cx, cy) = (w / 2.0, h / 2.0);
             let rad = p.angle.to_radians();
             let (ca, sa) = (rad.cos(), rad.sin());
-            if dense {
+            if stipple {
+                shapes.extend(stipple_fill(
+                    w,
+                    h,
+                    b,
+                    &p,
+                    &sampler,
+                    dmin,
+                    ca,
+                    sa,
+                    &mut removed_edge,
+                ));
+            } else if dense {
                 // Плотностной халфтон: отверстия одного размера, шаг зависит от тона —
                 // в тёмных местах стоят вплотную по перемычке, в светлых — на полный шаг.
                 // Перемычка держится сама: минимальный шаг равен размеру плюс перемычка.

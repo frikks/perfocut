@@ -651,6 +651,13 @@ pub fn report(r: &GenResult) -> String {
             t("кольца, шаг", "rings, pitch"),
             num(p.pitch, 2)
         )
+    } else if p.pattern == "stipple" {
+        format!(
+            "{}, {} {} {mm}",
+            s,
+            t("стипл, макс. шаг", "stipple, max pitch"),
+            num(p.pitch, 2)
+        )
     } else {
         let g = match p.grid.as_str() {
             "square" => t("квадратная", "square"),

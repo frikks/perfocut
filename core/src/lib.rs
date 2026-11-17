@@ -306,6 +306,69 @@ mod tests {
     }
 
     #[test]
+    fn stipple_pattern_works() {
+        let g = gradient(200, 120);
+        let p = Params {
+            pattern: "stipple".into(),
+            tone_cut: 0.0,
+            d_min: 3.0,
+            ..Params::default()
+        };
+        let r = gen::generate(Some(&g), &p);
+        assert!(r.stats.count > 500, "{}", r.stats.count);
+        // все отверстия одного размера: постоянный диаметр без kerf
+        let first = r.shapes[0].size();
+        assert!(r.shapes.iter().all(|s| (s.size() - first).abs() < 1e-9));
+        // детерминизм: то же зерно — тот же узор
+        let r2 = gen::generate(Some(&g), &p);
+        assert_eq!(r2.stats.count, r.stats.count);
+        assert_eq!(r2.shapes[0].start(), r.shapes[0].start());
+        // тёмный левый край плотнее светлого правого
+        let dark = r.shapes.iter().filter(|s| s.start().0 < 250.0).count();
+        let light = r.shapes.iter().filter(|s| s.start().0 > 750.0).count();
+        assert!(dark > light * 2, "dark {dark} vs light {light}");
+        // перемычка: случайное размещение не сближает отверстия ближе размера + перемычки
+        let c: Vec<(f64, f64, f64)> = r
+            .shapes
+            .iter()
+            .filter_map(|s| {
+                if let Shape::Circle { x, y, d } = s {
+                    Some((*x, *y, *d))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for (i, a) in c.iter().enumerate().step_by(7) {
+            for b2 in c.iter().skip(i + 1) {
+                let dist = ((a.0 - b2.0).powi(2) + (a.1 - b2.1).powi(2)).sqrt();
+                if dist < 3.0 * p.pitch {
+                    assert!(
+                        dist - a.2 / 2.0 - b2.2 / 2.0 >= p.bridge - 1e-6,
+                        "bridge {dist:.3} {} {}",
+                        a.2,
+                        b2.2
+                    );
+                }
+            }
+        }
+        // кромка: все точки внутри поля
+        for s in &r.shapes {
+            let pts = match s {
+                Shape::Circle { x, y, d } => export::circle_pts(*x, *y, *d, 0.01),
+                Shape::Poly { pts, .. } => pts.clone(),
+            };
+            for q in pts {
+                assert!(q.0 >= p.border - 0.02 && q.0 <= p.sheet_w - p.border + 0.02);
+                assert!(q.1 >= p.border - 0.02 && q.1 <= p.sheet_h - p.border + 0.02);
+            }
+        }
+        for fmt in ["svg", "dxf", "gcode"] {
+            assert!(super::export_format(&r, fmt).is_some(), "{fmt}");
+        }
+    }
+
+    #[test]
     fn lines_and_exports() {
         let g = gradient(200, 120);
         let p = Params {
