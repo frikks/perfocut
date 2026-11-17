@@ -311,13 +311,15 @@ export component SettingsPanel inherits VerticalLayout {
     Section {
         title: @tr("Узор");
         Seg {
-            items: [@tr("Отверстия"), @tr("Кольца"), @tr("Стиппл"), @tr("Линии")];
-            current: Store.p.pattern == "lines" ? 3
+            items: [@tr("Отверстия"), @tr("Кольца"), @tr("Стиппл"), @tr("Лучи"), @tr("Линии")];
+            current: Store.p.pattern == "lines" ? 4
+                : Store.p.pattern == "rays" ? 3
                 : Store.p.pattern == "stipple" ? 2
                 : Store.p.pattern == "rings" ? 1
                 : 0;
             select(i) => {
-                Store.p.pattern = i == 3 ? "lines"
+                Store.p.pattern = i == 4 ? "lines"
+                    : i == 3 ? "rays"
                     : i == 2 ? "stipple"
                     : i == 1 ? "rings"
                     : "dots";
@@ -577,10 +579,10 @@ export component SettingsPanel inherits VerticalLayout {
                 }
             }
         }
-        if Store.p.pattern == "lines": VerticalLayout {
+        if Store.p.pattern == "lines" || Store.p.pattern == "rays": VerticalLayout {
             spacing: Theme.touch ? 10px : 8px;
             FieldRow {
-                label: @tr("Шаг линий");
+                label: Store.p.pattern == "rays" ? @tr("Шаг лучей") : @tr("Шаг линий");
                 NumField {
                     value: Store.p.line-pitch;
                     unit: @tr("мм");
@@ -635,7 +637,7 @@ export component SettingsPanel inherits VerticalLayout {
                     Store.changed();
                 }
             }
-            Check {
+            if Store.p.pattern == "lines": Check {
                 text: @tr("Синусоида");
                 checked: Store.p.wave;
                 toggled(b) => {
@@ -643,7 +645,7 @@ export component SettingsPanel inherits VerticalLayout {
                     Store.changed();
                 }
             }
-            if Store.p.wave: FieldRow {
+            if Store.p.wave && Store.p.pattern == "lines": FieldRow {
                 label: @tr("Длина волны");
                 NumField {
                     value: Store.p.wave-len;
@@ -655,7 +657,7 @@ export component SettingsPanel inherits VerticalLayout {
                     }
                 }
             }
-            if Store.p.wave: FieldRow {
+            if Store.p.wave && Store.p.pattern == "lines": FieldRow {
                 label: @tr("Амплитуда");
                 NumField {
                     value: Store.p.wave-amp;

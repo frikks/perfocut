@@ -640,6 +640,8 @@ export component AppWindow inherits Window {
     in-out property <int> color-target: -1;
     in-out property <bool> settings-open;
     in-out property <bool> info-open;
+    // Сплэш при запуске: ставится из программы только на Android
+    in-out property <bool> splash;
     out property <bool> wide: self.width >= 960px;
     out property <length> cw: stage.cw;
     out property <length> ch: stage.ch;
@@ -1109,6 +1111,42 @@ export component AppWindow inherits Window {
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
+            }
+        }
+
+        // Сплэш при запуске: арт на весь экран, закрывается тапом или сама.
+        // Слой cover позади закрывает полосы на вытянутых экранах, contain спереди
+        // показывает весь арт целиком: логотип не обрезается ни на каких пропорциях.
+        Rectangle {
+            visible: self.opacity > 0.01;
+            opacity: root.splash ? 1 : 0;
+            animate opacity { duration: 240ms; }
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            background: #101318;
+            TouchArea {
+                enabled: root.splash;
+                clicked => {
+                    root.splash = false;
+                }
+            }
+            Image {
+                x: 0;
+                y: 0;
+                width: parent.width;
+                height: parent.height;
+                source: @image-url("splash.png");
+                image-fit: cover;
+            }
+            Image {
+                x: 0;
+                y: 0;
+                width: parent.width;
+                height: parent.height;
+                source: @image-url("splash.png");
+                image-fit: contain;
             }
         }
     }

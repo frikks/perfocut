@@ -219,6 +219,9 @@ msgstr "Sheet"
 msgid "Лучей"
 msgstr "Rays"
 
+msgid "Лучи"
+msgstr "Rays"
+
 msgid "Макс. размер"
 msgstr "Max size"
 
@@ -587,6 +590,9 @@ msgstr "Sampling step"
 
 msgid "Шаг колец"
 msgstr "Ring pitch"
+
+msgid "Шаг лучей"
+msgstr "Ray pitch"
 
 msgid "Шаг линий"
 msgstr "Line pitch"
