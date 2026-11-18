@@ -13,25 +13,33 @@ import { DrawTools, BrushBar, BrushPopup } from "draw.slint";
 export { Theme, Bridge, Kb, Store, Prefs, Par, KV, SizeRow, StatsUI, Fmt }
 
 struct Preset { c: color, hex: string }
-struct Dot { d: float, dd: float }
 
-// Сплэш при запуске: в теме программы перфорация собирается точками,
-// лазерная точка ведёт строку загрузки. Тап по любому месту закрывает раньше.
+// Сплэш при запуске: технологичная матрица перфорации, которую сканирует лазер.
+// Уходит по тапу/клику, по «Назад» и сам — по таймеру из Rust.
 component Splash inherits Rectangle {
     in-out property <bool> shown: true;
     callback close();
-    // Появление и прогресс (0..1) растут сами после показа
     property <float> appear: 0;
     property <float> load: 0;
-    property <length> bar-w: 240px;
-    // Сетка 3×3 как в логотипе: d — размер точки, dd — задержка появления (удалённость от центра)
-    property <[Dot]> grid: [
-        { d: 0.35, dd: 2 }, { d: 0.45, dd: 1 }, { d: 0.35, dd: 2 },
-        { d: 0.45, dd: 1 }, { d: 0.62, dd: 0 }, { d: 0.45, dd: 1 },
-        { d: 0.35, dd: 2 }, { d: 0.45, dd: 1 }, { d: 0.35, dd: 2 },
-    ];
-    animate appear { duration: 600ms; easing: ease-out; }
-    animate load { duration: 1900ms; easing: ease-in-out; }
+    property <bool> roomy: root.height >= 540px;
+    property <length> panel-w: Math.min(520px, root.width - 40px);
+    property <length> panel-h: root.roomy ? 240px : 196px;
+    property <length> step-x: root.width < 420px ? 26px : 34px;
+    property <length> step-y: root.roomy ? 34px : 30px;
+    property <length> grid-y: root.roomy ? 46px : 40px;
+    property <length> bar-w: Math.min(420px, root.width - 96px);
+    property <length> bar-y: root.roomy ? root.height / 2 + 158px : root.height - 72px;
+    property <length> mark: 22px;
+    property <int> ncols: Math.floor((root.panel-w - 68px) / root.step-x) + 1;
+    property <[int]> ix: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+    property <[int]> iy: [0, 1, 2, 3, 4];
+
+    // Вот это убирает сплеш: shown приходит из AppWindow и из таймера в Rust
+    visible: self.opacity > 0.01;
+    opacity: root.shown ? 1 : 0;
+    animate opacity { duration: 240ms; }
+    animate appear { duration: 700ms; easing: ease-out; }
+    animate load { duration: 1850ms; easing: ease-in-out; }
     init => {
         root.appear = 1;
         root.load = 1;
@@ -43,106 +51,225 @@ component Splash inherits Rectangle {
             root.close();
         }
     }
-    // Мягкое акцентное свечение снизу
+    // Фон: акцентное свечение и тонкая бегущая строка развёртки
     Rectangle {
-        x: -parent.width * 0.2;
-        y: parent.height - self.height * 0.55;
-        width: parent.width * 1.4;
-        height: parent.height * 0.5;
+        x: -root.width * 0.3;
+        y: root.height - self.height;
+        width: root.width * 1.6;
+        height: root.height * 0.6;
         border-radius: self.width / 2;
-        background: Theme.acc.with-alpha(0.07);
+        background: Theme.acc.with-alpha(0.05);
     }
-    // Пульс ореола лазерной точки в центре сетки: живёт, пока сплэш показан
     if root.shown: Rectangle {
-        property <float> beat: Math.sin(animation-tick() / 700ms * 360deg);
-        x: parent.width / 2 - self.width / 2;
-        y: parent.height / 2 - 90px - self.height / 2;
-        width: 54px + 10px * self.beat;
-        height: self.width;
-        border-radius: self.width / 2;
-        background: Theme.acc.with-alpha(0.16 + 0.07 * self.beat);
+        property <float> scan: Math.mod(animation-tick(), 2200ms) / 2200ms;
+        x: 0;
+        y: root.height * self.scan;
+        width: root.width;
+        height: 1px;
+        background: Theme.acc.with-alpha(0.10);
     }
-    for pt[i] in root.grid: Rectangle {
-        property <int> c: Math.mod(i, 3);
-        property <int> r: Math.floor(i / 3);
-        property <float> k: Math.clamp(root.appear * 3.4 - pt.dd * 0.65, 0, 1);
-        property <length> d: 72px * pt.d * (0.4 + 0.6 * self.k);
-        x: parent.width / 2 + (self.c - 1) * 40px - self.d / 2;
-        y: parent.height / 2 - 90px + (self.r - 1) * 40px - self.d / 2;
-        width: self.d;
-        height: self.d;
-        border-radius: self.d / 2;
-        background: i == 4 ? Theme.acc : Theme.t1;
-        opacity: self.k;
-    }
+    // Угловые скобки рабочего поля
+    Rectangle { x: root.mark; y: root.mark; width: 36px; height: 1px; background: Theme.acc.with-alpha(0.4); }
+    Rectangle { x: root.mark; y: root.mark; width: 1px; height: 36px; background: Theme.acc.with-alpha(0.4); }
+    Rectangle { x: root.width - root.mark - 36px; y: root.mark; width: 36px; height: 1px; background: Theme.acc.with-alpha(0.4); }
+    Rectangle { x: root.width - root.mark - 1px; y: root.mark; width: 1px; height: 36px; background: Theme.acc.with-alpha(0.4); }
+    Rectangle { x: root.mark; y: root.height - root.mark - 1px; width: 36px; height: 1px; background: Theme.acc.with-alpha(0.4); }
+    Rectangle { x: root.mark; y: root.height - root.mark - 36px; width: 1px; height: 36px; background: Theme.acc.with-alpha(0.4); }
+    Rectangle { x: root.width - root.mark - 36px; y: root.height - root.mark - 1px; width: 36px; height: 1px; background: Theme.acc.with-alpha(0.4); }
+    Rectangle { x: root.width - root.mark - 1px; y: root.height - root.mark - 36px; width: 1px; height: 36px; background: Theme.acc.with-alpha(0.4); }
+
     Text {
         text: "PerfoCut";
         color: Theme.t1;
-        font-size: 34px;
+        font-size: 36px;
         font-weight: 500;
-        width: parent.width;
-        y: parent.height / 2 - 18px;
+        width: root.width;
+        y: root.roomy ? root.height / 2 - 172px : 22px;
         horizontal-alignment: center;
-        opacity: Math.clamp(root.appear * 2 - 0.7, 0, 1);
+        opacity: Math.clamp(root.appear * 3 - 1, 0, 1);
     }
     Text {
-        text: @tr("Картинка → перфорация → файл");
-        color: Theme.t2;
-        font-size: Theme.fs;
-        width: parent.width;
-        y: parent.height / 2 + 28px;
+        text: "PERFORATION ENGINE  ·  LASER PATH  ·  " + Prefs.version;
+        color: Theme.acc-text;
+        font-family: Theme.mono;
+        font-size: Theme.fs-s;
+        width: root.width;
+        y: root.roomy ? root.height / 2 - 130px : 58px;
         horizontal-alignment: center;
-        opacity: Math.clamp(root.appear * 2 - 1.0, 0, 1);
+        opacity: Math.clamp(root.appear * 3 - 1.4, 0, 1);
     }
-    // Строка загрузки: лазер ведёт по линии реза
+    // Панель матрицы: отверстия проступают за лучом сканера
     Rectangle {
-        x: (parent.width - root.bar-w) / 2;
-        y: parent.height / 2 + 88px;
+        x: (root.width - root.panel-w) / 2;
+        y: root.roomy ? root.height / 2 - 98px : 88px;
+        width: root.panel-w;
+        height: root.panel-h;
+        border-radius: 12px;
+        background: Theme.card;
+        border-width: 1px;
+        border-color: Theme.line2;
+        clip: true;
+        Rectangle {
+            x: 0; y: 0;
+            width: parent.width;
+            height: 30px;
+            background: Theme.raised.with-alpha(0.5);
+        }
+        Rectangle {
+            x: 0; y: 30px;
+            width: parent.width;
+            height: 1px;
+            background: Theme.line;
+        }
+        Text {
+            x: 14px; y: 8px;
+            text: "MATRIX  ·  Ø 2.0–10.0 MM";
+            color: Theme.t3;
+            font-family: Theme.mono;
+            font-size: Theme.fs-s;
+        }
+        Text {
+            x: parent.width - self.width - 14px; y: 8px;
+            text: "SCAN " + Bridge.fmt(root.load * 100, 0) + "%";
+            color: Theme.acc-text;
+            font-family: Theme.mono;
+            font-size: Theme.fs-s;
+        }
+        for c in root.ix: Rectangle {
+            visible: c < root.ncols;
+            for r in root.iy: Rectangle {
+                property <float> tone: Math.abs(Math.sin((c * 2.7 + r * 5.3) * 57.3deg));
+                property <float> k: Math.clamp((root.load * (root.ncols + 1) - c) * 1.3, 0, 1);
+                property <float> hot: Math.clamp(2.2 - Math.abs(c - root.load * (root.ncols - 1)), 0, 1);
+                property <length> d: (5px + 12px * self.tone) * (0.5 + 0.5 * self.k);
+                x: 38px + c * root.step-x - self.d / 2;
+                y: root.grid-y + r * root.step-y - self.d / 2;
+                width: self.d;
+                height: self.d;
+                border-radius: self.d / 2;
+                background: self.tone > 0.76 ? Theme.acc : Theme.t1;
+                opacity: self.k * (0.6 + 0.4 * self.hot) * root.appear;
+            }
+        }
+        // Луч сканера: ореол, линия и головка
+        if root.shown: Rectangle {
+            property <float> beat: Math.sin(animation-tick() / 420ms * 360deg);
+            x: 38px + root.load * (root.ncols - 1) * root.step-x - self.width / 2;
+            y: root.grid-y - 8px;
+            width: 26px;
+            height: (root.iy.length - 1) * root.step-y + 16px;
+            background: Theme.acc.with-alpha(0.10 + 0.05 * self.beat);
+        }
+        Rectangle {
+            x: 38px + root.load * (root.ncols - 1) * root.step-x - 1px;
+            y: root.grid-y - 8px;
+            width: 2px;
+            height: (root.iy.length - 1) * root.step-y + 16px;
+            background: Theme.acc;
+            opacity: root.load < 0.99 ? 0.9 : 0;
+        }
+        Rectangle {
+            x: 38px + root.load * (root.ncols - 1) * root.step-x - 5px;
+            y: root.grid-y + (root.iy.length - 1) * root.step-y / 2 - 5px;
+            width: 10px;
+            height: 10px;
+            border-radius: 5px;
+            background: Theme.acc;
+            opacity: root.load < 0.99 ? 1 : 0;
+        }
+        // Ось координат с делениями
+        for t in root.ix: Rectangle {
+            visible: t < root.ncols;
+            x: 38px + t * root.step-x;
+            y: parent.height - 18px;
+            width: 1px;
+            height: 6px;
+            background: Theme.t3;
+            opacity: 0.45;
+        }
+        Text {
+            x: 14px; y: parent.height - 20px;
+            text: "0";
+            color: Theme.t3;
+            font-family: Theme.mono;
+            font-size: Theme.fs-s;
+        }
+        Text {
+            x: parent.width - self.width - 14px; y: parent.height - 20px;
+            text: "1000 MM";
+            color: Theme.t3;
+            font-family: Theme.mono;
+            font-size: Theme.fs-s;
+        }
+    }
+    // Линия реза: ход луча и процент выполнения
+    Text {
+        text: Bridge.fmt(root.load * 100, 0) + "%";
+        color: Theme.acc-text;
+        font-family: Theme.mono;
+        font-size: Theme.fs-s;
+        x: (root.width - root.bar-w) / 2;
         width: root.bar-w;
-        height: 4px;
-        border-radius: 2px;
+        y: root.bar-y - 22px;
+        horizontal-alignment: right;
+    }
+    Rectangle {
+        x: (root.width - root.bar-w) / 2;
+        y: root.bar-y;
+        width: root.bar-w;
+        height: 6px;
+        border-radius: 3px;
         background: Theme.raised2;
-        opacity: Math.clamp(root.load * 4, 0, 1);
         Rectangle {
             width: parent.width * root.load;
             height: parent.height;
-            border-radius: 2px;
+            border-radius: 3px;
             background: Theme.acc;
         }
         Rectangle {
             x: parent.width * root.load - self.width / 2;
-            y: (parent.height - self.height) / 2;
-            width: 8px;
-            height: 8px;
-            border-radius: self.width / 2;
+            y: -2px;
+            width: 10px;
+            height: 10px;
+            border-radius: 5px;
             background: Theme.acc;
         }
     }
     if root.shown: Rectangle {
-        property <float> beat: Math.sin(animation-tick() / 500ms * 360deg);
-        x: (parent.width - root.bar-w) / 2 + root.bar-w * root.load - self.width / 2;
-        y: parent.height / 2 + 90px - self.height / 2;
-        width: 22px + 6px * self.beat;
+        property <float> beat: Math.sin(animation-tick() / 400ms * 360deg);
+        x: (root.width - root.bar-w) / 2 + root.bar-w * root.load - self.width / 2;
+        y: root.bar-y + 3px - self.height / 2;
+        width: 24px + 6px * self.beat;
         height: self.width;
         border-radius: self.width / 2;
-        background: Theme.acc.with-alpha(0.22 + 0.1 * self.beat);
+        background: Theme.acc.with-alpha(0.2 + 0.1 * self.beat);
         opacity: root.load < 0.99 ? 1 : 0;
     }
     Text {
-        text: Bridge.fmt(root.load * 100, 0) + "%";
+        text: "LASER READY  ·  DXF / G-CODE / SVG";
         color: Theme.t3;
         font-family: Theme.mono;
         font-size: Theme.fs-s;
-        width: parent.width;
-        y: parent.height / 2 + 100px;
+        width: root.width;
+        y: root.bar-y + 18px;
         horizontal-alignment: center;
+        opacity: root.appear;
+    }
+    if root.roomy: Text {
+        text: @tr("Картинка → перфорация → файл");
+        color: Theme.t2;
+        font-size: Theme.fs;
+        width: root.width;
+        y: root.bar-y + 44px;
+        horizontal-alignment: center;
+        opacity: root.appear;
     }
     // Ник автора: тап открывает канал
     Rectangle {
         width: nick.preferred-width + 24px;
         height: nick.preferred-height + 14px;
-        x: (parent.width - self.width) / 2;
-        y: parent.height - self.height - 16px;
+        x: (root.width - self.width) / 2;
+        y: root.height - self.height - 10px;
         border-radius: 8px;
         ta := TouchArea {
             mouse-cursor: pointer;
