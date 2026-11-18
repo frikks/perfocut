@@ -21,7 +21,7 @@ const PHONE = { w: 412, h: 892, dsf: 2, mobile: true };
 // Точки окна 1440 × 900
 const D = {
   example: [735, 551], draw: [851, 551],
-  metal: [385, 80], contours: [503, 80], original: [622, 80],
+  metal: [503, 80], contours: [385, 80], original: [622, 80],
   gear: [1412, 28], themeDark: [626, 399], themeLight: [813, 399], themeAmoled: [813, 429], close: [893, 324],
   lines: [228, 299],
   done: [1083, 80], eraser: [473, 80],
