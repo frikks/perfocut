@@ -540,7 +540,6 @@ export component Section inherits Rectangle {
     border-radius: Theme.radius-lg;
     border-width: 1px;
     border-color: Theme.glass-edge;
-    clip: true;
     lay := VerticalLayout {
         Rectangle {
             height: Theme.touch ? 36px : 40px;
@@ -550,22 +549,16 @@ export component Section inherits Rectangle {
                 background: Theme.glass-shine;
             }
             HorizontalLayout {
-                padding-left: 12px;
+                padding-left: 16px;
                 padding-right: 16px;
                 spacing: 8px;
-                Rectangle {
-                    width: 3px;
-                    height: 16px;
-                    border-radius: 2px;
-                    background: Theme.acc;
-                }
                 VerticalLayout {
                     alignment: center;
                     Icon {
                         source: @image-url("icons/chevron.svg");
-                        tint: Theme.t3;
+                        tint: root.open ? Theme.acc : Theme.t3;
                         transform-rotation: root.open ? 90deg : 0deg;
-                        animate transform-rotation { duration: 140ms; }
+                        animate transform-rotation { duration: 140ms; easing: ease-out; }
                     }
                 }
                 Text {
@@ -575,6 +568,8 @@ export component Section inherits Rectangle {
                     font-weight: 500;
                     vertical-alignment: center;
                     horizontal-stretch: 1;
+                    wrap: no-wrap;
+                    overflow: elide;
                 }
                 Text {
                     text: root.meta;
@@ -582,6 +577,7 @@ export component Section inherits Rectangle {
                     font-family: Theme.mono;
                     font-size: Theme.fs-s;
                     vertical-alignment: center;
+                    overflow: elide;
                 }
             }
             TouchArea {
@@ -593,12 +589,11 @@ export component Section inherits Rectangle {
             }
         }
         Rectangle {
-            height: root.open ? body.preferred-height : 0px;
-            clip: true;
+            height: root.open ? body.preferred-height + 8px : 0px;
             body := VerticalLayout {
                 padding-left: 16px;
                 padding-right: 16px;
-                padding-bottom: Theme.touch ? 6px : 7px;
+                padding-bottom: Theme.touch ? 10px : 12px;
                 spacing: Theme.touch ? 5px : 6px;
                 @children
             }
@@ -622,6 +617,8 @@ export component Hint inherits Text {
     color: Theme.t3;
     font-size: Theme.fs-s;
     wrap: word-wrap;
+    // Запас на 3–4 строки: при узкой панели перенос не должен «съедать» соседние строки
+    min-height: Theme.touch ? 48px : 44px;
 }
 
 // Окно поверх затемнённого фона; тап по фону закрывает
@@ -634,7 +631,7 @@ export component Modal inherits Rectangle {
     callback info();
     visible: self.opacity > 0.01;
     opacity: shown ? 1 : 0;
-    animate opacity { duration: 140ms; }
+    animate opacity { duration: 140ms; easing: ease-out; }
     background: Theme.scrim;
     TouchArea {
         enabled: root.shown;

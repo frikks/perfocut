@@ -37,7 +37,7 @@ component Splash inherits Rectangle {
     // Вот это убирает сплеш: shown приходит из AppWindow и из таймера в Rust
     visible: self.opacity > 0.01;
     opacity: root.shown ? 1 : 0;
-    animate opacity { duration: 240ms; }
+    animate opacity { duration: 240ms; easing: ease-out; }
     animate appear { duration: 700ms; easing: ease-out; }
     animate load { duration: 1850ms; easing: ease-in-out; }
     init => {
@@ -89,7 +89,7 @@ component Splash inherits Rectangle {
         opacity: Math.clamp(root.appear * 3 - 1, 0, 1);
     }
     Text {
-        text: "PERFORATION ENGINE  ·  LASER PATH  ·  " + Prefs.version;
+        text: "PERFORATION ENGINE  /  LASER PATH  /  " + Prefs.version;
         color: Theme.acc-text;
         font-family: Theme.mono;
         font-size: Theme.fs-s;
@@ -123,7 +123,7 @@ component Splash inherits Rectangle {
         }
         Text {
             x: 14px; y: 8px;
-            text: "MATRIX  ·  Ø 2.0–10.0 MM";
+            text: "MATRIX  /  Ø 2.0–10.0 MM";
             color: Theme.t3;
             font-family: Theme.mono;
             font-size: Theme.fs-s;
@@ -246,7 +246,7 @@ component Splash inherits Rectangle {
         opacity: root.load < 0.99 ? 1 : 0;
     }
     Text {
-        text: "LASER READY  ·  DXF / G-CODE / SVG";
+        text: "LASER READY  —  DXF / G-CODE / SVG";
         color: Theme.t3;
         font-family: Theme.mono;
         font-size: Theme.fs-s;
@@ -1422,7 +1422,7 @@ export component AppWindow inherits Window {
             Rectangle {
                 visible: self.opacity > 0.01;
                 opacity: Store.gen-flash ? 1 : 0;
-                animate opacity { duration: 300ms; }
+                animate opacity { duration: 300ms; easing: ease-out; }
                 x: 0; y: 0;
                 width: parent.width;
                 height: parent.height;
@@ -1439,7 +1439,7 @@ export component AppWindow inherits Window {
             Rectangle {
                 visible: self.opacity > 0.01;
                 opacity: Store.toast-shown ? 1 : 0;
-                animate opacity { duration: 160ms; }
+                animate opacity { duration: 160ms; easing: ease-out; }
                 width: Math.min(parent.width - 32px, tt.preferred-width + 32px);
                 height: tt.preferred-height + 20px;
                 x: (parent.width - self.width) / 2;
