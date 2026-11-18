@@ -124,6 +124,8 @@ export global Store {
 
     // Итог и экспорт
     in property <StatsUI> stats;
+    // Короткая вспышка при применении результата генерации
+    in-out property <bool> gen-flash;
     in property <[Fmt]> formats;
     in property <bool> can-export;
     callback format-toggled(int, bool);

@@ -146,6 +146,11 @@ pub fn run() -> Result<(), slint::PlatformError> {
     saved.theme = saved.theme.clamp(0, 3);
     saved.accent = saved.accent.clamp(0, 5);
     saved.view_mode = saved.view_mode.clamp(0, 2);
+    // Раз в жизни обновляем старое значение по умолчанию: теперь «Контуры» открываются первыми
+    if !saved.view_mode_v2 {
+        saved.view_mode = 1;
+        saved.view_mode_v2 = true;
+    }
     let sheet = Rgb::parse(&saved.sheet_color).unwrap_or(SHEET_DEFAULT);
     let back = Rgb::parse(&saved.back_color).unwrap_or(BACK_DEFAULT);
 
@@ -379,6 +384,7 @@ fn bind(ui: &AppWindow) {
     s.on_view_changed(|| {
         with(|st, ui| {
             st.saved.view_mode = ui.global::<Store>().get_view_mode();
+            st.saved.view_mode_v2 = true;
             st.saved.store();
             request_draw(st);
         });
@@ -968,16 +974,17 @@ fn set_picture_with(name: String, bytes: Vec<u8>, sketch: Option<Sketch>) -> boo
             gray: Arc::new(d.gray),
             sk: None,
         };
+        let auto_aspect = sketch.is_none();
         if let Some(sk) = sketch {
             draw::attach(&mut pic, sk);
         }
-        install(st, ui, pic);
+        install(st, ui, pic, auto_aspect);
     })
     .is_some()
 }
 
 /// Новая картинка или холст вместо прежних: сброс вида и пересчёт узора.
-fn install(st: &mut State, ui: &AppWindow, pic: Pic) {
+fn install(st: &mut State, ui: &AppWindow, pic: Pic, auto_aspect: bool) {
     let store = ui.global::<Store>();
     store.set_drawing(false);
     store.set_ink(Image::default());
@@ -986,6 +993,17 @@ fn install(st: &mut State, ui: &AppWindow, pic: Pic) {
         st.saved.ratio = st.p.sheet_w / st.p.sheet_h;
     }
     st.pic = Some(pic);
+    // Новая картинка: высота листа сразу по её пропорциям, как по кнопке «Высота по пропорциям»
+    if auto_aspect {
+        let (w0, h0) = st.pic.as_ref().map(|q| (q.w0, q.h0)).unwrap_or((0, 0));
+        if w0 > 0 && h0 > 0 {
+            let mut p = st.p.clone();
+            p.sheet_h = (p.sheet_w * h0 as f64 / w0 as f64).round().max(1.0);
+            st.saved.ratio = p.sheet_w / p.sheet_h;
+            st.p = p;
+            ui.global::<Store>().set_p(convert::to_par(&st.p));
+        }
+    }
     st.view = View::default();
     st.res = None;
     st.p_ver += 1;
@@ -1028,7 +1046,7 @@ fn open_order(name: &str, bytes: &[u8]) {
         let Some(pic) = sketch.and_then(draw::blank_pic) else {
             return;
         };
-        with(|st, ui| install(st, ui, pic));
+        with(|st, ui| install(st, ui, pic, false));
     } else if let Some((src_name, data)) = source {
         if !set_picture_with(src_name, data, sketch) {
             return;
@@ -1086,6 +1104,15 @@ fn apply_result(st: &mut State, ui: &AppWindow, ver: u64, r: GenResult) {
     st.res_ver = ver;
     show_stats(st, ui);
     request_draw(st);
+    // Мгновенный отклик на готовый результат: тонкий луч и вспышка по холсту
+    let store = ui.global::<Store>();
+    store.set_gen_flash(true);
+    let weak = ui.as_weak();
+    Timer::single_shot(Duration::from_millis(150), move || {
+        if let Some(ui) = weak.upgrade() {
+            ui.global::<Store>().set_gen_flash(false);
+        }
+    });
 }
 
 /// Результат для текущих настроек; если расчёт ещё идёт, считаем сразу.

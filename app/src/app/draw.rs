@@ -318,7 +318,7 @@ pub(super) fn open(st: &mut State, ui: &AppWindow) {
         let sketch = Sketch::new(p.sheet_w, p.sheet_h);
         set_params(st, ui, p, true);
         let Some(pic) = blank_pic(sketch) else { return };
-        install(st, ui, pic);
+        install(st, ui, pic, false);
     } else if let Some(pic) = st.pic.as_mut() {
         if pic.sk.is_none() {
             let (_, _, dw, dh) = render::image_rect(

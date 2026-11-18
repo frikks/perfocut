@@ -187,7 +187,7 @@ export component NumField inherits Rectangle {
     in property <bool> enabled: true;
     callback edited(float);
     property <string> shown: Bridge.fmt(value * scale, integer ? 0 : decimals);
-    min-height: Theme.row;
+    min-height: Theme.field-row;
     horizontal-stretch: 1;
     min-width: 64px;
     opacity: enabled ? 1 : 0.45;
@@ -263,7 +263,7 @@ export component TextField inherits Rectangle {
     in property <bool> mono: false;
     in property <InputType> kind: InputType.text;
     callback edited(string);
-    min-height: multi ? Math.max(Theme.row * 2, ti.preferred-height + 16px) : Theme.row;
+    min-height: multi ? Math.max(Theme.field-row * 2, ti.preferred-height + 12px) : Theme.field-row;
     horizontal-stretch: 1;
     changed value => {
         if !ti.has-focus {
@@ -327,7 +327,7 @@ export component TextField inherits Rectangle {
 export component FieldRow inherits Rectangle {
     in property <string> label;
     in property <length> field-w: Theme.touch ? 120px : 116px;
-    min-height: Theme.row;
+    min-height: Theme.field-row;
     HorizontalLayout {
         spacing: 12px;
         Text {
@@ -528,8 +528,8 @@ export component Section inherits Rectangle {
             body := VerticalLayout {
                 padding-left: 16px;
                 padding-right: 16px;
-                padding-bottom: Theme.touch ? 8px : 10px;
-                spacing: Theme.touch ? 6px : 8px;
+                padding-bottom: Theme.touch ? 6px : 7px;
+                spacing: Theme.touch ? 5px : 6px;
                 @children
             }
         }
@@ -545,7 +545,7 @@ export component Caption inherits Text {
     color: Theme.t3;
     font-size: Theme.fs-s;
     vertical-alignment: bottom;
-    min-height: Theme.touch ? 20px : 22px;
+    min-height: Theme.touch ? 18px : 18px;
 }
 
 export component Hint inherits Text {
