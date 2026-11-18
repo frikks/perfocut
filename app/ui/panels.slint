@@ -609,6 +609,43 @@ export component SettingsPanel inherits VerticalLayout {
                     }
                 }
             }
+            Caption {
+                text: @tr("Микроджоинты (M-joint)");
+            }
+            FieldRow {
+                label: @tr("Количество");
+                NumField {
+                    value: Store.p.mjoint-n;
+                    integer: true;
+                    edited(v) => {
+                        Store.p.mjoint-n = Math.clamp(Math.round(v), 0, 24);
+                        Store.changed();
+                    }
+                }
+            }
+            if Store.p.mjoint-n > 0: FieldRow {
+                label: @tr("Шаг, мм");
+                NumField {
+                    value: Store.mjoint-step;
+                    decimals: 2;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.set-mjoint-step(v);
+                    }
+                }
+            }
+            if Store.p.mjoint-n > 0: FieldRow {
+                label: @tr("Ширина");
+                NumField {
+                    value: Store.p.mjoint-w;
+                    decimals: 2;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.mjoint-w = v;
+                        Store.changed();
+                    }
+                }
+            }
             FieldRow {
                 label: @tr("Разброс / зерно");
                 field-w: Theme.touch ? 220px : 172px;

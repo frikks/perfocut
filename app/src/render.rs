@@ -153,6 +153,24 @@ fn shapes_path(shapes: &[Shape], t: &Tf, clip: (f64, f64)) -> Option<tiny_skia::
     pb.finish()
 }
 
+/// Контур отверстий с микроджоинтами: те же разрывы, что уйдут в файл.
+fn hole_path(shapes: &[Shape], t: &Tf, clip: (f64, f64), p: &Params) -> Option<tiny_skia::Path> {
+    if p.pattern == "lines" || p.mjoint_n <= 0 {
+        return shapes_path(shapes, t, clip);
+    }
+    let mut pb = PathBuilder::new();
+    for sh in shapes {
+        for seg in perfo_core::export::shape_segments(sh, p.mjoint_n, p.mjoint_w) {
+            let Some(first) = seg.first() else { continue };
+            pb.move_to((t.ox + first.0 * t.s) as f32, (t.oy - first.1 * t.s) as f32);
+            for q in seg.iter().skip(1) {
+                pb.line_to((t.ox + q.0 * t.s) as f32, (t.oy - q.1 * t.s) as f32);
+            }
+        }
+    }
+    pb.finish()
+}
+
 /// Размещение картинки на листе (мм, ось Y вниз) — та же формула, что в ядре.
 pub fn image_rect(p: &Params, iw: f64, ih: f64) -> (f64, f64, f64, f64) {
     let (w, h) = (p.sheet_w, p.sheet_h);
@@ -221,7 +239,7 @@ pub fn paint_sheet(
                     None,
                 );
             }
-            if let Some(path) = shapes_path(shapes, t, clip) {
+            if let Some(path) = hole_path(shapes, t, clip, p) {
                 let w = (t.s * 0.15).clamp(0.5, 1.0) as f32;
                 pm.stroke_path(&path, &solid(look.ink), &stroke(w), ts, None);
             }
@@ -258,7 +276,7 @@ pub fn paint_sheet(
                 };
                 pm.draw_pixmap(0, 0, pic.as_ref(), &paint, ts.pre_concat(it), mask.as_ref());
             }
-            if let Some(path) = shapes_path(shapes, t, clip) {
+            if let Some(path) = hole_path(shapes, t, clip, p) {
                 pm.stroke_path(
                     &path,
                     &solid(Color::from_rgba8(0xe8, 0x83, 0x3a, 217)),
@@ -288,7 +306,7 @@ pub fn paint_sheet(
                 ..Paint::default()
             };
             pm.fill_rect(rect, &paint, ts, None);
-            if let Some(path) = shapes_path(shapes, t, clip) {
+            if let Some(path) = hole_path(shapes, t, clip, p) {
                 pm.fill_path(
                     &path,
                     &solid(look.back.color()),

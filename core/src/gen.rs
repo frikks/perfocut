@@ -1232,9 +1232,22 @@ fn finish(
     let mut smin = f64::INFINITY;
     let mut smax: f64 = 0.0;
     let mut sizes: Vec<f64> = Vec::with_capacity(shapes.len());
+    let mj = if p.pattern == "lines" {
+        0
+    } else {
+        p.mjoint_n.max(0)
+    };
     for s in &shapes {
         area += s.area();
-        cut += s.perimeter();
+        let per = s.perimeter();
+        if mj > 0 {
+            // Перемычки не режутся; между отрезками лазер делает быстрый переход
+            let gap = p.mjoint_w.max(0.01).min(per / mj as f64 * 0.8);
+            cut += per - mj as f64 * gap;
+            travel += mj as f64 * gap;
+        } else {
+            cut += per;
+        }
         let st0 = s.start();
         travel += ((st0.0 - last.0).powi(2) + (st0.1 - last.1).powi(2)).sqrt();
         last = st0;
@@ -1279,7 +1292,7 @@ fn finish(
     st.open_area_pct = area / (w * h) * 100.0;
     st.cut_len_m = cut / 1000.0;
     st.travel_m = travel / 1000.0;
-    st.pierces = shapes.len()
+    st.pierces = shapes.len() * (if mj > 0 { mj as usize } else { 1 })
         + if contour_paths.is_empty() {
             p.outline as usize
         } else {

@@ -17,6 +17,11 @@ pub struct Params {
     pub tab_w: f64,
     /// Сдвиг недорезов вдоль периметра, доля шага (0..1).
     pub tab_offset: f64,
+    // Микроджоинты: перемычки на контуре каждого отверстия, чтобы вырезанный кусок не падал
+    /// Число перемычек на отверстии; 0 — выключено.
+    pub mjoint_n: i64,
+    /// Ширина одной перемычки, мм.
+    pub mjoint_w: f64,
     // Изображение
     pub fit: String, // cover | contain | stretch
     pub img_scale: f64,
@@ -109,6 +114,8 @@ impl Default for Params {
             tab_n: 0,
             tab_w: 5.0,
             tab_offset: 0.0,
+            mjoint_n: 0,
+            mjoint_w: 0.5,
             fit: "cover".into(),
             img_scale: 1.0,
             img_dx: 0.0,
@@ -189,6 +196,8 @@ impl Params {
         p.tab_n = p.tab_n.clamp(0, 9999);
         p.tab_w = fin(p.tab_w, 5.0).clamp(0.1, 1000.0);
         p.tab_offset = fin(p.tab_offset, 0.0).clamp(0.0, 1.0);
+        p.mjoint_n = p.mjoint_n.clamp(0, 24);
+        p.mjoint_w = fin(p.mjoint_w, 0.5).clamp(0.05, 50.0);
         p.img_scale = fin(p.img_scale, 1.0).clamp(0.05, 20.0);
         p.brightness = fin(p.brightness, 0.0).clamp(-1.0, 1.0);
         p.contrast = fin(p.contrast, 0.0).clamp(-1.0, 3.0);

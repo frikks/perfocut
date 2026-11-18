@@ -294,6 +294,9 @@ msgstr "Min width"
 msgid "Материал"
 msgstr "Material"
 
+msgid "Микроджоинты (M-joint)"
+msgstr "Micro-joints (M-joint)"
+
 msgid "Настройки"
 msgstr "Settings"
 

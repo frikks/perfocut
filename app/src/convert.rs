@@ -26,6 +26,7 @@ macro_rules! par_conv {
                 star_points: par.star_points.clamp(3.0, 12.0).round() as u32,
                 seed: par.seed.max(0.0) as u64,
                 tab_n: par.tab_n.clamp(0, 9999) as i64,
+                mjoint_n: par.mjoint_n.clamp(0, 24) as i64,
                 lang: prev.lang.clone(),
             }
         }
@@ -39,6 +40,7 @@ macro_rules! par_conv {
                 star_points: p.star_points as f32,
                 seed: p.seed as f32,
                 tab_n: p.tab_n.clamp(0, 9999) as i32,
+                mjoint_n: p.mjoint_n.clamp(0, 24) as i32,
             }
         }
     };
@@ -48,7 +50,7 @@ par_conv!(
     num: sheet_w, sheet_h, border, img_scale, img_dx, img_dy, brightness, contrast, gamma, tone_cut,
         pitch, angle, offset_x, offset_y, d_min, d_max, quant, line_pitch, line_angle, w_min, w_max,
         wave_len, wave_amp, step, thickness, min_k, bridge, kerf, shape_aspect, star_inner, jitter, density, cut_speed, rapid_speed, pierce_time,
-        price_m, price_pierce, price_kg, price_fixed, tab_w, tab_offset;
+        price_m, price_pierce, price_kg, price_fixed, tab_w, tab_offset, mjoint_w;
     text: fit, pattern, grid, shape, size_mode, fixed_sizes, currency, gc_on, gc_off, gc_header, gc_footer,
         origin, name, order_no, client, phone, email, comment;
     flag: outline, negative, fixed, wave, gc_arcs, gc_numbers, dxf_layers;

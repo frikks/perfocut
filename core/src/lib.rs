@@ -774,4 +774,58 @@ mod tests {
         let svg0 = String::from_utf8(super::export_format(&r0, "svg").unwrap()).unwrap();
         assert!(svg0.contains("<rect id=\"contour\""));
     }
+
+    #[test]
+    fn micro_joints_break_holes_and_count_pierces() {
+        use std::f64::consts::PI;
+        let s = gen::Shape::Circle {
+            x: 100.0,
+            y: 100.0,
+            d: 10.0,
+        };
+        // Один замкнутый контур без M-joint и три открытых дуги с ним
+        assert_eq!(export::shape_segments(&s, 0, 0.5).len(), 1);
+        let segs = export::shape_segments(&s, 3, 0.5);
+        assert_eq!(segs.len(), 3);
+        let total: f64 = segs
+            .iter()
+            .map(|q| {
+                q.windows(2)
+                    .map(|p| ((p[1].0 - p[0].0).powi(2) + (p[1].1 - p[0].1).powi(2)).sqrt())
+                    .sum::<f64>()
+            })
+            .sum();
+        assert!((total - (PI * 10.0 - 3.0 * 0.5)).abs() < 0.3, "{total}");
+
+        let g = gradient(200, 120);
+        let p = Params {
+            outline: false,
+            mjoint_n: 3,
+            mjoint_w: 0.5,
+            d_min: 10.0,
+            d_max: 10.0,
+            size_mode: "range".into(),
+            ..Params::default()
+        };
+        let r = gen::generate(Some(&g), &p);
+        let r0 = gen::generate(
+            Some(&g),
+            &Params {
+                mjoint_n: 0,
+                ..p.clone()
+            },
+        );
+        assert_eq!(r.stats.pierces, r0.stats.pierces * 3);
+        assert!(r.stats.cut_len_m < r0.stats.cut_len_m);
+        // SVG: открытые дуги вместо окружностей
+        let svg = String::from_utf8(super::export_format(&r, "svg").unwrap()).unwrap();
+        assert!(!svg.contains("<circle"));
+        assert!(svg.contains("<path d=\"M"));
+        let svg0 = String::from_utf8(super::export_format(&r0, "svg").unwrap()).unwrap();
+        assert!(svg0.contains("<circle"));
+        // DXF: незамкнутые полилинии вместо entity CIRCLE
+        let dxf = String::from_utf8(super::export_format(&r, "dxf").unwrap()).unwrap();
+        assert!(!dxf.contains("CIRCLE"));
+        assert!(dxf.contains("POLYLINE"));
+    }
 }

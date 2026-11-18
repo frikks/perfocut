@@ -18,6 +18,7 @@ use slint::{
     TimerMode, VecModel, Weak,
 };
 use std::cell::RefCell;
+use std::f64::consts::PI;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
@@ -303,6 +304,9 @@ fn bind(ui: &AppWindow) {
     });
     s.on_set_tab_step(|v| {
         with(|st, ui| set_tab_step(st, ui, f64::from(v)));
+    });
+    s.on_set_mjoint_step(|v| {
+        with(|st, ui| set_mjoint_step(st, ui, f64::from(v)));
     });
     s.on_apply_preset(|i| {
         with(|st, ui| apply_preset(st, ui, i));
@@ -668,6 +672,18 @@ fn set_tab_step(st: &mut State, ui: &AppWindow, v: f64) {
     set_params(st, ui, p, true);
 }
 
+/// Шаг микроджоинтов: длина окружности минимального отверстия / количество.
+fn set_mjoint_step(st: &mut State, ui: &AppWindow, v: f64) {
+    let per = PI * st.p.d_min.max(0.1);
+    if !v.is_finite() || v <= 0.0 {
+        return;
+    }
+    let n = (per / v).round().clamp(1.0, 24.0) as i64;
+    let mut p = st.p.clone();
+    p.mjoint_n = n;
+    set_params(st, ui, p, true);
+}
+
 fn long_side(p: &Params) -> f64 {
     p.sheet_w.max(p.sheet_h) - 2.0 * p.border
 }
@@ -687,6 +703,12 @@ fn show_meta(st: &State, ui: &AppWindow) {
     // Шаг недорезов: при изменении количества пересчитывается сам
     store.set_tab_step(if p.tab_n > 0 {
         (2.0 * (p.sheet_w + p.sheet_h) / p.tab_n as f64) as f32
+    } else {
+        0.0
+    });
+    // Шаг микроджоинтов считаем по минимальному диаметру: на крупных отверстиях частота выше
+    store.set_mjoint_step(if p.mjoint_n > 0 {
+        (PI * p.d_min / p.mjoint_n as f64) as f32
     } else {
         0.0
     });

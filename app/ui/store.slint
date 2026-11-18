@@ -1,7 +1,7 @@
 // Данные, которые интерфейс показывает и меняет. Программа на Rust читает и заполняет их.
 
 export struct Par {
-    sheet-w: float, sheet-h: float, border: float, outline: bool, tab-n: int, tab-w: float, tab-offset: float,
+    sheet-w: float, sheet-h: float, border: float, outline: bool, tab-n: int, tab-w: float, tab-offset: float, mjoint-n: int, mjoint-w: float,
     fit: string, img-scale: float, img-dx: float, img-dy: float,
     brightness: float, contrast: float, gamma: float, negative: bool, tone-cut: float,
     pattern: string, grid: string, pitch: float, angle: float, offset-x: float, offset-y: float,
@@ -34,6 +34,9 @@ export global Store {
     // Шаг недорезов: вычисляется из периметра и количества, редактирование шага меняет количество
     in-out property <float> tab-step;
     callback set-tab-step(float);
+    // Шаг микроджоинтов по минимальному диаметру отверстия
+    in-out property <float> mjoint-step;
+    callback set-mjoint-step(float);
     in property <string> sheet-meta;
     in property <string> metal-meta;
 

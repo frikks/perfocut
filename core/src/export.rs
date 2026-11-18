@@ -139,6 +139,79 @@ pub fn sheet_paths(w: f64, h: f64, tab_n: i64, tab_w: f64, offset: f64) -> Vec<V
     paths
 }
 
+// ---------------- Микроджоинты на отверстиях ----------------
+
+/// Возвращает замкнутый контур фигуры в виде точек.
+pub fn shape_outline(s: &Shape) -> Vec<(f64, f64)> {
+    match s {
+        Shape::Circle { x, y, d } => circle_pts(*x, *y, *d, 0.05),
+        Shape::Poly { pts, .. } => pts.clone(),
+    }
+}
+
+/// Разбивает замкнутый контур на открытые отрезки с перемычками (микроджоинтами).
+/// `n` перемычек равномерно по длине контура, каждая шириной `w` мм остаётся невырезанной.
+fn split_closed(pts: &[(f64, f64)], n: usize, w: f64) -> Vec<Vec<(f64, f64)>> {
+    let mut p = pts.to_vec();
+    if p.len() > 1 && p[0] == p[p.len() - 1] {
+        p.pop();
+    }
+    let k = p.len();
+    if k < 3 || n == 0 {
+        return vec![pts.to_vec()];
+    }
+    let mut cum = Vec::with_capacity(k + 1);
+    cum.push(0.0);
+    for i in 0..k {
+        let a = p[i];
+        let b = p[(i + 1) % k];
+        cum.push(cum[i] + ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt());
+    }
+    let per = cum[k];
+    if per <= 1e-9 {
+        return vec![pts.to_vec()];
+    }
+    let step = per / n as f64;
+    let gap = w.clamp(0.01, step * 0.8);
+    // Точка на контуре по пройденной длине дуги
+    let at = |s: f64| -> (f64, f64) {
+        let s = s.rem_euclid(per);
+        let i = cum
+            .partition_point(|&v| v <= s)
+            .saturating_sub(1)
+            .min(k - 1);
+        let edge = (cum[i + 1] - cum[i]).max(1e-12);
+        let t = ((s - cum[i]) / edge).clamp(0.0, 1.0);
+        let a = p[i];
+        let b = p[(i + 1) % k];
+        (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t)
+    };
+    let sample = (step / 24.0).clamp(0.2, 1.0);
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        let a = i as f64 * step + gap / 2.0;
+        let b = (i + 1) as f64 * step - gap / 2.0;
+        if b <= a {
+            continue;
+        }
+        let pieces = ((b - a) / sample).ceil().max(1.0) as usize;
+        let mut seg = Vec::with_capacity(pieces + 1);
+        for j in 0..=pieces {
+            seg.push(at(a + (b - a) * j as f64 / pieces as f64));
+        }
+        out.push(seg);
+    }
+    out
+}
+
+/// Контуры фигур для экспорта: с микроджоинтами — открытые отрезки, без них — старый путь.
+pub fn shape_segments(s: &Shape, n: i64, w: f64) -> Vec<Vec<(f64, f64)>> {
+    if n <= 0 {
+        return vec![shape_outline(s)];
+    }
+    split_closed(&shape_outline(s), n as usize, w)
+}
+
 // ---------------- DXF (R12, AC1009) ----------------
 pub fn dxf(r: &GenResult) -> String {
     let p = &r.params;
@@ -232,16 +305,22 @@ pub fn dxf(r: &GenResult) -> String {
     };
     for s in &r.shapes {
         let l = lay_of(s);
-        match s {
-            Shape::Circle { x, y, d } => {
-                g(0, "CIRCLE");
-                g(8, &l);
-                g(10, &n4(*x));
-                g(20, &n4(*y));
-                g(30, "0.0");
-                g(40, &n4(d / 2.0));
+        if p.mjoint_n > 0 && p.pattern != "lines" {
+            for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
+                poly(&mut g, &l, seg, false);
             }
-            Shape::Poly { pts, .. } => poly(&mut g, &l, pts, true),
+        } else {
+            match s {
+                Shape::Circle { x, y, d } => {
+                    g(0, "CIRCLE");
+                    g(8, &l);
+                    g(10, &n4(*x));
+                    g(20, &n4(*y));
+                    g(30, "0.0");
+                    g(40, &n4(d / 2.0));
+                }
+                Shape::Poly { pts, .. } => poly(&mut g, &l, pts, true),
+            }
         }
     }
     if p.outline {
@@ -294,25 +373,35 @@ pub fn svg(r: &GenResult) -> String {
     }
     o.push_str("<g id=\"holes\">\n");
     for s in &r.shapes {
-        match s {
-            Shape::Circle { x, y, d } => {
-                let _ = writeln!(
-                    o,
-                    "<circle cx=\"{}\" cy=\"{}\" r=\"{}\"/>",
-                    n4(*x),
-                    n4(h - y),
-                    n4(d / 2.0)
-                );
-            }
-            Shape::Poly { pts, .. } => {
-                o.push_str("<path d=\"M");
-                for (i, q) in pts.iter().enumerate() {
-                    if i > 0 {
-                        o.push('L');
-                    }
-                    let _ = write!(o, "{} {}", n4(q.0), n4(h - q.1));
+        if p.mjoint_n > 0 && p.pattern != "lines" {
+            for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
+                let _ = write!(o, "<path d=\"M");
+                for q in seg {
+                    let _ = write!(o, "L{} {}", n4(q.0), n4(h - q.1));
                 }
-                o.push_str("Z\"/>\n");
+                let _ = writeln!(o, "\"/>");
+            }
+        } else {
+            match s {
+                Shape::Circle { x, y, d } => {
+                    let _ = writeln!(
+                        o,
+                        "<circle cx=\"{}\" cy=\"{}\" r=\"{}\"/>",
+                        n4(*x),
+                        n4(h - y),
+                        n4(d / 2.0)
+                    );
+                }
+                Shape::Poly { pts, .. } => {
+                    o.push_str("<path d=\"M");
+                    for (i, q) in pts.iter().enumerate() {
+                        if i > 0 {
+                            o.push('L');
+                        }
+                        let _ = write!(o, "{} {}", n4(q.0), n4(h - q.1));
+                    }
+                    o.push_str("Z\"/>\n");
+                }
             }
         }
     }
@@ -437,33 +526,40 @@ pub fn gcode(r: &GenResult) -> String {
     };
 
     for s in &r.shapes {
-        match s {
-            Shape::Circle { x, y, d } => {
-                let rr = d / 2.0;
-                if p.gc_arcs {
-                    line(&mut o, &format!("G00 X{} Y{}", f(x - ox), f(y - oy)));
-                    line(&mut o, &p.gc_on);
-                    line(
-                        &mut o,
-                        &format!("G01 X{} Y{} F{}", f(x + rr - ox), f(y - oy), feed),
-                    );
-                    line(
-                        &mut o,
-                        &format!("G02 X{} Y{} I{} J0", f(x - rr - ox), f(y - oy), f(-rr)),
-                    );
-                    line(
-                        &mut o,
-                        &format!("G02 X{} Y{} I{} J0", f(x + rr - ox), f(y - oy), f(rr)),
-                    );
-                    line(&mut o, &p.gc_off);
-                } else {
-                    let pts = circle_pts(*x, *y, *d, 0.02);
-                    cut_poly(&mut o, &mut line, &pts, true, true);
-                }
+        if p.mjoint_n > 0 && p.pattern != "lines" {
+            // Разрезанная дуга: врезка в металле на начале каждого отрезка
+            for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
+                cut_poly(&mut o, &mut line, seg, false, false);
             }
-            Shape::Poly { pts, .. } => {
-                let is_hole = p.pattern != "lines";
-                cut_poly(&mut o, &mut line, pts, is_hole, true);
+        } else {
+            match s {
+                Shape::Circle { x, y, d } => {
+                    let rr = d / 2.0;
+                    if p.gc_arcs {
+                        line(&mut o, &format!("G00 X{} Y{}", f(x - ox), f(y - oy)));
+                        line(&mut o, &p.gc_on);
+                        line(
+                            &mut o,
+                            &format!("G01 X{} Y{} F{}", f(x + rr - ox), f(y - oy), feed),
+                        );
+                        line(
+                            &mut o,
+                            &format!("G02 X{} Y{} I{} J0", f(x - rr - ox), f(y - oy), f(-rr)),
+                        );
+                        line(
+                            &mut o,
+                            &format!("G02 X{} Y{} I{} J0", f(x + rr - ox), f(y - oy), f(rr)),
+                        );
+                        line(&mut o, &p.gc_off);
+                    } else {
+                        let pts = circle_pts(*x, *y, *d, 0.02);
+                        cut_poly(&mut o, &mut line, &pts, true, true);
+                    }
+                }
+                Shape::Poly { pts, .. } => {
+                    let is_hole = p.pattern != "lines";
+                    cut_poly(&mut o, &mut line, pts, is_hole, true);
+                }
             }
         }
     }
@@ -509,9 +605,15 @@ pub fn plt(r: &GenResult) -> String {
         o.push_str(NL);
     };
     for s in &r.shapes {
-        match s {
-            Shape::Circle { x, y, d } => put(&circle_pts(*x, *y, *d, 0.02), &mut o, true),
-            Shape::Poly { pts, .. } => put(pts, &mut o, true),
+        if p.mjoint_n > 0 && p.pattern != "lines" {
+            for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
+                put(seg, &mut o, false);
+            }
+        } else {
+            match s {
+                Shape::Circle { x, y, d } => put(&circle_pts(*x, *y, *d, 0.02), &mut o, true),
+                Shape::Poly { pts, .. } => put(pts, &mut o, true),
+            }
         }
     }
     if p.outline {
@@ -560,11 +662,17 @@ pub fn eps(r: &GenResult) -> String {
         });
     };
     for s in &r.shapes {
-        match s {
-            Shape::Circle { x, y, d } => {
-                let _ = writeln!(o, "{} {} {} c", n4(*x), n4(*y), n4(d / 2.0));
+        if p.mjoint_n > 0 && p.pattern != "lines" {
+            for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
+                poly(&mut o, seg, false);
             }
-            Shape::Poly { pts, .. } => poly(&mut o, pts, true),
+        } else {
+            match s {
+                Shape::Circle { x, y, d } => {
+                    let _ = writeln!(o, "{} {} {} c", n4(*x), n4(*y), n4(d / 2.0));
+                }
+                Shape::Poly { pts, .. } => poly(&mut o, pts, true),
+            }
         }
     }
     if p.outline {
@@ -590,26 +698,36 @@ pub fn pdf(r: &GenResult) -> Vec<u8> {
     let kk = 0.552_284_75;
     let f = |v: f64| num(v, 3);
     for s in &r.shapes {
-        match s {
-            Shape::Circle { x, y, d } => {
-                let rr = d / 2.0;
-                let m = rr * kk;
-                let _ = writeln!(
-                    c,
-                    "{} {} m {} {} {} {} {} {} c {} {} {} {} {} {} c {} {} {} {} {} {} c {} {} {} {} {} {} c h S",
-                    f(x + rr), f(*y),
-                    f(x + rr), f(y + m), f(x + m), f(y + rr), f(*x), f(y + rr),
-                    f(x - m), f(y + rr), f(x - rr), f(y + m), f(x - rr), f(*y),
-                    f(x - rr), f(y - m), f(x - m), f(y - rr), f(*x), f(y - rr),
-                    f(x + m), f(y - rr), f(x + rr), f(y - m), f(x + rr), f(*y)
-                );
-            }
-            Shape::Poly { pts, .. } => {
-                let _ = write!(c, "{} {} m", f(pts[0].0), f(pts[0].1));
-                for q in pts.iter().skip(1) {
+        if p.mjoint_n > 0 && p.pattern != "lines" {
+            for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
+                let _ = write!(c, "{} {} m", f(seg[0].0), f(seg[0].1));
+                for q in seg.iter().skip(1) {
                     let _ = write!(c, " {} {} l", f(q.0), f(q.1));
                 }
-                c.push_str(" h S\n");
+                c.push_str(" S\n");
+            }
+        } else {
+            match s {
+                Shape::Circle { x, y, d } => {
+                    let rr = d / 2.0;
+                    let m = rr * kk;
+                    let _ = writeln!(
+                        c,
+                        "{} {} m {} {} {} {} {} {} c {} {} {} {} {} {} c {} {} {} {} {} {} c {} {} {} {} {} {} c h S",
+                        f(x + rr), f(*y),
+                        f(x + rr), f(y + m), f(x + m), f(y + rr), f(*x), f(y + rr),
+                        f(x - m), f(y + rr), f(x - rr), f(y + m), f(x - rr), f(*y),
+                        f(x - rr), f(y - m), f(x - m), f(y - rr), f(*x), f(y - rr),
+                        f(x + m), f(y - rr), f(x + rr), f(y - m), f(x + rr), f(*y)
+                    );
+                }
+                Shape::Poly { pts, .. } => {
+                    let _ = write!(c, "{} {} m", f(pts[0].0), f(pts[0].1));
+                    for q in pts.iter().skip(1) {
+                        let _ = write!(c, " {} {} l", f(q.0), f(q.1));
+                    }
+                    c.push_str(" h S\n");
+                }
             }
         }
     }
