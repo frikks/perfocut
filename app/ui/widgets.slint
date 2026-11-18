@@ -26,11 +26,11 @@ export component Btn inherits Rectangle {
     horizontal-stretch: stretch ? 1 : 0;
     border-radius: Theme.radius;
     opacity: enabled ? 1 : 0.45;
-    background: kind == 1 ? (ta.pressed ? Theme.acc.darker(10%) : ta.has-hover ? Theme.acc-hover : Theme.acc)
-        : kind == 2 ? (ta.pressed ? Theme.raised2 : ta.has-hover ? Theme.hover-surface : transparent)
-        : (ta.pressed || ta.has-hover ? Theme.raised2 : Theme.raised);
+    background: kind == 1 ? (ta.pressed ? Theme.acc.darker(12%) : ta.has-hover ? Theme.acc-hover : @linear-gradient(135deg, Theme.acc-hover, Theme.acc))
+        : kind == 2 ? (ta.pressed ? Theme.raised2 : ta.has-hover ? Theme.glass-shine : transparent)
+        : (ta.pressed ? Theme.raised2 : ta.has-hover ? Theme.glass-shine : Theme.glass);
     border-width: kind == 0 || framed || fs.has-focus ? 1px : 0px;
-    border-color: fs.has-focus ? Theme.focus : Theme.line2;
+    border-color: fs.has-focus ? Theme.focus : kind == 1 ? transparent : Theme.glass-edge;
     accessible-role: button;
     accessible-label: root.text != "" ? root.text : root.tip;
     accessible-action-default => {
@@ -88,15 +88,29 @@ export component Seg inherits Rectangle {
     in property <[string]> items;
     in property <int> current;
     in property <int> columns: 0;
+    in property <bool> animated: false;
     callback select(int);
     property <int> cols: columns > 0 ? columns : items.length;
     property <int> rows: Math.ceil(items.length / Math.max(1, cols));
     property <length> cell-h: Theme.row - 4px;
-    border-radius: 10px;
-    background: Theme.card;
+    property <length> cell-w: (self.width - 6px + 2px) / root.cols;
+    border-radius: Theme.radius;
+    background: Theme.glass;
     border-width: 1px;
-    border-color: Theme.line;
+    border-color: Theme.glass-edge;
     height: rows * cell-h + (rows - 1) * 2px + 6px;
+    // Анимированный индикатор вместо резкой замены фона
+    if root.animated: Rectangle {
+        x: 3px + root.current * root.cell-w;
+        y: 3px;
+        width: root.cell-w - 2px;
+        height: root.cell-h;
+        border-radius: 7px;
+        background: Theme.acc-soft;
+        border-width: 1px;
+        border-color: Theme.glow;
+        animate x { duration: 180ms; easing: ease-out; }
+    }
     for it[i] in root.items: Rectangle {
         property <int> c: Math.mod(i, root.cols);
         property <int> r: Math.floor(i / root.cols);
@@ -105,7 +119,7 @@ export component Seg inherits Rectangle {
         width: (parent.width - 6px + 2px) / root.cols - 2px;
         height: root.cell-h;
         border-radius: 7px;
-        background: i == root.current ? Theme.seg-on : fs.has-focus ? Theme.hover-surface : ta.has-hover ? Theme.raised : transparent;
+        background: i == root.current && !root.animated ? Theme.seg-on : fs.has-focus ? Theme.hover-surface : ta.has-hover ? Theme.hover-surface : transparent;
         border-width: (i == root.current && !Theme.dark) || fs.has-focus ? 1px : 0px;
         border-color: fs.has-focus ? Theme.focus : Theme.line2;
         accessible-role: button;
@@ -201,10 +215,10 @@ export component Check inherits Rectangle {
 component FieldBox inherits Rectangle {
     in property <bool> focused;
     in property <bool> hover;
-    border-radius: 8px;
-    background: Theme.raised;
+    border-radius: Theme.radius;
+    background: Theme.glass-strong;
     border-width: 1px;
-    border-color: focused ? Theme.acc : hover ? Theme.field-hover : Theme.field-line;
+    border-color: focused ? Theme.focus : hover ? Theme.field-hover : Theme.glass-edge;
     animate border-color { duration: 120ms; }
     if focused: Rectangle {
         x: -3px;
@@ -522,13 +536,29 @@ export component Section inherits Rectangle {
     in property <string> meta;
     in-out property <bool> open: true;
     min-height: lay.preferred-height;
+    background: Theme.glass;
+    border-radius: Theme.radius-lg;
+    border-width: 1px;
+    border-color: Theme.glass-edge;
+    clip: true;
     lay := VerticalLayout {
         Rectangle {
-            height: Theme.touch ? 36px : 44px;
+            height: Theme.touch ? 36px : 40px;
+            background: Theme.glass-shine;
+            Rectangle {
+                y: 0; height: 1px; width: parent.width;
+                background: Theme.glass-shine;
+            }
             HorizontalLayout {
-                padding-left: 16px;
+                padding-left: 12px;
                 padding-right: 16px;
                 spacing: 8px;
+                Rectangle {
+                    width: 3px;
+                    height: 16px;
+                    border-radius: 2px;
+                    background: Theme.acc;
+                }
                 VerticalLayout {
                     alignment: center;
                     Icon {
@@ -613,17 +643,30 @@ export component Modal inherits Rectangle {
             root.close();
         }
     }
+    card-shadow := Rectangle {
+        width: Math.min(parent.width - 32px, root.max-w) + 8px;
+        height: Math.min(parent.height - 48px, lay.preferred-height) + 8px;
+        x: (parent.width - self.width) / 2 + 4px;
+        y: (parent.height - self.height) / 2 + 12px;
+        border-radius: Theme.radius-lg + 4px;
+        background: Theme.glass-shadow;
+    }
     card := Rectangle {
         width: Math.min(parent.width - 32px, root.max-w);
         height: Math.min(parent.height - 48px, lay.preferred-height);
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2 + (root.shown ? 0px : 8px);
-        animate y { duration: 140ms; }
-        background: Theme.card;
-        border-radius: 16px;
+        animate y { duration: 220ms; easing: ease-out; }
+        background: Theme.glass-strong;
+        border-radius: Theme.radius-lg;
         border-width: 1px;
-        border-color: Theme.line2;
+        border-color: Theme.glass-edge;
         clip: true;
+        Rectangle {
+            x: 0; y: 0; width: parent.width; height: 2px;
+            background: @linear-gradient(90deg, transparent, Theme.acc, transparent);
+            opacity: 0.7;
+        }
         TouchArea { }
         lay := VerticalLayout {
             padding: Theme.touch ? 16px : 20px;

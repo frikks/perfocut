@@ -104,10 +104,10 @@ component Splash inherits Rectangle {
         y: root.roomy ? root.height / 2 - 98px : 88px;
         width: root.panel-w;
         height: root.panel-h;
-        border-radius: 12px;
-        background: Theme.card;
+        border-radius: Theme.radius-lg;
+        background: Theme.glass-strong;
         border-width: 1px;
-        border-color: Theme.line2;
+        border-color: Theme.glass-edge;
         clip: true;
         Rectangle {
             x: 0; y: 0;
@@ -347,11 +347,12 @@ component Header inherits Rectangle {
     in property <length> pad-l;
     in property <length> pad-r;
     callback settings();
-    background: Theme.bg;
+    background: @linear-gradient(180deg, Theme.glass-strong, Theme.glass);
     Rectangle {
         y: parent.height - 1px;
         height: 1px;
-        background: Theme.line;
+        background: @linear-gradient(90deg, transparent, Theme.acc, transparent);
+        opacity: 0.6;
     }
     HorizontalLayout {
         padding-left: 16px + root.pad-l;
@@ -473,11 +474,11 @@ component Stage inherits Rectangle {
     VerticalLayout {
         Rectangle {
             height: Store.drawing && root.compact ? Math.max(Theme.row, 38px) : Theme.row + (Theme.touch ? 10px : 16px);
-            background: Theme.bg;
+            background: Theme.glass;
             Rectangle {
                 y: parent.height - 1px;
                 height: 1px;
-                background: Theme.line;
+                background: Theme.glass-edge;
             }
             if Store.drawing: DrawTools {
                 compact: root.compact;
@@ -499,6 +500,7 @@ component Stage inherits Rectangle {
                     min-width: 236px;
                     max-width: 360px;
                     Seg {
+                        animated: true;
                         items: [@tr("Контуры"), @tr("Металл"), @tr("Оригинал")];
                         current: Store.view-mode == 1 ? 0 : Store.view-mode == 0 ? 1 : 2;
                         select(i) => {
@@ -556,11 +558,11 @@ component Stage inherits Rectangle {
         }
         if Store.drawing && !root.compact: Rectangle {
             height: bb.preferred-height;
-            background: Theme.bg;
+            background: Theme.glass;
             Rectangle {
                 y: parent.height - 1px;
                 height: 1px;
-                background: Theme.line;
+                background: Theme.glass-edge;
             }
             bb := BrushBar { }
         }
@@ -937,7 +939,7 @@ export component AppWindow inherits Window {
     min-width: 360px;
     // Телефон в альбомной ориентации: окно бывает ниже 520 px, веб не должен растягивать холст
     min-height: 360px;
-    background: Theme.bg;
+    background: @linear-gradient(180deg, Theme.bg0, Theme.bg 55%, Theme.bg0);
     forward-focus: fs;
 
     in-out property <int> tab: 0;

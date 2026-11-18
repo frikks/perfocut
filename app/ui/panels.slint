@@ -1178,12 +1178,19 @@ export component SettingsPanel inherits VerticalLayout {
 component Stat inherits Rectangle {
     in property <string> label;
     in property <string> value;
-    border-radius: 12px;
-    background: Theme.card;
+    border-radius: Theme.radius-lg;
+    background: Theme.glass;
     border-width: 1px;
-    border-color: Theme.line;
+    border-color: Theme.glass-edge;
     min-height: lay.preferred-height;
     horizontal-stretch: 1;
+    Rectangle {
+        x: 12px; y: 0;
+        width: 28px;
+        height: 2px;
+        background: Theme.acc;
+        opacity: 0.8;
+    }
     lay := VerticalLayout {
         padding: 12px;
         spacing: 4px;
