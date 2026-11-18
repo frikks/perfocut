@@ -183,6 +183,33 @@ msgstr "Picture → perforation → file"
 msgid "Квадр."
 msgstr "Square"
 
+msgid "Прямоуг."
+msgstr "Rectangular"
+
+msgid "Косоуг."
+msgstr "Oblique"
+
+msgid "Ромб."
+msgstr "Rhombic"
+
+msgid "Радиал."
+msgstr "Radial"
+
+msgid "Мозаика"
+msgstr "Mosaic"
+
+msgid "Адаптив."
+msgstr "Adaptive"
+
+msgid "Пропорция Y / X"
+msgstr "Aspect Y / X"
+
+msgid "Точки расставлены концентрическими кольцами от центра листа."
+msgstr "Holes are placed in concentric rings from the centre of the sheet."
+
+msgid "Сетка с случайным сдвигом: точка пропускается, если соседняя ближе минимальной дистанции."
+msgstr "Jittered grid: a hole is skipped when a neighbour is closer than the minimum distance."
+
 msgid "Квадратная"
 msgstr "Square"
 

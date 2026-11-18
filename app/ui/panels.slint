@@ -390,12 +390,51 @@ export component SettingsPanel inherits VerticalLayout {
                 text: @tr("Сетка");
             }
             if Store.p.pattern == "dots": Seg {
-                items: [@tr("Квадратная"), @tr("Треуг."), @tr("Треуг. 2")];
-                current: Store.p.grid == "square" ? 0 : Store.p.grid == "tri90" ? 2 : 1;
+                columns: 4;
+                items: [@tr("Квадр."), @tr("Треуг."), @tr("Треуг. 2"), @tr("Прямоуг."),
+                        @tr("Косоуг."), @tr("Шест."), @tr("Ромб."), @tr("Радиал."),
+                        @tr("Мозаика"), @tr("Адаптив.")];
+                current: Store.p.grid == "square" ? 0
+                    : Store.p.grid == "tri90" ? 2
+                    : Store.p.grid == "rect" ? 3
+                    : Store.p.grid == "oblique" ? 4
+                    : Store.p.grid == "hex" ? 5
+                    : Store.p.grid == "rhomb" ? 6
+                    : Store.p.grid == "radial" ? 7
+                    : Store.p.grid == "mosaic" ? 8
+                    : Store.p.grid == "adaptive" ? 9
+                    : 1;
                 select(i) => {
-                    Store.p.grid = i == 0 ? "square" : i == 2 ? "tri90" : "tri";
+                    Store.p.grid = i == 0 ? "square"
+                        : i == 2 ? "tri90"
+                        : i == 3 ? "rect"
+                        : i == 4 ? "oblique"
+                        : i == 5 ? "hex"
+                        : i == 6 ? "rhomb"
+                        : i == 7 ? "radial"
+                        : i == 8 ? "mosaic"
+                        : i == 9 ? "adaptive"
+                        : "tri";
                     Store.changed();
                 }
+            }
+            if Store.p.pattern == "dots" && Store.p.grid == "rect": FieldRow {
+                label: @tr("Пропорция Y / X");
+                NumField {
+                    value: Store.p.grid-aspect;
+                    decimals: 2;
+                    unit: "×";
+                    edited(v) => {
+                        Store.p.grid-aspect = v;
+                        Store.changed();
+                    }
+                }
+            }
+            if Store.p.pattern == "dots" && Store.p.grid == "radial": Hint {
+                text: @tr("Точки расставлены концентрическими кольцами от центра листа.");
+            }
+            if Store.p.pattern == "dots" && Store.p.grid == "adaptive": Hint {
+                text: @tr("Сетка с случайным сдвигом: точка пропускается, если соседняя ближе минимальной дистанции.");
             }
             Caption {
                 text: @tr("Форма");

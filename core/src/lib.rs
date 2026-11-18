@@ -828,4 +828,56 @@ mod tests {
         assert!(!dxf.contains("CIRCLE"));
         assert!(dxf.contains("POLYLINE"));
     }
+
+    #[test]
+    fn new_grid_types_generate() {
+        let g = gradient(200, 120);
+        let grids = [
+            "square", "tri", "tri90", "rect", "oblique", "hex", "rhomb", "radial", "mosaic",
+            "adaptive",
+        ];
+        for grid in grids {
+            let p = Params {
+                pattern: "dots".into(),
+                grid: grid.into(),
+                grid_aspect: 1.6,
+                pitch: 12.0,
+                tone_cut: 0.0,
+                d_max: 4.0,
+                ..Params::default()
+            };
+            let r = gen::generate(Some(&g), &p);
+            assert!(r.stats.count > 20, "{grid}: {}", r.stats.count);
+        }
+        // Адаптивная сетка не ставит отверстия ближе минимума (размер + перемычка)
+        let p = Params {
+            pattern: "dots".into(),
+            grid: "adaptive".into(),
+            pitch: 16.0,
+            tone_cut: 0.0,
+            d_min: 4.0,
+            d_max: 4.0,
+            bridge: 1.0,
+            ..Params::default()
+        };
+        let r = gen::generate(Some(&g), &p);
+        let centers: Vec<(f64, f64)> = r.shapes.iter().take(200).map(|s| s.center()).collect();
+        let min_d = p.d_min + p.bridge - 1e-6;
+        for (i, a) in centers.iter().enumerate() {
+            for b in centers.iter().skip(i + 1) {
+                let d = ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt();
+                assert!(d >= min_d, "too close: {d} < {min_d}");
+            }
+        }
+        // Радиальная сетка содержит отверстие в центре листа
+        let radial = Params {
+            grid: "radial".into(),
+            ..p.clone()
+        };
+        let rr = gen::generate(Some(&g), &radial);
+        assert!(rr
+            .shapes
+            .iter()
+            .any(|s| (s.center().0 - 500.0).abs() < 1e-6 && (s.center().1 - 300.0).abs() < 1e-6));
+    }
 }

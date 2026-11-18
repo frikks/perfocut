@@ -200,6 +200,58 @@ fn jitter_u01(seed: u64, x: f64, y: f64) -> f64 {
 /// Сколько отверстий умещается на кольце радиуса `r` при шаге `pitch`:
 /// максимум n, при котором хорда между соседями не меньше шага.
 /// Близко к центру — одно отверстие, дальше — примерно 2πr/pitch.
+/// Точка решётки по целым индексам `i,j`. Шаг `pch`, пропорция строк `aspect`.
+fn grid_point(grid: &str, i: i64, j: i64, pch: f64, aspect: f64) -> (f64, f64) {
+    let s3 = 3f64.sqrt() / 2.0;
+    let (ci, cj) = (i as f64, j as f64);
+    match grid {
+        "tri" => (
+            ci * pch + if j.rem_euclid(2) == 1 { pch / 2.0 } else { 0.0 },
+            cj * pch * s3,
+        ),
+        "tri90" => (
+            ci * pch * s3,
+            cj * pch + if i.rem_euclid(2) == 1 { pch / 2.0 } else { 0.0 },
+        ),
+        "rect" => (ci * pch, cj * pch * aspect),
+        "oblique" => (ci * pch + cj * pch * 0.5, cj * pch * s3),
+        "hex" => (
+            ci * pch * 1.5 + j.rem_euclid(2) as f64 * pch * 0.75,
+            cj * pch * s3,
+        ),
+        "rhomb" => (
+            (ci + cj) * pch / std::f64::consts::SQRT_2,
+            (cj - ci) * pch / std::f64::consts::SQRT_2,
+        ),
+        "mosaic" => (
+            ci * pch
+                + if j.rem_euclid(4) >= 2 {
+                    pch * 0.25
+                } else {
+                    0.0
+                },
+            cj * pch * 0.8 + if i.rem_euclid(2) == 1 { pch * 0.2 } else { 0.0 },
+        ),
+        _ => (ci * pch, cj * pch),
+    }
+}
+
+/// Шаг по строке и столбцу для оценки числа точек решётки.
+fn grid_cell(grid: &str, pch: f64, aspect: f64) -> (f64, f64) {
+    let s3 = 3f64.sqrt() / 2.0;
+    match grid {
+        "tri" | "oblique" | "hex" => (pch * s3, pch * if grid == "hex" { 1.5 } else { 1.0 }),
+        "tri90" => (pch, pch * s3),
+        "rect" => (pch * aspect, pch),
+        "rhomb" => (
+            pch * std::f64::consts::SQRT_2,
+            pch * std::f64::consts::SQRT_2,
+        ),
+        "mosaic" => (pch * 0.8, pch),
+        _ => (pch, pch),
+    }
+}
+
 fn ring_holes(r: f64, pitch: f64) -> i64 {
     if r * 2.0 < pitch {
         return 1;
@@ -1143,57 +1195,109 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
             } else {
                 let reach =
                     (w * w + h * h).sqrt() / 2.0 + p.offset_x.abs() + p.offset_y.abs() + pch;
-                let s3 = 3f64.sqrt() / 2.0;
-                let (row_h, col_w) = match p.grid.as_str() {
-                    "tri" => (pch * s3, pch),
-                    "tri90" => (pch, pch * s3),
-                    _ => (pch, pch),
-                };
-                let nj = (reach / row_h).ceil() as i64 + 1;
-                let ni = (reach / col_w).ceil() as i64 + 1;
-                for j in -nj..=nj {
-                    let mut row: Vec<Shape> = Vec::new();
-                    for i in -ni..=ni {
-                        let (lx, ly) = match p.grid.as_str() {
-                            "tri" => (
-                                i as f64 * col_w
-                                    + if j.rem_euclid(2) == 1 { pch / 2.0 } else { 0.0 },
-                                j as f64 * row_h,
-                            ),
-                            "tri90" => (
-                                i as f64 * col_w,
-                                j as f64 * row_h
-                                    + if i.rem_euclid(2) == 1 { pch / 2.0 } else { 0.0 },
-                            ),
-                            _ => (i as f64 * col_w, j as f64 * row_h),
-                        };
-                        let x = cx + lx * ca - ly * sa + p.offset_x;
-                        let y = cy + lx * sa + ly * ca + p.offset_y;
-                        if x < b || x > w - b || y < b || y > h - b {
-                            continue;
+                let (row_h, col_w) = grid_cell(p.grid.as_str(), pch, p.grid_aspect);
+                if p.grid == "radial" {
+                    // Радиальная сетка: концентрические кольца точек, как ConcentricRings в perforata
+                    let (mut r, mut ring) = (0.0, 0);
+                    while r <= reach {
+                        let n = ring_holes(r, pch).max(1);
+                        for k in 0..n {
+                            let a = 2.0 * PI * k as f64 / n as f64 + ring as f64 * 0.17;
+                            let lx = r * a.cos();
+                            let ly = r * a.sin();
+                            let x = cx + lx * ca - ly * sa + p.offset_x;
+                            let y = cy + lx * sa + ly * ca + p.offset_y;
+                            if x < b || x > w - b || y < b || y > h - b {
+                                continue;
+                            }
+                            let t = sampler.tone(x, y, pch / 2.0);
+                            if let Some(sh) = dot_shape(
+                                x,
+                                y,
+                                ca,
+                                sa,
+                                t,
+                                &p,
+                                prop,
+                                dmin,
+                                dmax,
+                                cap,
+                                &fixed,
+                                &mut removed_edge,
+                            ) {
+                                shapes.push(sh);
+                            }
                         }
-                        let t = sampler.tone(x, y, pch / 2.0);
-                        if let Some(sh) = dot_shape(
-                            x,
-                            y,
-                            ca,
-                            sa,
-                            t,
-                            &p,
-                            prop,
-                            dmin,
-                            dmax,
-                            cap,
-                            &fixed,
-                            &mut removed_edge,
-                        ) {
-                            row.push(sh);
+                        r += pch;
+                        ring += 1;
+                    }
+                } else {
+                    let adaptive = p.grid == "adaptive";
+                    let min_d = (dmin + p.bridge).max(pch * 0.4);
+                    let mut accepted: HashMap<(i64, i64), Vec<(f64, f64)>> = HashMap::new();
+                    let nj = (reach / row_h).ceil() as i64 + 1;
+                    let ni = (reach / col_w).ceil() as i64 + 1;
+                    for j in -nj..=nj {
+                        let mut row: Vec<Shape> = Vec::new();
+                        for i in -ni..=ni {
+                            let (mut lx, mut ly) =
+                                grid_point(p.grid.as_str(), i, j, pch, p.grid_aspect);
+                            if adaptive {
+                                let key = ((i + 100_000) * 4096 + (j + 100_000)) as f64;
+                                lx += (jitter_u01(p.seed, key, 7.0) - 0.5) * pch * 0.75;
+                                ly += (jitter_u01(p.seed, key, 8.0) - 0.5) * pch * 0.75;
+                            }
+                            let x = cx + lx * ca - ly * sa + p.offset_x;
+                            let y = cy + lx * sa + ly * ca + p.offset_y;
+                            if x < b || x > w - b || y < b || y > h - b {
+                                continue;
+                            }
+                            if adaptive {
+                                let (gx, gy) =
+                                    ((x / min_d).floor() as i64, (y / min_d).floor() as i64);
+                                let mut ok = true;
+                                'near: for dy in -1..=1 {
+                                    for dx in -1..=1 {
+                                        if let Some(list) = accepted.get(&(gx + dx, gy + dy)) {
+                                            for &(qx, qy) in list {
+                                                if (x - qx).powi(2) + (y - qy).powi(2)
+                                                    < min_d * min_d - 1e-12
+                                                {
+                                                    ok = false;
+                                                    break 'near;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if !ok {
+                                    continue;
+                                }
+                                accepted.entry((gx, gy)).or_default().push((x, y));
+                            }
+                            let t = sampler.tone(x, y, pch / 2.0);
+                            if let Some(sh) = dot_shape(
+                                x,
+                                y,
+                                ca,
+                                sa,
+                                t,
+                                &p,
+                                prop,
+                                dmin,
+                                dmax,
+                                cap,
+                                &fixed,
+                                &mut removed_edge,
+                            ) {
+                                row.push(sh);
+                            }
                         }
+                        if j.rem_euclid(2) == 1 {
+                            row.reverse();
+                        }
+                        shapes.extend(row);
                     }
-                    if j.rem_euclid(2) == 1 {
-                        row.reverse();
-                    }
-                    shapes.extend(row);
                 }
             }
         }

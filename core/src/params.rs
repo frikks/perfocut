@@ -34,7 +34,9 @@ pub struct Params {
     pub tone_cut: f64,
     // Узор
     pub pattern: String, // dots | rings | stipple | lines
-    pub grid: String,    // square | tri | tri90
+    pub grid: String, // square | tri | tri90 | rect | oblique | hex | rhomb | radial | mosaic | adaptive
+    /// Пропорция шага по Y/X для прямоугольной сетки.
+    pub grid_aspect: f64,
     pub pitch: f64,
     pub angle: f64,
     pub offset_x: f64,
@@ -127,6 +129,7 @@ impl Default for Params {
             tone_cut: 0.06,
             pattern: "dots".into(),
             grid: "tri".into(),
+            grid_aspect: 1.0,
             pitch: 12.0,
             angle: 0.0,
             offset_x: 0.0,
@@ -204,6 +207,7 @@ impl Params {
         p.gamma = fin(p.gamma, 1.0).clamp(0.1, 5.0);
         p.tone_cut = fin(p.tone_cut, 0.0).clamp(0.0, 0.95);
         p.pitch = fin(p.pitch, 12.0).clamp(0.5, 1000.0);
+        p.grid_aspect = fin(p.grid_aspect, 1.0).clamp(0.2, 5.0);
         p.line_pitch = fin(p.line_pitch, 10.0).clamp(0.5, 1000.0);
         p.d_min = fin(p.d_min, 0.0).max(0.0);
         p.d_max = fin(p.d_max, 1.0).max(0.01);
