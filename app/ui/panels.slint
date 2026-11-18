@@ -299,10 +299,14 @@ export component SettingsPanel inherits VerticalLayout {
                 Store.changed();
             }
         }
+        if Store.p.outline: Caption {
+            text: @tr("Недорез рамки (Gap)");
+        }
         if Store.p.outline: FieldRow {
-            label: @tr("Усиков");
+            label: @tr("Количество");
             NumField {
                 value: Store.p.tab-n;
+                integer: true;
                 edited(v) => {
                     Store.p.tab-n = Math.clamp(Math.round(v), 0, 9999);
                     Store.changed();
@@ -310,7 +314,18 @@ export component SettingsPanel inherits VerticalLayout {
             }
         }
         if Store.p.outline && Store.p.tab-n > 0: FieldRow {
-            label: @tr("Ширина усика");
+            label: @tr("Шаг, мм");
+            NumField {
+                value: Store.tab-step;
+                decimals: 1;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.set-tab-step(v);
+                }
+            }
+        }
+        if Store.p.outline && Store.p.tab-n > 0: FieldRow {
+            label: @tr("Ширина");
             NumField {
                 value: Store.p.tab-w;
                 decimals: 1;
@@ -319,6 +334,18 @@ export component SettingsPanel inherits VerticalLayout {
                     Store.p.tab-w = v;
                     Store.changed();
                 }
+            }
+        }
+        if Store.p.outline && Store.p.tab-n > 0: Slide {
+            label: @tr("Сдвиг по контуру");
+            value: Store.p.tab-offset;
+            minv: 0;
+            maxv: 1;
+            step: 0.01;
+            shown: Bridge.fmt(Store.p.tab-offset * 100, 0) + "%";
+            edited(v) => {
+                Store.p.tab-offset = v;
+                Store.changed();
             }
         }
         Btn {

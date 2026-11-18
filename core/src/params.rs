@@ -13,8 +13,10 @@ pub struct Params {
     /// Число усиков (мостиков) на контуре листа: контур режется с разрывами,
     /// лист держится на усиках. 0 — контур режется целиком.
     pub tab_n: i64,
-    /// Ширина одного усика, мм.
+    /// Ширина одного усика (недореза), мм.
     pub tab_w: f64,
+    /// Сдвиг недорезов вдоль периметра, доля шага (0..1).
+    pub tab_offset: f64,
     // Изображение
     pub fit: String, // cover | contain | stretch
     pub img_scale: f64,
@@ -106,6 +108,7 @@ impl Default for Params {
             outline: true,
             tab_n: 0,
             tab_w: 5.0,
+            tab_offset: 0.0,
             fit: "cover".into(),
             img_scale: 1.0,
             img_dx: 0.0,
@@ -185,6 +188,7 @@ impl Params {
         p.border = fin(p.border, 0.0).clamp(0.0, half.max(0.0));
         p.tab_n = p.tab_n.clamp(0, 9999);
         p.tab_w = fin(p.tab_w, 5.0).clamp(0.1, 1000.0);
+        p.tab_offset = fin(p.tab_offset, 0.0).clamp(0.0, 1.0);
         p.img_scale = fin(p.img_scale, 1.0).clamp(0.05, 20.0);
         p.brightness = fin(p.brightness, 0.0).clamp(-1.0, 1.0);
         p.contrast = fin(p.contrast, 0.0).clamp(-1.0, 3.0);

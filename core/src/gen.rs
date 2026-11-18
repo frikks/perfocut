@@ -1245,7 +1245,7 @@ fn finish(
     }
     // Контур листа: с усиками режется отрезками между разрывами
     let contour_paths = if p.outline && p.tab_n > 0 {
-        crate::export::sheet_paths(w, h, p.tab_n, p.tab_w)
+        crate::export::sheet_paths(w, h, p.tab_n, p.tab_w, p.tab_offset)
     } else {
         Vec::new()
     };

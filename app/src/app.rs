@@ -301,6 +301,9 @@ fn bind(ui: &AppWindow) {
     s.on_set_holes(|v| {
         with(|st, ui| set_holes(st, ui, f64::from(v)));
     });
+    s.on_set_tab_step(|v| {
+        with(|st, ui| set_tab_step(st, ui, f64::from(v)));
+    });
     s.on_apply_preset(|i| {
         with(|st, ui| apply_preset(st, ui, i));
     });
@@ -653,6 +656,18 @@ fn set_params(st: &mut State, ui: &AppWindow, p: Params, push: bool) {
     schedule_gen(st);
 }
 
+/// Шаг недорезов задаёт количество: периметр / шаг, и обратно.
+fn set_tab_step(st: &mut State, ui: &AppWindow, v: f64) {
+    let per = 2.0 * (st.p.sheet_w + st.p.sheet_h);
+    if !v.is_finite() || v <= 0.0 || per <= 0.0 {
+        return;
+    }
+    let n = (per / v).round().clamp(1.0, 9999.0) as i64;
+    let mut p = st.p.clone();
+    p.tab_n = n;
+    set_params(st, ui, p, true);
+}
+
 fn long_side(p: &Params) -> f64 {
     p.sheet_w.max(p.sheet_h) - 2.0 * p.border
 }
@@ -669,6 +684,12 @@ fn show_meta(st: &State, ui: &AppWindow) {
         0.0
     };
     store.set_holes_n(n.min(1e6) as i32);
+    // Шаг недорезов: при изменении количества пересчитывается сам
+    store.set_tab_step(if p.tab_n > 0 {
+        (2.0 * (p.sheet_w + p.sheet_h) / p.tab_n as f64) as f32
+    } else {
+        0.0
+    });
     // Самая широкая кисть — треть длинной стороны листа
     store.set_brush_max((p.sheet_w.max(p.sheet_h) / 3.0).clamp(20.0, 5000.0) as f32);
 }

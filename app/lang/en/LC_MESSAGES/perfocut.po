@@ -189,6 +189,9 @@ msgstr "Square"
 msgid "Клиент"
 msgstr "Client"
 
+msgid "Количество"
+msgstr "Count"
+
 msgid "Кольца"
 msgstr "Rings"
 
@@ -317,6 +320,9 @@ msgstr "Could not save:"
 
 msgid "Неверный цвет"
 msgstr "Invalid color"
+
+msgid "Недорез рамки (Gap)"
+msgstr "Frame gap (notch)"
 
 msgid "Ноль координат"
 msgstr "Origin"
@@ -498,6 +504,9 @@ msgstr "Custom color"
 msgid "Сдвиг X / Y"
 msgstr "Offset X / Y"
 
+msgid "Сдвиг по контуру"
+msgstr "Offset along contour"
+
 msgid "Сетка"
 msgstr "Grid"
 
@@ -614,6 +623,9 @@ msgstr "Centre"
 
 msgid "Цитрус"
 msgstr "Citrus"
+
+msgid "Шаг, мм"
+msgstr "Step, mm"
 
 msgid "Шаг / поворот"
 msgstr "Pitch / rotation"

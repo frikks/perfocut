@@ -727,7 +727,7 @@ mod tests {
             ..Params::default()
         };
         // Хелпер: 4 усика — 8 открытых отрезков, суммарно 3200 − 4·5 мм
-        let paths = export::sheet_paths(1000.0, 600.0, 4, 5.0);
+        let paths = export::sheet_paths(1000.0, 600.0, 4, 5.0, 0.0);
         assert_eq!(paths.len(), 8);
         for s in &paths {
             assert_eq!(s.len(), 2);
@@ -738,7 +738,11 @@ mod tests {
             .sum();
         assert!((total - (2.0 * (1000.0 + 600.0) - 4.0 * 5.0)).abs() < 1e-9);
         // усик, севший на угол листа, рвёт обе смежные кромки: 3 усика — 6 отрезков
-        assert_eq!(export::sheet_paths(1000.0, 600.0, 3, 5.0).len(), 6);
+        assert_eq!(export::sheet_paths(1000.0, 600.0, 3, 5.0, 0.0).len(), 6);
+        // Сдвиг на четверть шага: первый недорез с 400 мм уходит на 600 мм
+        let shifted = export::tab_centers(1000.0, 600.0, 4, 0.25);
+        assert!((shifted[0].0 - 600.0).abs() < 1e-9 && shifted[0].1.abs() < 1e-9);
+        assert_eq!(export::sheet_paths(1000.0, 600.0, 4, 5.0, 0.25).len(), 8);
         let r = gen::generate(Some(&g), &p);
         // без усиков — цельный контур: на 15 мм длиннее и один пирс
         let r0 = gen::generate(

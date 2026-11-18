@@ -49,22 +49,51 @@ fn sheet_outline(w: f64, h: f64) -> Vec<(f64, f64)> {
     vec![(0.0, 0.0), (w, 0.0), (w, h), (0.0, h)]
 }
 
-/// Контур листа с усиками (мостиками): периметр разбит на открытые отрезки,
-/// напротив каждого усика — разрыв, лист держится на усиках при резке.
-/// Без усиков возвращается замкнутый периметр (четыре угла) — экспортёры
-/// рисуют его как замкнутый путь. Усики стоят равномерно по периметру.
-pub fn sheet_paths(w: f64, h: f64, tab_n: i64, tab_w: f64) -> Vec<Vec<(f64, f64)>> {
+/// Контур листа с недорезами (усиками): периметр разбит на открытые отрезки,
+/// напротив каждого недореза — разрыв, лист держится на усиках при резке.
+/// Без недорезов возвращается замкнутый периметр (четыре угла) — экспортёры
+/// рисуют его как замкнутый путь. Недорезы стоят равномерно по периметру,
+/// `offset` сдвигает их на долю шага вдоль обхода контура.
+pub fn tab_centers(w: f64, h: f64, n: i64, offset: f64) -> Vec<(f64, f64)> {
+    let per = 2.0 * (w + h);
+    let n = n.max(0) as usize;
+    if n == 0 || per <= 0.0 {
+        return Vec::new();
+    }
+    let at = |s: f64| -> (f64, f64) {
+        let s = s.rem_euclid(per);
+        if s < w {
+            (s, 0.0)
+        } else if s < w + h {
+            (w, s - w)
+        } else if s < 2.0 * w + h {
+            (w - (s - w - h), h)
+        } else {
+            (0.0, per - s)
+        }
+    };
+    (0..n)
+        .map(|i| {
+            let s = per * (2 * i + 1) as f64 / (2 * n) as f64 + offset * per / n as f64;
+            at(s)
+        })
+        .collect()
+}
+
+pub fn sheet_paths(w: f64, h: f64, tab_n: i64, tab_w: f64, offset: f64) -> Vec<Vec<(f64, f64)>> {
     let corners = sheet_outline(w, h);
     let per = 2.0 * (w + h);
     let n = tab_n.max(0) as usize;
     if n == 0 || per <= 0.0 {
         return vec![corners];
     }
-    // Ширина усика не больше половины интервала между усиками
+    // Ширина недореза не больше половины интервала между ними
     let tw = tab_w.clamp(0.01, per / (2.0 * n as f64));
-    // Центры усиков по дуге периметра, со сдвигом на полшага — чтобы не попадать на углы
+    // Центры недорезов по дуге периметра, со сдвигом на полшага — чтобы не попадать на углы
     let centers: Vec<f64> = (0..n)
-        .map(|i| per * (2 * i + 1) as f64 / (2 * n) as f64)
+        .map(|i| {
+            (per * (2 * i + 1) as f64 / (2 * n) as f64 + offset * per / n as f64).rem_euclid(per)
+        })
         .collect();
     let in_tab = |s: f64| {
         centers
@@ -217,7 +246,7 @@ pub fn dxf(r: &GenResult) -> String {
     }
     if p.outline {
         if p.tab_n > 0 {
-            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w) {
+            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w, p.tab_offset) {
                 poly(&mut g, "CONTOUR", seg, false);
             }
         } else {
@@ -244,7 +273,7 @@ pub fn svg(r: &GenResult) -> String {
     if p.outline {
         if p.tab_n > 0 {
             let mut d = String::new();
-            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w) {
+            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w, p.tab_offset) {
                 if !d.is_empty() {
                     d.push(' ');
                 }
@@ -354,7 +383,7 @@ pub fn gcode(r: &GenResult) -> String {
             r.shapes.len()
                 + if p.outline {
                     if p.tab_n > 0 {
-                        sheet_paths(w, h, p.tab_n, p.tab_w).len()
+                        sheet_paths(w, h, p.tab_n, p.tab_w, p.tab_offset).len()
                     } else {
                         1
                     }
@@ -441,7 +470,7 @@ pub fn gcode(r: &GenResult) -> String {
     if p.outline {
         line(&mut o, "(contour)");
         if p.tab_n > 0 {
-            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w) {
+            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w, p.tab_offset) {
                 cut_poly(&mut o, &mut line, seg, false, false);
             }
         } else {
@@ -487,7 +516,7 @@ pub fn plt(r: &GenResult) -> String {
     }
     if p.outline {
         if p.tab_n > 0 {
-            for seg in &sheet_paths(p.sheet_w, p.sheet_h, p.tab_n, p.tab_w) {
+            for seg in &sheet_paths(p.sheet_w, p.sheet_h, p.tab_n, p.tab_w, p.tab_offset) {
                 put(seg, &mut o, false);
             }
         } else {
@@ -540,7 +569,7 @@ pub fn eps(r: &GenResult) -> String {
     }
     if p.outline {
         if p.tab_n > 0 {
-            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w) {
+            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w, p.tab_offset) {
                 poly(&mut o, seg, false);
             }
         } else {
@@ -586,7 +615,7 @@ pub fn pdf(r: &GenResult) -> Vec<u8> {
     }
     if p.outline {
         if p.tab_n > 0 {
-            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w) {
+            for seg in &sheet_paths(w, h, p.tab_n, p.tab_w, p.tab_offset) {
                 let _ = write!(c, "{} {} m", f(seg[0].0), f(seg[0].1));
                 for q in seg.iter().skip(1) {
                     let _ = write!(c, " {} {} l", f(q.0), f(q.1));

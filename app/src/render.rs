@@ -308,6 +308,30 @@ pub fn paint_sheet(
             }
         }
     }
+    // Недорезы (Gap) видны на холсте сразу после добавления
+    if p.outline && p.tab_n > 0 {
+        paint_gaps(pm, ts, t, p);
+    }
+}
+
+/// Маркеры недорезов на контуре: ореол, оранжевая точка и белая сердцевина.
+fn paint_gaps(pm: &mut Pixmap, ts: Transform, t: &Tf, p: &Params) {
+    let acc = solid(Color::from_rgba8(0xe8, 0x83, 0x3a, 255));
+    let halo = solid(Color::from_rgba8(0xe8, 0x83, 0x3a, 60));
+    let r = ((p.tab_w * t.s / 2.0).max(4.0)).min(16.0) as f32;
+    for (x, y) in perfo_core::export::tab_centers(p.sheet_w, p.sheet_h, p.tab_n, p.tab_offset) {
+        let px = (t.ox + x * t.s) as f32;
+        let py = (t.oy - y * t.s) as f32;
+        if let Some(path) = PathBuilder::from_circle(px, py, r * 1.9) {
+            pm.fill_path(&path, &halo, FillRule::Winding, ts, None);
+        }
+        if let Some(path) = PathBuilder::from_circle(px, py, r) {
+            pm.fill_path(&path, &acc, FillRule::Winding, ts, None);
+        }
+        if let Some(path) = PathBuilder::from_circle(px, py, (r * 0.35).max(1.2)) {
+            pm.fill_path(&path, &solid(Color::WHITE), FillRule::Winding, ts, None);
+        }
+    }
 }
 
 /// Размерные линии под листом и слева от него. Подписи рисует интерфейс.
@@ -373,6 +397,40 @@ pub fn sample_pixmap() -> Option<Pixmap> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gap_markers_are_visible_and_follow_offset() {
+        let p = Params {
+            outline: true,
+            tab_n: 4,
+            tab_w: 10.0,
+            ..Params::default()
+        };
+        let t = Tf {
+            s: 0.2,
+            ox: 50.0,
+            oy: 170.0,
+        };
+        let mut pm = Pixmap::new(300, 200).expect("pixmap");
+        paint_gaps(&mut pm, Transform::identity(), &t, &p);
+        // Первый недорез: середина нижней кромки, сдвиг 0
+        let c = pm.pixel(133, 170).expect("pixel");
+        assert!(c.red() > 200 && c.blue() < 90, "{:?}", c);
+        // Сдвиг на четверть шага переносит маркер на 40 пикселей вправо
+        let mut pm2 = Pixmap::new(300, 200).expect("pixmap");
+        paint_gaps(
+            &mut pm2,
+            Transform::identity(),
+            &t,
+            &Params {
+                tab_offset: 0.25,
+                ..p.clone()
+            },
+        );
+        assert_eq!(pm2.pixel(133, 170).expect("pixel").alpha(), 0);
+        let c = pm2.pixel(173, 170).expect("pixel");
+        assert!(c.red() > 200 && c.blue() < 90, "{:?}", c);
+    }
 
     #[test]
     fn zoom_keeps_point_under_cursor() {
