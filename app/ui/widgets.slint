@@ -9,12 +9,13 @@ export component Icon inherits Image {
     image-fit: contain;
 }
 
-// Кнопка: 0 обычная, 1 главная, 2 без фона
+// Кнопка: 0 обычная, 1 главная, 2 без фона; framed добавляет рамку кнопке без фона
 export component Btn inherits Rectangle {
     in property <string> text;
     in property <image> icon;
     in property <bool> has-icon: false;
     in property <int> kind: 0;
+    in property <bool> framed: false;
     in property <bool> enabled: true;
     in property <bool> stretch: false;
     in property <string> tip;
@@ -27,7 +28,7 @@ export component Btn inherits Rectangle {
     background: kind == 1 ? (ta.pressed ? Theme.acc.darker(10%) : ta.has-hover ? Theme.acc-hover : Theme.acc)
         : kind == 2 ? (ta.pressed ? Theme.raised2 : ta.has-hover ? Theme.raised : transparent)
         : (ta.pressed || ta.has-hover ? Theme.raised2 : Theme.raised);
-    border-width: kind == 0 ? 1px : 0px;
+    border-width: kind == 0 || framed ? 1px : 0px;
     border-color: Theme.line2;
     animate background { duration: 120ms; }
     HorizontalLayout {

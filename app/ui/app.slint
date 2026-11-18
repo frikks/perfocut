@@ -13,6 +13,156 @@ import { DrawTools, BrushBar, BrushPopup } from "draw.slint";
 export { Theme, Bridge, Kb, Store, Prefs, Par, KV, SizeRow, StatsUI, Fmt }
 
 struct Preset { c: color, hex: string }
+struct Dot { d: float, dd: float }
+
+// Сплэш при запуске: в теме программы перфорация собирается точками,
+// лазерная точка ведёт строку загрузки. Тап по любому месту закрывает раньше.
+component Splash inherits Rectangle {
+    in-out property <bool> shown: true;
+    callback close();
+    // Появление и прогресс (0..1) растут сами после показа
+    property <float> appear: 0;
+    property <float> load: 0;
+    property <length> bar-w: 240px;
+    // Сетка 3×3 как в логотипе: d — размер точки, dd — задержка появления (удалённость от центра)
+    property <[Dot]> grid: [
+        { d: 0.35, dd: 2 }, { d: 0.45, dd: 1 }, { d: 0.35, dd: 2 },
+        { d: 0.45, dd: 1 }, { d: 0.62, dd: 0 }, { d: 0.45, dd: 1 },
+        { d: 0.35, dd: 2 }, { d: 0.45, dd: 1 }, { d: 0.35, dd: 2 },
+    ];
+    animate appear { duration: 600ms; easing: ease-out; }
+    animate load { duration: 1900ms; easing: ease-in-out; }
+    init => {
+        root.appear = 1;
+        root.load = 1;
+    }
+    background: Theme.bg0;
+    TouchArea {
+        enabled: root.shown;
+        clicked => {
+            root.close();
+        }
+    }
+    // Мягкое акцентное свечение снизу
+    Rectangle {
+        x: -parent.width * 0.2;
+        y: parent.height - self.height * 0.55;
+        width: parent.width * 1.4;
+        height: parent.height * 0.5;
+        border-radius: self.width / 2;
+        background: Theme.acc.with-alpha(0.07);
+    }
+    // Пульс ореола лазерной точки в центре сетки: живёт, пока сплэш показан
+    if root.shown: Rectangle {
+        property <float> beat: Math.sin(animation-tick() / 700ms * 360deg);
+        x: parent.width / 2 - self.width / 2;
+        y: parent.height / 2 - 90px - self.height / 2;
+        width: 54px + 10px * self.beat;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: Theme.acc.with-alpha(0.16 + 0.07 * self.beat);
+    }
+    for pt[i] in root.grid: Rectangle {
+        property <int> c: Math.mod(i, 3);
+        property <int> r: Math.floor(i / 3);
+        property <float> k: Math.clamp(root.appear * 3.4 - pt.dd * 0.65, 0, 1);
+        property <length> d: 72px * pt.d * (0.4 + 0.6 * self.k);
+        x: parent.width / 2 + (self.c - 1) * 40px - self.d / 2;
+        y: parent.height / 2 - 90px + (self.r - 1) * 40px - self.d / 2;
+        width: self.d;
+        height: self.d;
+        border-radius: self.d / 2;
+        background: i == 4 ? Theme.acc : Theme.t1;
+        opacity: self.k;
+    }
+    Text {
+        text: "PerfoCut";
+        color: Theme.t1;
+        font-size: 34px;
+        font-weight: 500;
+        width: parent.width;
+        y: parent.height / 2 - 18px;
+        horizontal-alignment: center;
+        opacity: Math.clamp(root.appear * 2 - 0.7, 0, 1);
+    }
+    Text {
+        text: @tr("Картинка → перфорация → файл");
+        color: Theme.t2;
+        font-size: Theme.fs;
+        width: parent.width;
+        y: parent.height / 2 + 28px;
+        horizontal-alignment: center;
+        opacity: Math.clamp(root.appear * 2 - 1.0, 0, 1);
+    }
+    // Строка загрузки: лазер ведёт по линии реза
+    Rectangle {
+        x: (parent.width - root.bar-w) / 2;
+        y: parent.height / 2 + 88px;
+        width: root.bar-w;
+        height: 4px;
+        border-radius: 2px;
+        background: Theme.raised2;
+        opacity: Math.clamp(root.load * 4, 0, 1);
+        Rectangle {
+            width: parent.width * root.load;
+            height: parent.height;
+            border-radius: 2px;
+            background: Theme.acc;
+        }
+        Rectangle {
+            x: parent.width * root.load - self.width / 2;
+            y: (parent.height - self.height) / 2;
+            width: 8px;
+            height: 8px;
+            border-radius: self.width / 2;
+            background: Theme.acc;
+        }
+    }
+    if root.shown: Rectangle {
+        property <float> beat: Math.sin(animation-tick() / 500ms * 360deg);
+        x: (parent.width - root.bar-w) / 2 + root.bar-w * root.load - self.width / 2;
+        y: parent.height / 2 + 90px - self.height / 2;
+        width: 22px + 6px * self.beat;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: Theme.acc.with-alpha(0.22 + 0.1 * self.beat);
+        opacity: root.load < 0.99 ? 1 : 0;
+    }
+    Text {
+        text: Bridge.fmt(root.load * 100, 0) + "%";
+        color: Theme.t3;
+        font-family: Theme.mono;
+        font-size: Theme.fs-s;
+        width: parent.width;
+        y: parent.height / 2 + 100px;
+        horizontal-alignment: center;
+    }
+    // Ник автора: тап открывает канал
+    Rectangle {
+        width: nick.preferred-width + 24px;
+        height: nick.preferred-height + 14px;
+        x: (parent.width - self.width) / 2;
+        y: parent.height - self.height - 16px;
+        border-radius: 8px;
+        ta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                Bridge.haptic("click");
+                Prefs.open-url("https://t.me/Frikks");
+            }
+        }
+        nick := Text {
+            width: parent.width;
+            height: parent.height;
+            text: "by @Frikks";
+            color: ta.has-hover ? Theme.acc-text : Theme.t3;
+            font-size: Theme.fs-s;
+            font-family: Theme.mono;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
 
 component Logo inherits HorizontalLayout {
     in property <bool> compact;
@@ -640,6 +790,8 @@ export component AppWindow inherits Window {
     in-out property <int> color-target: -1;
     in-out property <bool> settings-open;
     in-out property <bool> info-open;
+    // Сплэш при запуске: ставится из программы, закрывается тапом или сама
+    in-out property <bool> splash;
     out property <bool> wide: self.width >= 960px;
     out property <length> cw: stage.cw;
     out property <length> ch: stage.ch;
@@ -681,6 +833,10 @@ export component AppWindow inherits Window {
     }
 
     function back() -> bool {
+        if root.splash {
+            root.splash = false;
+            return true;
+        }
         if root.color-target >= 0 {
             root.color-target = -1;
             return true;
@@ -983,6 +1139,22 @@ export component AppWindow inherits Window {
                 VerticalLayout {
                     spacing: 4px;
                     Caption {
+                        text: @tr("Акцент");
+                    }
+                    Seg {
+                        columns: 3;
+                        items: [@tr("Цитрус"), @tr("Изумруд"), @tr("Лазурь"), @tr("Аметист"), @tr("Роза"), @tr("Магма")];
+                        current: Prefs.accent;
+                        select(i) => {
+                            Prefs.accent = i;
+                            Theme.accent = i;
+                            Prefs.changed();
+                        }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 4px;
+                    Caption {
                         text: @tr("Язык");
                     }
                     Seg {
@@ -1109,6 +1281,18 @@ export component AppWindow inherits Window {
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
+            }
+        }
+
+        // Сплэш при запуске — поверх всего окна
+        Splash {
+            x: 0;
+            y: 0;
+            width: root.width;
+            height: root.height;
+            shown: root.splash;
+            close => {
+                root.splash = false;
             }
         }
 

@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 #[serde(default)]
 pub struct Saved {
     pub theme: i32,
+    /// Акцентный цвет: 0 цитрус, 1 изумруд, 2 лазурь, 3 аметист, 4 роза, 5 магма
+    pub accent: i32,
     /// "ru" или "en"; пусто при первом запуске — тогда язык системы
     pub lang: String,
     pub vibro: bool,
@@ -45,7 +47,7 @@ pub struct Preset {
     pub pierce_time: f64,
     pub price_m: f64,
     pub price_pierce: f64,
-    pub price_m2: f64,
+    pub price_kg: f64,
     pub price_fixed: f64,
     pub currency: String,
 }
@@ -64,7 +66,7 @@ impl Default for Preset {
             pierce_time: 0.3,
             price_m: 25.0,
             price_pierce: 1.5,
-            price_m2: 0.0,
+            price_kg: 0.0,
             price_fixed: 0.0,
             currency: "₽".into(),
         }
@@ -92,6 +94,7 @@ impl Default for Saved {
     fn default() -> Self {
         Saved {
             theme: 0,
+            accent: 0,
             lang: String::new(),
             vibro: true,
             lock_ratio: false,

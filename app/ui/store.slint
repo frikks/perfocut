@@ -9,7 +9,7 @@ export struct Par {
     line-pitch: float, line-angle: float, w-min: float, w-max: float, wave: bool, wave-len: float, wave-amp: float, step: float,
     thickness: float, min-k: float, bridge: float, kerf: float, density: float,
     cut-speed: float, rapid-speed: float, pierce-time: float,
-    price-m: float, price-pierce: float, price-m2: float, price-fixed: float, currency: string,
+    price-m: float, price-pierce: float, price-kg: float, price-fixed: float, currency: string,
     gc-on: string, gc-off: string, gc-header: string, gc-footer: string, gc-arcs: bool, gc-numbers: bool, gc-decimals: int,
     origin: string, dxf-layers: bool,
     name: string, order-no: string, client: string, phone: string, email: string, comment: string,
@@ -140,6 +140,7 @@ export global Store {
 
 export global Prefs {
     in-out property <int> theme;
+    in-out property <int> accent;
     in-out property <int> lang;
     in-out property <bool> vibro: true;
     in property <bool> is-phone;

@@ -442,14 +442,22 @@ export component SettingsPanel inherits VerticalLayout {
                 }
             }
             FieldRow {
-                label: Store.p.pattern == "rings" ? @tr("Шаг колец")
-                    : Store.p.pattern == "stipple" ? @tr("Макс. шаг")
-                    : @tr("Шаг сетки");
+                label: @tr("Шаг / поворот");
+                field-w: Theme.touch ? 220px : 172px;
                 NumField {
                     value: Store.p.pitch;
                     unit: @tr("мм");
                     edited(v) => {
                         Store.p.pitch = v;
+                        Store.changed();
+                    }
+                }
+                NumField {
+                    value: Store.p.angle;
+                    decimals: 1;
+                    unit: "°";
+                    edited(v) => {
+                        Store.p.angle = v;
                         Store.changed();
                     }
                 }
@@ -462,18 +470,6 @@ export component SettingsPanel inherits VerticalLayout {
                     unit: @tr("шт");
                     edited(v) => {
                         Store.set-holes(v);
-                    }
-                }
-            }
-            FieldRow {
-                label: @tr("Поворот");
-                NumField {
-                    value: Store.p.angle;
-                    decimals: 1;
-                    unit: "°";
-                    edited(v) => {
-                        Store.p.angle = v;
-                        Store.changed();
                     }
                 }
             }
@@ -497,8 +493,14 @@ export component SettingsPanel inherits VerticalLayout {
                     }
                 }
             }
-            FieldRow {
-                label: Store.p.size-mode == "dense" || Store.p.pattern == "stipple" ? @tr("Размер отверстий") : @tr("Мин. размер");
+            if Store.p.pattern == "stipple": Hint {
+                text: @tr("Отверстия одного размера, расставлены случайно: плотность выше в тёмных местах.");
+            }
+            Caption {
+                text: @tr("Размер");
+            }
+            if Store.p.size-mode == "dense" || Store.p.pattern == "stipple": FieldRow {
+                label: @tr("Размер отверстий");
                 NumField {
                     value: Store.p.d-min;
                     unit: @tr("мм");
@@ -509,7 +511,16 @@ export component SettingsPanel inherits VerticalLayout {
                 }
             }
             if Store.p.size-mode != "dense" && Store.p.pattern != "stipple": FieldRow {
-                label: @tr("Макс. размер");
+                label: @tr("Мин. и макс. размер");
+                field-w: Theme.touch ? 220px : 172px;
+                NumField {
+                    value: Store.p.d-min;
+                    unit: @tr("мм");
+                    edited(v) => {
+                        Store.p.d-min = v;
+                        Store.changed();
+                    }
+                }
                 NumField {
                     value: Store.p.d-max;
                     unit: @tr("мм");
@@ -538,6 +549,7 @@ export component SettingsPanel inherits VerticalLayout {
                     Btn {
                         text: "SVG_t";
                         kind: 2;
+                        framed: true;
                         min-height: 30px;
                         clicked => {
                             Store.trace();
@@ -545,24 +557,13 @@ export component SettingsPanel inherits VerticalLayout {
                     }
                 }
             }
-            if Store.p.pattern == "dots": Seg {
+            if Store.p.pattern == "dots" || Store.p.pattern == "rings": Seg {
                 items: [@tr("От мин. до макс."), @tr("Пропорционально"), @tr("По плотности")];
                 current: Store.p.size-mode == "prop" ? 1 : Store.p.size-mode == "dense" ? 2 : 0;
                 select(i) => {
                     Store.p.size-mode = i == 1 ? "prop" : i == 2 ? "dense" : "range";
                     Store.changed();
                 }
-            }
-            if Store.p.pattern == "rings": Seg {
-                items: [@tr("От мин. до макс."), @tr("Пропорционально"), @tr("По плотности")];
-                current: Store.p.size-mode == "prop" ? 1 : Store.p.size-mode == "dense" ? 2 : 0;
-                select(i) => {
-                    Store.p.size-mode = i == 1 ? "prop" : i == 2 ? "dense" : "range";
-                    Store.changed();
-                }
-            }
-            if Store.p.pattern == "stipple": Hint {
-                text: @tr("Отверстия одного размера, расставлены случайно: плотность выше в тёмных местах.");
             }
             if Store.p.size-mode == "prop" && Store.p.pattern != "stipple": Hint {
                 text: @tr("Диаметр растёт от нуля вместе с темнотой, как в SVG tracing. Отверстия меньше мин. размера не режутся.");
@@ -582,7 +583,8 @@ export component SettingsPanel inherits VerticalLayout {
                 }
             }
             FieldRow {
-                label: @tr("Разброс размеров");
+                label: @tr("Разброс / зерно");
+                field-w: Theme.touch ? 220px : 172px;
                 NumField {
                     value: Store.p.jitter;
                     unit: "%";
@@ -591,9 +593,6 @@ export component SettingsPanel inherits VerticalLayout {
                         Store.changed();
                     }
                 }
-            }
-            if Store.p.jitter > 0: FieldRow {
-                label: @tr("Зерно");
                 NumField {
                     value: Store.p.seed;
                     integer: true;
@@ -624,7 +623,8 @@ export component SettingsPanel inherits VerticalLayout {
         if Store.p.pattern == "lines": VerticalLayout {
             spacing: Theme.touch ? 7px : 8px;
             FieldRow {
-                label: @tr("Шаг линий");
+                label: @tr("Шаг / поворот");
+                field-w: Theme.touch ? 220px : 172px;
                 NumField {
                     value: Store.p.line-pitch;
                     unit: @tr("мм");
@@ -633,9 +633,6 @@ export component SettingsPanel inherits VerticalLayout {
                         Store.changed();
                     }
                 }
-            }
-            FieldRow {
-                label: @tr("Поворот");
                 NumField {
                     value: Store.p.line-angle;
                     decimals: 1;
@@ -647,7 +644,8 @@ export component SettingsPanel inherits VerticalLayout {
                 }
             }
             FieldRow {
-                label: @tr("Мин. ширина");
+                label: @tr("Мин. и макс. ширина");
+                field-w: Theme.touch ? 220px : 172px;
                 NumField {
                     value: Store.p.w-min;
                     unit: @tr("мм");
@@ -656,9 +654,6 @@ export component SettingsPanel inherits VerticalLayout {
                         Store.changed();
                     }
                 }
-            }
-            FieldRow {
-                label: @tr("Макс. ширина");
                 NumField {
                     value: Store.p.w-max;
                     unit: @tr("мм");
@@ -688,7 +683,8 @@ export component SettingsPanel inherits VerticalLayout {
                 }
             }
             if Store.p.wave && Store.p.pattern == "lines": FieldRow {
-                label: @tr("Длина волны");
+                label: @tr("Длина / амплитуда волны");
+                field-w: Theme.touch ? 220px : 172px;
                 NumField {
                     value: Store.p.wave-len;
                     decimals: 1;
@@ -698,9 +694,6 @@ export component SettingsPanel inherits VerticalLayout {
                         Store.changed();
                     }
                 }
-            }
-            if Store.p.wave && Store.p.pattern == "lines": FieldRow {
-                label: @tr("Амплитуда");
                 NumField {
                     value: Store.p.wave-amp;
                     unit: @tr("мм");
@@ -868,12 +861,12 @@ export component SettingsPanel inherits VerticalLayout {
             }
         }
         FieldRow {
-            label: @tr("Металл, за м²");
+            label: @tr("Металл, за кг");
             NumField {
-                value: Store.p.price-m2;
+                value: Store.p.price-kg;
                 unit: Store.p.currency;
                 edited(v) => {
-                    Store.p.price-m2 = v;
+                    Store.p.price-kg = v;
                     Store.changed();
                 }
             }

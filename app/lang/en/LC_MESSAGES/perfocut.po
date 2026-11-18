@@ -36,6 +36,9 @@ msgstr "{n} holes at the edge did not fit the margin and were skipped"
 msgid "Автор"
 msgstr "Author"
 
+msgid "Акцент"
+msgstr "Accent"
+
 msgid "Амплитуда"
 msgstr "Amplitude"
 
@@ -114,6 +117,9 @@ msgstr "Length (× width)"
 msgid "Длина волны"
 msgstr "Wavelength"
 
+msgid "Длина / амплитуда волны"
+msgstr "Wave length / amplitude"
+
 msgid "Длина реза"
 msgstr "Cut length"
 
@@ -153,6 +159,9 @@ msgstr "Product"
 msgid "Изображение"
 msgstr "Image"
 
+msgid "Изумруд"
+msgstr "Emerald"
+
 msgid "Итог"
 msgstr "Summary"
 
@@ -167,6 +176,9 @@ msgstr "System"
 
 msgid "Картинка для перфорации"
 msgstr "Image for perforation"
+
+msgid "Картинка → перфорация → файл"
+msgstr "Picture → perforation → file"
 
 msgid "Квадр."
 msgstr "Square"
@@ -216,6 +228,12 @@ msgstr "Lines"
 msgid "Лист"
 msgstr "Sheet"
 
+msgid "Лазурь"
+msgstr "Azure"
+
+msgid "Магма"
+msgstr "Magma"
+
 msgid "Лучей"
 msgstr "Rays"
 
@@ -243,11 +261,14 @@ msgstr "Metal"
 msgid "Металл и лазер"
 msgstr "Metal and laser"
 
-msgid "Металл, за м²"
-msgstr "Metal, per m²"
+msgid "Металл, за кг"
+msgstr "Metal, per kg"
 
 msgid "Метр реза"
 msgstr "Per metre of cut"
+
+msgid "Мин. и макс. размер"
+msgstr "Min and max size"
 
 msgid "Мин. отверстие, × толщины"
 msgstr "Min hole, × thickness"
@@ -260,6 +281,9 @@ msgstr "Kerf compensation"
 
 msgid "Мин. размер"
 msgstr "Min size"
+
+msgid "Мин. и макс. ширина"
+msgstr "Min and max width"
 
 msgid "Мин. ширина"
 msgstr "Min width"
@@ -420,6 +444,9 @@ msgstr "Works on phones."
 msgid "Разброс размеров"
 msgstr "Size spread"
 
+msgid "Разброс / зерно"
+msgstr "Spread / seed"
+
 msgid "Размер от тона"
 msgstr "Size from tone"
 
@@ -443,6 +470,9 @@ msgstr "Cut the sheet outline"
 
 msgid "Резка"
 msgstr "Cutting"
+
+msgid "Роза"
+msgstr "Rose"
 
 msgid "Ромб"
 msgstr "Diamond"
@@ -581,6 +611,12 @@ msgstr "Background color"
 
 msgid "Центр"
 msgstr "Centre"
+
+msgid "Цитрус"
+msgstr "Citrus"
+
+msgid "Шаг / поворот"
+msgstr "Pitch / rotation"
 
 msgid "Шаг выборки"
 msgstr "Sampling step"

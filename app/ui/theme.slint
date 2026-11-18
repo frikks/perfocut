@@ -4,6 +4,8 @@ import { Palette } from "std-widgets.slint";
 export global Theme {
     // 0 основная (графит), 1 светлая, 2 как в системе, 3 AMOLED
     in-out property <int> mode: 0;
+    // Акцентный цвет: 0 цитрус, 1 изумруд, 2 лазурь, 3 аметист, 4 роза, 5 магма
+    in-out property <int> accent: 0;
     // Сенсорный экран: крупнее строки и шрифт
     in-out property <bool> touch: false;
     // Системный масштаб шрифта Android
@@ -24,10 +26,43 @@ export global Theme {
     out property <color> t1: dark ? #ededed : #18181b;
     out property <color> t2: dark ? #a1a1a6 : #52525a;
     out property <color> t3: dark ? #85858b : #71717a;
-    out property <color> acc: #e8833a;
-    out property <color> acc-hover: dark ? #ef9150 : #dc7429;
-    out property <color> acc-ink: #1b1209;
-    out property <color> acc-text: dark ? #f0a36b : #b45a17;
+    // Акцент: цитрус, изумруд, лазурь, аметист, роза, магма
+    out property <color> acc: accent == 1 ? #2fbf8f
+        : accent == 2 ? #4aa8ff
+        : accent == 3 ? #9d7bff
+        : accent == 4 ? #ef5f96
+        : accent == 5 ? #ef5350
+        : #e8833a;
+    out property <color> acc-hover: !dark ? (accent == 1 ? #27a87e
+        : accent == 2 ? #3591f0
+        : accent == 3 ? #8658f0
+        : accent == 4 ? #e14a86
+        : accent == 5 ? #e03e38
+        : #dc7429)
+        : (accent == 1 ? #46d3a2
+        : accent == 2 ? #66b8ff
+        : accent == 3 ? #ae92ff
+        : accent == 4 ? #f97ab0
+        : accent == 5 ? #ff6b66
+        : #ef9150);
+    out property <color> acc-ink: accent == 1 ? #082018
+        : accent == 2 ? #0a1a2b
+        : accent == 3 ? #180f2b
+        : accent == 4 ? #2b0a16
+        : accent == 5 ? #2b0d0a
+        : #1b1209;
+    out property <color> acc-text: !dark ? (accent == 1 ? #17835c
+        : accent == 2 ? #1d6fc4
+        : accent == 3 ? #6f3fd6
+        : accent == 4 ? #c93a74
+        : accent == 5 ? #b3322c
+        : #b45a17)
+        : (accent == 1 ? #6fdcb4
+        : accent == 2 ? #85bcff
+        : accent == 3 ? #bda2ff
+        : accent == 4 ? #fa92bd
+        : accent == 5 ? #ff8079
+        : #f0a36b);
     out property <color> seg-on: !dark ? #ffffff : amoled ? #2a2a2d : #38383c;
     out property <color> bar: !dark ? #c7c7cc : amoled ? #3d3d42 : #4a4a4f;
     out property <color> toast: !dark ? #18181b : amoled ? #1d1d1f : #2c2c2f;

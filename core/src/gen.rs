@@ -1289,7 +1289,8 @@ fn finish(
         cut / p.cut_speed + travel / p.rapid_speed + st.pierces as f64 * p.pierce_time / 60.0;
     st.cost_cut = st.cut_len_m * p.price_m;
     st.cost_pierce = st.pierces as f64 * p.price_pierce;
-    st.cost_material = w * h / 1e6 * p.price_m2;
+    // Материал по весу: площадь (м²) × толщина (мм) × плотность (г/см³) = масса в кг
+    st.cost_material = (w * h / 1e6) * p.thickness * p.density * p.price_kg;
     st.cost_fixed = p.price_fixed;
     st.cost = st.cost_cut + st.cost_pierce + st.cost_material + st.cost_fixed;
     st.weight_kg = (w * h - area) * p.thickness * p.density * 1e-6;

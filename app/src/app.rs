@@ -143,16 +143,19 @@ pub fn run() -> Result<(), slint::PlatformError> {
     p.lang = saved.lang.clone();
     fix_default_name(&mut p, en);
     saved.theme = saved.theme.clamp(0, 3);
+    saved.accent = saved.accent.clamp(0, 5);
     saved.view_mode = saved.view_mode.clamp(0, 2);
     let sheet = Rgb::parse(&saved.sheet_color).unwrap_or(SHEET_DEFAULT);
     let back = Rgb::parse(&saved.back_color).unwrap_or(BACK_DEFAULT);
 
     let prefs = ui.global::<Prefs>();
     prefs.set_theme(saved.theme);
+    prefs.set_accent(saved.accent);
     prefs.set_lang(i32::from(en));
     prefs.set_vibro(saved.vibro);
     prefs.set_version(env!("CARGO_PKG_VERSION").into());
     ui.global::<Theme>().set_mode(saved.theme);
+    ui.global::<Theme>().set_accent(saved.accent);
     platform::init(&ui);
 
     let store = ui.global::<Store>();
@@ -239,6 +242,22 @@ pub fn run() -> Result<(), slint::PlatformError> {
         show_stats(st, ui);
         bars(ui);
     });
+    // Сплэш при запуске: тема программы, анимация перфорации и строки загрузки.
+    // Сам уходит через пару секунд; тап, клик или «назад» закрывают раньше.
+    ui.set_splash(true);
+    {
+        let ui = ui.as_weak();
+        let ms = if cfg!(target_os = "android") {
+            2600
+        } else {
+            2000
+        };
+        Timer::single_shot(Duration::from_millis(ms), move || {
+            if let Some(ui) = ui.upgrade() {
+                ui.set_splash(false);
+            }
+        });
+    }
     ui.run()
 }
 
@@ -718,7 +737,7 @@ fn apply_preset(st: &mut State, ui: &AppWindow, i: i32) {
     p.pierce_time = pr.pierce_time;
     p.price_m = pr.price_m;
     p.price_pierce = pr.price_pierce;
-    p.price_m2 = pr.price_m2;
+    p.price_kg = pr.price_kg;
     p.price_fixed = pr.price_fixed;
     p.currency = pr.currency.clone();
     ui.global::<Store>().set_preset_current(i);
@@ -747,7 +766,7 @@ fn save_preset(st: &mut State, ui: &AppWindow) {
         pierce_time: p.pierce_time,
         price_m: p.price_m,
         price_pierce: p.price_pierce,
-        price_m2: p.price_m2,
+        price_kg: p.price_kg,
         price_fixed: p.price_fixed,
         currency: p.currency.clone(),
     };
@@ -803,6 +822,7 @@ fn reset(st: &mut State, ui: &AppWindow) {
 fn prefs_changed(st: &mut State, ui: &AppWindow) {
     let pr = ui.global::<Prefs>();
     st.saved.theme = pr.get_theme().clamp(0, 3);
+    st.saved.accent = pr.get_accent().clamp(0, 5);
     st.saved.vibro = pr.get_vibro();
     let lang = if pr.get_lang() == 1 { "en" } else { "ru" };
     if lang != st.saved.lang {

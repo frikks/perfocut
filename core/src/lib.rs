@@ -56,6 +56,24 @@ mod tests {
     }
 
     #[test]
+    fn cost_material_by_weight() {
+        let g = gradient(200, 120);
+        let p = Params {
+            thickness: 2.0,
+            density: 7.85,
+            price_kg: 100.0,
+            ..Params::default()
+        };
+        let r = gen::generate(Some(&g), &p);
+        // Площадь листа 1000×600 мм = 0,6 м²; масса = 0,6 м² × 2 мм × 7,85 г/см³ = 9,42 кг
+        let expect = 0.6 * 2.0 * 7.85 * 100.0;
+        assert!((r.stats.cost_material - expect).abs() < 1e-6);
+        // Масса изделия (лист минус отверстия) меньше массы целого листа
+        let whole = 0.6 * 2.0 * 7.85;
+        assert!(r.stats.weight_kg > 0.0 && r.stats.weight_kg < whole);
+    }
+
+    #[test]
     fn prop_mode_like_svg_tracing() {
         let g = gradient(200, 120);
         let p = Params {

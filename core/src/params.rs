@@ -71,7 +71,8 @@ pub struct Params {
     pub pierce_time: f64,
     pub price_m: f64,
     pub price_pierce: f64,
-    pub price_m2: f64,
+    /// Цена металла за килограмм: масса листа = площадь × толщина × плотность.
+    pub price_kg: f64,
     pub price_fixed: f64,
     pub currency: String,
     // G-code
@@ -150,7 +151,7 @@ impl Default for Params {
             pierce_time: 0.3,
             price_m: 25.0,
             price_pierce: 1.5,
-            price_m2: 0.0,
+            price_kg: 0.0,
             price_fixed: 0.0,
             currency: "₽".into(),
             gc_on: "M07".into(),
