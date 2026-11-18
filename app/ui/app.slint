@@ -313,10 +313,16 @@ component Logo inherits HorizontalLayout {
     alignment: start;
     VerticalLayout {
         alignment: center;
-        Image {
-            source: @image-url("icons/logo.svg");
-            width: 24px;
-            height: 24px;
+        Rectangle {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            background: Theme.acc-soft;
+            Image {
+                source: @image-url("icons/logo.svg");
+                width: 24px;
+                height: 24px;
+            }
         }
     }
     Text {
@@ -360,6 +366,7 @@ component Header inherits Rectangle {
             Btn {
                 text: root.wide ? @tr("Открыть") : "";
                 kind: root.wide ? 0 : 2;
+                tip: @tr("Открыть");
                 has-icon: true;
                 icon: @image-url("icons/folder.svg");
                 clicked => {
@@ -403,6 +410,7 @@ component Header inherits Rectangle {
                     kind: 2;
                     has-icon: true;
                     icon: @image-url("icons/gear.svg");
+                    tip: @tr("Настройки");
                     clicked => {
                         root.settings();
                     }
@@ -538,6 +546,7 @@ component Stage inherits Rectangle {
                         kind: 2;
                         has-icon: true;
                         icon: @image-url("icons/fit.svg");
+                        tip: @tr("Вписать в окно");
                         clicked => {
                             Store.fit-view();
                         }
@@ -720,6 +729,7 @@ component Stage inherits Rectangle {
                 y: parent.height - self.height - 8px;
                 has-icon: true;
                 icon: @image-url("icons/fit.svg");
+                tip: @tr("Вписать в окно");
                 clicked => {
                     Store.fit-view();
                 }
@@ -847,6 +857,7 @@ component Stage inherits Rectangle {
                 y: parent.height - self.height - 8px;
                 has-icon: true;
                 icon: Store.full-canvas ? @image-url("icons/collapse.svg") : @image-url("icons/expand.svg");
+                tip: Store.full-canvas ? @tr("Свернуть холст") : @tr("Развернуть холст");
                 clicked => {
                     Store.full-canvas = !Store.full-canvas;
                     Store.full-canvas-changed(Store.full-canvas);
@@ -936,6 +947,8 @@ export component AppWindow inherits Window {
     // Сплэш при запуске: ставится из программы, закрывается тапом или сама
     in-out property <bool> splash;
     out property <bool> wide: self.width >= 960px;
+    // Средняя ширина: панели уже, холсту остаётся больше места
+    out property <bool> medium: self.width >= 760px && self.width < 1200px;
     out property <length> cw: stage.cw;
     out property <length> ch: stage.ch;
     property <bool> modal-open: color-target >= 0 || settings-open || info-open;
@@ -947,8 +960,8 @@ export component AppWindow inherits Window {
     property <length> area-w: self.width;
     property <length> area-h: (kb-open ? Math.min(self.height - self.safe-area-insets.bottom, self.virtual-keyboard-position.y) : self.height - self.safe-area-insets.bottom) - inset-top;
     property <length> head-h: wide ? 56px : Theme.touch ? 40px : 48px;
-    property <length> left-w: Theme.touch ? 340px : 316px;
-    property <length> right-w: Theme.touch ? 320px : 300px;
+    property <length> left-w: Theme.touch ? 340px : root.medium ? 284px : 316px;
+    property <length> right-w: Theme.touch ? 320px : root.medium ? 264px : 300px;
     // На телефоне рисование занимает весь экран под шапкой: нижние вкладки спрятаны
     property <length> stage-h: Store.full-canvas ? area-h : wide ? area-h - head-h : Store.drawing ? area-h - head-h : Math.round((area-h - head-h) * (kb-open ? 0.26 : 0.44) / 1px) * 1px;
     property <[Preset]> sheet-a: [

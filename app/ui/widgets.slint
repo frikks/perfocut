@@ -9,7 +9,8 @@ export component Icon inherits Image {
     image-fit: contain;
 }
 
-// Кнопка: 0 обычная, 1 главная, 2 без фона; framed добавляет рамку кнопке без фона
+// Кнопка: 0 обычная, 1 главная, 2 без фона; framed добавляет рамку кнопке без фона.
+// Доступна с клавиатуры (Enter/Space) и для скринридеров.
 export component Btn inherits Rectangle {
     in property <string> text;
     in property <image> icon;
@@ -23,13 +24,21 @@ export component Btn inherits Rectangle {
     min-height: Theme.row;
     min-width: Theme.row;
     horizontal-stretch: stretch ? 1 : 0;
-    border-radius: 8px;
+    border-radius: Theme.radius;
     opacity: enabled ? 1 : 0.45;
     background: kind == 1 ? (ta.pressed ? Theme.acc.darker(10%) : ta.has-hover ? Theme.acc-hover : Theme.acc)
-        : kind == 2 ? (ta.pressed ? Theme.raised2 : ta.has-hover ? Theme.raised : transparent)
+        : kind == 2 ? (ta.pressed ? Theme.raised2 : ta.has-hover ? Theme.hover-surface : transparent)
         : (ta.pressed || ta.has-hover ? Theme.raised2 : Theme.raised);
-    border-width: kind == 0 || framed ? 1px : 0px;
-    border-color: Theme.line2;
+    border-width: kind == 0 || framed || fs.has-focus ? 1px : 0px;
+    border-color: fs.has-focus ? Theme.focus : Theme.line2;
+    accessible-role: button;
+    accessible-label: root.text != "" ? root.text : root.tip;
+    accessible-action-default => {
+        if root.enabled {
+            Bridge.haptic("click");
+            root.clicked();
+        }
+    }
     animate background { duration: 120ms; }
     HorizontalLayout {
         padding-left: root.text == "" ? 0px : 12px;
@@ -61,6 +70,17 @@ export component Btn inherits Rectangle {
             root.clicked();
         }
     }
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(e) => {
+            if e.text == Key.Return || e.text == Key.Space || e.text == " " {
+                Bridge.haptic("click");
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
 }
 
 // Переключатель из нескольких вариантов; columns = 2 раскладывает их сеткой 2×N
@@ -85,9 +105,17 @@ export component Seg inherits Rectangle {
         width: (parent.width - 6px + 2px) / root.cols - 2px;
         height: root.cell-h;
         border-radius: 7px;
-        background: i == root.current ? Theme.seg-on : ta.has-hover ? Theme.raised : transparent;
-        border-width: i == root.current && !Theme.dark ? 1px : 0px;
-        border-color: Theme.line2;
+        background: i == root.current ? Theme.seg-on : fs.has-focus ? Theme.hover-surface : ta.has-hover ? Theme.raised : transparent;
+        border-width: (i == root.current && !Theme.dark) || fs.has-focus ? 1px : 0px;
+        border-color: fs.has-focus ? Theme.focus : Theme.line2;
+        accessible-role: button;
+        accessible-label: it;
+        accessible-action-default => {
+            if i != root.current {
+                Bridge.haptic("tick");
+                root.select(i);
+            }
+        }
         animate background { duration: 120ms; }
         Text {
             x: 6px;
@@ -107,6 +135,18 @@ export component Seg inherits Rectangle {
                     Bridge.haptic("tick");
                     root.select(i);
                 }
+            }
+        }
+        fs := FocusScope {
+            key-pressed(e) => {
+                if e.text == Key.Return || e.text == Key.Space || e.text == " " {
+                    if i != root.current {
+                        Bridge.haptic("tick");
+                        root.select(i);
+                    }
+                    return accept;
+                }
+                reject
             }
         }
     }
@@ -603,6 +643,7 @@ export component Modal inherits Rectangle {
                     kind: 2;
                     has-icon: true;
                     icon: @image-url("icons/info.svg");
+                    tip: @tr("О программе");
                     clicked => {
                         root.info();
                     }
@@ -611,6 +652,7 @@ export component Modal inherits Rectangle {
                     kind: 2;
                     has-icon: true;
                     icon: @image-url("icons/x.svg");
+                    tip: @tr("Закрыть");
                     clicked => {
                         root.close();
                     }

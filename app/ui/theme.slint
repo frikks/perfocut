@@ -63,6 +63,12 @@ export global Theme {
         : accent == 4 ? #fa92bd
         : accent == 5 ? #ff8079
         : #f0a36b);
+    // Семантические токены: фокус, мягкий акцент, поверхность наведения, радиус и сетка отступов
+    out property <color> focus: acc;
+    out property <color> acc-soft: acc.with-alpha(0.14);
+    out property <color> hover-surface: dark ? #ffffff0f : #0000000a;
+    out property <length> radius: 10px;
+    out property <length> gap: 8px;
     out property <color> seg-on: !dark ? #ffffff : amoled ? #2a2a2d : #38383c;
     out property <color> bar: !dark ? #c7c7cc : amoled ? #3d3d42 : #4a4a4f;
     out property <color> toast: !dark ? #18181b : amoled ? #1d1d1f : #2c2c2f;

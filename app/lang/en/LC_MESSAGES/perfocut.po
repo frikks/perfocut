@@ -486,6 +486,12 @@ msgstr "Spread / seed"
 msgid "Размер от тона"
 msgstr "Size from tone"
 
+msgid "Развернуть холст"
+msgstr "Expand canvas"
+
+msgid "Свернуть холст"
+msgstr "Collapse canvas"
+
 msgid "Размер отверстий"
 msgstr "Hole size"
 
