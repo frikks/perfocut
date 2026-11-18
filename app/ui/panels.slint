@@ -1171,8 +1171,8 @@ component Head inherits Text {
 }
 
 export component SummaryPanel inherits VerticalLayout {
-    padding: 16px;
-    spacing: 16px;
+    padding: Theme.touch ? 12px : 16px;
+    spacing: Theme.touch ? 12px : 16px;
     VerticalLayout {
         spacing: 4px;
         Head {
@@ -1303,8 +1303,8 @@ export component SummaryPanel inherits VerticalLayout {
 }
 
 export component ExportPanel inherits VerticalLayout {
-    padding: 16px;
-    spacing: 8px;
+    padding: Theme.touch ? 12px : 16px;
+    spacing: Theme.touch ? 6px : 8px;
     Head {
         text: @tr("Форматы");
     }

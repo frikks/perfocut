@@ -464,7 +464,7 @@ component Stage inherits Rectangle {
     }
     VerticalLayout {
         Rectangle {
-            height: Store.drawing && root.compact ? Math.max(Theme.row, 44px) : Theme.row + 16px;
+            height: Store.drawing && root.compact ? Math.max(Theme.row, 38px) : Theme.row + (Theme.touch ? 10px : 16px);
             background: Theme.bg;
             Rectangle {
                 y: parent.height - 1px;
@@ -946,7 +946,7 @@ export component AppWindow inherits Window {
     // Холст во всю ширину окна: вырез экрана учитывается отступами панелей, а не краем холста
     property <length> area-w: self.width;
     property <length> area-h: (kb-open ? Math.min(self.height - self.safe-area-insets.bottom, self.virtual-keyboard-position.y) : self.height - self.safe-area-insets.bottom) - inset-top;
-    property <length> head-h: wide ? 56px : Theme.touch ? 44px : 48px;
+    property <length> head-h: wide ? 56px : Theme.touch ? 40px : 48px;
     property <length> left-w: Theme.touch ? 340px : 316px;
     property <length> right-w: Theme.touch ? 320px : 300px;
     // На телефоне рисование занимает весь экран под шапкой: нижние вкладки спрятаны

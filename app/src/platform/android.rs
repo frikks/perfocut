@@ -63,7 +63,7 @@ pub fn init(ui: &AppWindow) {
     let theme = ui.global::<Theme>();
     theme.set_touch(true);
     if let Some(k) = with_activity(|env, act| env.call_method(act, "fontScale", "()F", &[])?.f()) {
-        theme.set_font_scale(k.clamp(0.8, 1.6));
+        theme.set_font_scale((k.clamp(0.8, 1.5) * 0.92).clamp(0.72, 1.35));
     }
 }
 

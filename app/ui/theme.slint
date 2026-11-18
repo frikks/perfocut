@@ -72,16 +72,16 @@ export global Theme {
     out property <color> warn: dark ? #d9a441 : #b7791f;
     out property <color> ok: dark ? #4cc38a : #2f9e6b;
 
-    out property <length> row: touch ? Math.max(38px, fs * 2.4) : 32px;
+    out property <length> row: touch ? Math.max(34px, fs * 2.1) : 32px;
     // Поля ввода ниже обычных строк: больше настроек помещается без прокрутки
-    out property <length> field-row: touch ? Math.max(36px, fs * 2.2) : 28px;
+    out property <length> field-row: touch ? Math.max(32px, fs * 1.95) : 28px;
     out property <length> fs: 14px * font-scale;
     out property <length> fs-s: 12px * font-scale;
     out property <length> fs-m: 13px * font-scale;
     out property <length> fs-h: 15px * font-scale;
     out property <length> fs-xl: (touch ? 30px : 28px) * font-scale;
-    out property <length> icon: 16px;
-    out property <length> pad: touch ? 16px : 16px;
+    out property <length> icon: touch ? 15px : 16px;
+    out property <length> pad: touch ? 12px : 16px;
     out property <string> sans: "Inter";
     out property <string> mono: "JetBrains Mono";
 }
