@@ -139,6 +139,7 @@ docs/      заметки к релизу и скриншоты
 
 ## Ссылки
 
+- [Дизайн-система](docs/design-system.md)
 - [Все релизы](https://github.com/frikks/perfocut/releases)
 - [Сообщить об ошибке](https://github.com/frikks/perfocut/issues)
 - [Исходный код](https://github.com/frikks/perfocut)
