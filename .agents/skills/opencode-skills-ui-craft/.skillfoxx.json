@@ -1,0 +1,147 @@
+{
+  "entry": "skills/ui-craft",
+  "commitSha": "49b751742b013ebb3e0495eb7992423185f04be0",
+  "contentDigest": "sha256:68a8e261ecfb1b12c02577c382da58d6bdcfe09d1f8e5c07cc27094c900709ec",
+  "files": [
+    {
+      "path": "SKILL.md",
+      "sha": "2984c95dba331d8dfb126f5cdce1f52694e18e65"
+    },
+    {
+      "path": "references/accessibility.md",
+      "sha": "b044f0b11466fd81e574a5d45a6dc05c3ad2932a"
+    },
+    {
+      "path": "references/agents.md",
+      "sha": "eac92e09834b5b2d14145bf67030f413fc0d2fa9"
+    },
+    {
+      "path": "references/ai-chat.md",
+      "sha": "95d0610ac87e4ba41f57c10d0d697e6e2d95c3fa"
+    },
+    {
+      "path": "references/brief.md",
+      "sha": "41cfa3e569afd830335ae9a506b9663b18e578f4"
+    },
+    {
+      "path": "references/color.md",
+      "sha": "2bb3d264d192f85f0bae4b999f79c65a814d02c1"
+    },
+    {
+      "path": "references/components.md",
+      "sha": "d312aa2f864db2b07ca9f881af8af1ba59282b61"
+    },
+    {
+      "path": "references/copy.md",
+      "sha": "b3333d36a6f182200a29d5ff9aec908850609754"
+    },
+    {
+      "path": "references/coverage.md",
+      "sha": "5f2129eb36dd557634e39d699bf02633e42481ea"
+    },
+    {
+      "path": "references/craft-intent.md",
+      "sha": "96bbaf60f3c85ef5c8aabc795eb8102747d0d8fa"
+    },
+    {
+      "path": "references/dashboard.md",
+      "sha": "4ee2be0d75ab5a6931d1c4b959132f70e652e993"
+    },
+    {
+      "path": "references/dataviz.md",
+      "sha": "088a8bfa9ce773d9d112a53e269517678486d708"
+    },
+    {
+      "path": "references/finish-bar.md",
+      "sha": "a210dbaf1889c72b98414aeee0450483db099cbe"
+    },
+    {
+      "path": "references/forms.md",
+      "sha": "b7b6812470f908544d1468e031644815d50487c2"
+    },
+    {
+      "path": "references/heuristics.md",
+      "sha": "dfb421a0c26aa6b5fc5d750ba478f49f6ee92b4f"
+    },
+    {
+      "path": "references/inspiration.md",
+      "sha": "71393e5020c1f2a7aee1b8066171e6be5a70d5b3"
+    },
+    {
+      "path": "references/layout.md",
+      "sha": "ea20fc4c72a9fb1518a28477c4c8c8bd24017537"
+    },
+    {
+      "path": "references/loops.md",
+      "sha": "800681f8a0ba85f5b35ad7bdbf8c200d7a518924"
+    },
+    {
+      "path": "references/metadata.md",
+      "sha": "c81d7a46bbf7278f751614f03c46dbff0c57caff"
+    },
+    {
+      "path": "references/modern-css.md",
+      "sha": "00628c82b8e56c9d44c2e2b023931cce12234d7e"
+    },
+    {
+      "path": "references/motion.md",
+      "sha": "eb333329d8e5e750d1f84b63ecf183633d764523"
+    },
+    {
+      "path": "references/personas.md",
+      "sha": "e34d753f89f8be2088466951ec523cb126bc576d"
+    },
+    {
+      "path": "references/principles-catalog.md",
+      "sha": "a223c9468b288db428af59559060e85e9b480b92"
+    },
+    {
+      "path": "references/recipe-auth.md",
+      "sha": "9809eca2dc4181e2d37caa6204a99291c326adf6"
+    },
+    {
+      "path": "references/recipe-dashboard.md",
+      "sha": "0d3720f535de8cfa3543c8dcb5bed5144f554da2"
+    },
+    {
+      "path": "references/recipe-landing.md",
+      "sha": "f7f3e67a8a69268d26770f2865011ffedd9e5824"
+    },
+    {
+      "path": "references/responsive.md",
+      "sha": "e76470edea773f8fb496973dd337bf10409120a8"
+    },
+    {
+      "path": "references/review.md",
+      "sha": "57e8d66f064db1a89894595ef65df7d15d424771"
+    },
+    {
+      "path": "references/sound.md",
+      "sha": "a9e6df17c46e69cf8b111a70da948db7195b9dc0"
+    },
+    {
+      "path": "references/spec.md",
+      "sha": "e45e0cd9f65aa7518bf99cea546a08d24e7a9859"
+    },
+    {
+      "path": "references/stack.md",
+      "sha": "b53ec76d908725a9b41a6e24425a02055b569491"
+    },
+    {
+      "path": "references/state-design.md",
+      "sha": "1bfe2747423726f7b953e733c18048334e5ede0d"
+    },
+    {
+      "path": "references/themes.md",
+      "sha": "3c504c6e44f6ad42a34fd9a34d3fffa2eff89d62"
+    },
+    {
+      "path": "references/tokens.md",
+      "sha": "009bb79f690cc15215ab083a1ea570bea99e807d"
+    },
+    {
+      "path": "references/typography.md",
+      "sha": "1e6d3e5ca6207d23c61ce1204cb249a0549c76a6"
+    }
+  ]
+}
