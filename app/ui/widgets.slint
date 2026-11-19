@@ -29,8 +29,8 @@ export component Btn inherits Rectangle {
     background: kind == 1 ? (ta.pressed ? Theme.acc.darker(12%) : ta.has-hover ? Theme.acc-hover : @linear-gradient(135deg, Theme.acc-hover, Theme.acc))
         : kind == 2 ? (ta.pressed ? Theme.raised2 : ta.has-hover ? Theme.glass-shine : transparent)
         : (ta.pressed ? Theme.raised2 : ta.has-hover ? Theme.glass-shine : Theme.glass);
-    border-width: kind == 0 || framed || fs.has-focus ? 1px : 0px;
-    border-color: fs.has-focus ? Theme.focus : kind == 1 ? transparent : Theme.glass-edge;
+    border-width: kind == 0 || framed ? 1px : 0px;
+    border-color: kind == 1 ? transparent : Theme.glass-edge;
     accessible-role: button;
     accessible-label: root.text != "" ? root.text : root.tip;
     accessible-action-default => {
@@ -68,17 +68,6 @@ export component Btn inherits Rectangle {
         clicked => {
             Bridge.haptic("click");
             root.clicked();
-        }
-    }
-    fs := FocusScope {
-        enabled: root.enabled;
-        key-pressed(e) => {
-            if e.text == Key.Return || e.text == Key.Space || e.text == " " {
-                Bridge.haptic("click");
-                root.clicked();
-                return accept;
-            }
-            reject
         }
     }
 }
@@ -119,9 +108,9 @@ export component Seg inherits Rectangle {
         width: (parent.width - 6px + 2px) / root.cols - 2px;
         height: root.cell-h;
         border-radius: 7px;
-        background: i == root.current && !root.animated ? Theme.seg-on : fs.has-focus ? Theme.hover-surface : ta.has-hover ? Theme.hover-surface : transparent;
-        border-width: (i == root.current && !Theme.dark) || fs.has-focus ? 1px : 0px;
-        border-color: fs.has-focus ? Theme.focus : Theme.line2;
+        background: i == root.current && !root.animated ? Theme.seg-on : ta.has-hover ? Theme.hover-surface : transparent;
+        border-width: i == root.current && !Theme.dark ? 1px : 0px;
+        border-color: Theme.line2;
         accessible-role: button;
         accessible-label: it;
         accessible-action-default => {
@@ -149,18 +138,6 @@ export component Seg inherits Rectangle {
                     Bridge.haptic("tick");
                     root.select(i);
                 }
-            }
-        }
-        fs := FocusScope {
-            key-pressed(e) => {
-                if e.text == Key.Return || e.text == Key.Space || e.text == " " {
-                    if i != root.current {
-                        Bridge.haptic("tick");
-                        root.select(i);
-                    }
-                    return accept;
-                }
-                reject
             }
         }
     }
@@ -590,6 +567,7 @@ export component Section inherits Rectangle {
         }
         Rectangle {
             height: root.open ? body.preferred-height + 8px : 0px;
+            clip: true;
             body := VerticalLayout {
                 padding-left: 16px;
                 padding-right: 16px;
