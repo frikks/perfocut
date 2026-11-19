@@ -17,6 +17,7 @@ export struct Par {
 
 export struct KV { k: string, v: string }
 export struct SizeRow { label: string, frac: float, n: string }
+export struct Template { id: string, name: string, desc: string, preview: string }
 export struct StatsUI {
     has: bool, cost: string, currency: string, rows: [KV],
     count: string, pierces: string, cut: string, time: string, open: string, mass: string,
@@ -36,6 +37,9 @@ export global Store {
     callback set-tab-step(float);
     // Смена сетки: принудительная синхронизация параметров и пересчёт узора
     callback set-grid(string);
+    // Библиотека готовых шаблонов перфорации
+    in property <[Template]> templates;
+    callback apply-template(string);
     // Шаг микроджоинтов по минимальному диаметру отверстия
     in-out property <float> mjoint-step;
     callback set-mjoint-step(float);

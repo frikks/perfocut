@@ -7,6 +7,7 @@ pub mod image;
 pub mod params;
 pub mod sketch;
 pub mod step;
+pub mod templates;
 pub mod zip;
 
 use gen::GenResult;
@@ -827,6 +828,30 @@ mod tests {
         let dxf = String::from_utf8(super::export_format(&r, "dxf").unwrap()).unwrap();
         assert!(!dxf.contains("CIRCLE"));
         assert!(dxf.contains("POLYLINE"));
+    }
+
+    #[test]
+    fn template_apply_keeps_order_settings() {
+        use templates;
+        let p = Params {
+            sheet_w: 777.0,
+            sheet_h: 333.0,
+            thickness: 3.0,
+            price_kg: 42.0,
+            lang: "en".into(),
+            ..Params::default()
+        };
+        let t = templates::find("speaker").expect("template");
+        let q = t.apply_to(&p);
+        assert_eq!(q.sheet_w, 777.0);
+        assert_eq!(q.sheet_h, 333.0);
+        assert_eq!(q.thickness, 3.0);
+        assert_eq!(q.price_kg, 42.0);
+        assert_eq!(q.lang, "en");
+        assert_eq!(q.pattern, "dots");
+        assert_eq!(q.grid, "tri");
+        assert_eq!(q.d_max, 12.0);
+        assert_eq!(templates::TEMPLATES.len(), 18);
     }
 
     #[test]

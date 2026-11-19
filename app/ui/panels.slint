@@ -2,6 +2,67 @@ import { Theme, Bridge } from "theme.slint";
 import { Store, Prefs, Par } from "store.slint";
 import { Btn, Seg, Check, NumField, TextField, FieldRow, Slide, Section, Caption, Hint, Icon, Bullet } from "widgets.slint";
 
+// Карточка шаблона: мини-превью узора и подпись
+component TemplateCard inherits Rectangle {
+    in property <string> name;
+    in property <string> desc;
+    in property <string> preview;
+    callback clicked();
+    min-width: 96px;
+    min-height: 78px;
+    border-radius: 6px;
+    background: Theme.panel;
+    border-width: 1px;
+    border-color: Theme.panel-edge;
+    VerticalLayout {
+        padding: 5px;
+        spacing: 2px;
+        Rectangle {
+            height: 32px;
+            clip: true;
+            if root.preview == "lines": VerticalLayout {
+                for k in 3: Rectangle {
+                    height: 4px;
+                    width: parent.width - 6px;
+                    x: 3px;
+                    border-radius: 2px;
+                    background: Theme.acc;
+                    opacity: 0.8;
+                }
+            }
+            if root.preview != "lines": Rectangle {
+                for i in 9: Rectangle {
+                    property <int> c: Math.mod(i, 3);
+                    property <int> r: Math.floor(i / 3);
+                    property <bool> shift: root.preview == "tri" || root.preview == "hex" || root.preview == "rhomb";
+                    x: 8px + self.c * 11px + (self.shift && self.r == 1 ? 5px : 0px);
+                    y: 2px + self.r * 10px;
+                    width: root.preview == "rings" ? 14px - self.r * 2px : 5px;
+                    height: root.preview == "rings" ? 14px - self.r * 2px : 5px;
+                    border-radius: root.preview == "rings" ? self.width / 2 : 3px;
+                    border-width: root.preview == "rings" ? 1px : 0px;
+                    border-color: Theme.acc;
+                    background: root.preview == "rings" ? transparent : Theme.acc;
+                    opacity: 0.85;
+                }
+            }
+        }
+        Text {
+            text: root.name;
+            color: Theme.panel-ink;
+            font-family: Theme.mono;
+            font-size: Theme.fs-s;
+            wrap: word-wrap;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
 export component SettingsPanel inherits VerticalLayout {
     Section {
         title: @tr("Изображение");
@@ -240,6 +301,24 @@ export component SettingsPanel inherits VerticalLayout {
             select(i) => {
                 Store.p.negative = i == 1;
                 Store.changed();
+            }
+        }
+    }
+
+    Section {
+        title: @tr("Библиотека шаблонов");
+        meta: "18";
+        open: false;
+        Hint {
+            text: @tr("Один клик применяет готовый узор. Размер листа, картинка, металл и цены сохраняются.");
+        }
+        GridLayout {
+            spacing: 6px;
+            for t in Store.templates: TemplateCard {
+                name: t.name;
+                desc: t.desc;
+                preview: t.preview;
+                clicked => { Store.apply-template(t.id); }
             }
         }
     }

@@ -600,6 +600,12 @@ msgstr "Phone"
 msgid "Тема"
 msgstr "Theme"
 
+msgid "Библиотека шаблонов"
+msgstr "Template library"
+
+msgid "Один клик применяет готовый узор. Размер листа, картинка, металл и цены сохраняются."
+msgstr "One click applies a ready pattern. Sheet size, image, metal and prices are kept."
+
 msgid "Терминал"
 msgstr "Terminal"
 

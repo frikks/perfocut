@@ -8,11 +8,12 @@ use crate::i18n::{self, fmt_n, fmt_time, t, tf};
 use crate::platform::{self, SaveOutcome};
 use crate::render::{self, Look, Rgb, Tf, View};
 use crate::saved::{self, Preset, Saved};
-use crate::{AppWindow, Bridge, Fmt, Prefs, SizeRow, StatsUI, Store, Theme, KV};
+use crate::{AppWindow, Bridge, Fmt, Prefs, SizeRow, StatsUI, Store, Template, Theme, KV};
 use perfo_core::gen::{self, GenResult};
 use perfo_core::image::Gray;
 use perfo_core::params::Params;
 use perfo_core::sketch::Sketch;
+use perfo_core::templates;
 use slint::{
     ComponentHandle, Image, Model, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, Timer,
     TimerMode, VecModel, Weak,
@@ -188,6 +189,16 @@ pub fn run() -> Result<(), slint::PlatformError> {
     store.set_brush_tone(saved.brush_tone as f32);
     let formats = Rc::new(VecModel::from(format_rows(&saved)));
     store.set_formats(ModelRc::from(formats.clone()));
+    let tpl: Vec<Template> = templates::TEMPLATES
+        .iter()
+        .map(|t| Template {
+            id: t.id.into(),
+            name: t.name.into(),
+            desc: t.desc.into(),
+            preview: t.preview.into(),
+        })
+        .collect();
+    store.set_templates(ModelRc::new(VecModel::from(tpl)));
     refresh_presets(&saved, &store);
 
     bind(&ui);
@@ -323,6 +334,15 @@ fn bind(ui: &AppWindow) {
     });
     s.on_set_grid(|g| {
         with(|st, ui| set_grid(st, ui, &g));
+    });
+    s.on_apply_template(|id| {
+        with(|st, ui| {
+            if let Some(t) = templates::find(&id) {
+                let p = t.apply_to(&st.p);
+                set_params(st, ui, p, true);
+                toast(st, ui, t.name, 2200);
+            }
+        });
     });
     s.on_set_mjoint_step(|v| {
         with(|st, ui| set_mjoint_step(st, ui, f64::from(v)));
