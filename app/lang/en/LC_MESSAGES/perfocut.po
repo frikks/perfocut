@@ -606,6 +606,33 @@ msgstr "Template library"
 msgid "Один клик применяет готовый узор. Размер листа, картинка, металл и цены сохраняются."
 msgstr "One click applies a ready pattern. Sheet size, image, metal and prices are kept."
 
+msgid "Профиль станка"
+msgstr "Machine profile"
+
+msgid "Монтаж и гравировка"
+msgstr "Mounting and engraving"
+
+msgid "Монтажных отверстий"
+msgstr "Mounting holes"
+
+msgid "Диаметр монтажных"
+msgstr "Mounting hole diameter"
+
+msgid "Отступ от кромки"
+msgstr "Offset from edge"
+
+msgid "Надпись для гравировки"
+msgstr "Engraving text"
+
+msgid "Артикул или номер заказа"
+msgstr "Part number or order ID"
+
+msgid "Высота букв"
+msgstr "Letter height"
+
+msgid "Надпись выгружается в слое ENGRAVE (DXF, SVG) и комментарием в G-code."
+msgstr "Text is exported on the ENGRAVE layer (DXF, SVG) and as a G-code comment."
+
 msgid "Терминал"
 msgstr "Terminal"
 

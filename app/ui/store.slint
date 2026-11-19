@@ -13,11 +13,13 @@ export struct Par {
     gc-on: string, gc-off: string, gc-header: string, gc-footer: string, gc-arcs: bool, gc-numbers: bool, gc-decimals: int,
     origin: string, dxf-layers: bool,
     name: string, order-no: string, client: string, phone: string, email: string, comment: string,
+    mount-n: int, mount-d: float, mount-inset: float, engrave-text: string, engrave-h: float,
 }
 
 export struct KV { k: string, v: string }
 export struct SizeRow { label: string, frac: float, n: string }
 export struct Template { id: string, name: string, desc: string, preview: string }
+export struct Machine { id: string, name: string, desc: string }
 export struct StatsUI {
     has: bool, cost: string, currency: string, rows: [KV],
     count: string, pierces: string, cut: string, time: string, open: string, mass: string,
@@ -40,6 +42,10 @@ export global Store {
     // Библиотека готовых шаблонов перфорации
     in property <[Template]> templates;
     callback apply-template(string);
+    // Профили станков
+    in property <[Machine]> machines;
+    callback apply-machine(string);
+    in-out property <int> machine-current;
     // Шаг микроджоинтов по минимальному диаметру отверстия
     in-out property <float> mjoint-step;
     callback set-mjoint-step(float);

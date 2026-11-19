@@ -1304,13 +1304,71 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
     }
 
     // У узора «линии» порядок уже задан построчно серпантином — оптимизация только ломает его.
-    let shapes = if p.pattern == "lines" {
+    let mut shapes = if p.pattern == "lines" {
         shapes
     } else {
         optimize_path(shapes, p.pitch * 2.0)
     };
+    // Монтажные отверстия: углы и середины кромок, по числу в настройке
+    if p.mount_n > 0 && p.mount_d > 0.0 {
+        let i = p.mount_inset.min(w / 4.0).min(h / 4.0).max(0.0);
+        let spots = [
+            (i, i),
+            (w - i, i),
+            (w - i, h - i),
+            (i, h - i),
+            (w / 2.0, i),
+            (w - i, h / 2.0),
+            (w / 2.0, h - i),
+            (i, h / 2.0),
+        ];
+        for &(x, y) in spots.iter().take(p.mount_n as usize) {
+            shapes.push(Shape::Circle { x, y, d: p.mount_d });
+        }
+    }
 
     finish(shapes, warnings, removed_edge, min_allowed, max_allowed, p)
+}
+
+/// Ищет пары отверстий, у которых зазор меньше заданной перемычки.
+/// Возвращает координаты середины и величину нехватки, не более 8 пар.
+pub fn bridge_violations(shapes: &[Shape], bridge: f64) -> Vec<(f64, f64, f64)> {
+    let max_size = shapes.iter().map(|s| s.size()).fold(0.0_f64, f64::max);
+    let cell = (max_size + bridge).max(1.0);
+    let mut grid: HashMap<(i64, i64), Vec<usize>> = HashMap::with_capacity(shapes.len() / 4 + 1);
+    for (idx, s) in shapes.iter().enumerate() {
+        let (x, y) = s.center();
+        grid.entry(((x / cell).floor() as i64, (y / cell).floor() as i64))
+            .or_default()
+            .push(idx);
+    }
+    let mut out = Vec::new();
+    for (idx, s) in shapes.iter().enumerate() {
+        let (x, y) = s.center();
+        let (gx, gy) = ((x / cell).floor() as i64, (y / cell).floor() as i64);
+        'near: for dy in -1..=1 {
+            for dx in -1..=1 {
+                if let Some(bucket) = grid.get(&(gx + dx, gy + dy)) {
+                    for &j in bucket {
+                        if j <= idx {
+                            continue;
+                        }
+                        let q = &shapes[j];
+                        let (qx, qy) = q.center();
+                        let d = ((qx - x).powi(2) + (qy - y).powi(2)).sqrt();
+                        let need = (s.size() + q.size()) / 2.0 + bridge;
+                        if d + 1e-9 < need {
+                            out.push(((x + qx) / 2.0, (y + qy) / 2.0, need - d));
+                            if out.len() >= 8 {
+                                break 'near;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    out
 }
 
 fn finish(
@@ -1425,6 +1483,27 @@ fn finish(
                 count(shapes.len() as f64, false)
             )
         });
+    }
+    if p.bridge > 0.0 {
+        let bad = bridge_violations(&shapes, p.bridge);
+        if !bad.is_empty() {
+            let first = &bad[0];
+            warnings.push(if p.lang == "en" {
+                format!(
+                    "Bridge too thin at {} × {} mm (short by {} mm); increase pitch or reduce size",
+                    dec(first.0, true),
+                    dec(first.1, true),
+                    dec(first.2, true)
+                )
+            } else {
+                format!(
+                    "Перемычка тоньше нормы у {} × {} мм (не хватает {} мм): увеличьте шаг или уменьшите размер",
+                    dec(first.0, false),
+                    dec(first.1, false),
+                    dec(first.2, false)
+                )
+            });
+        }
     }
     st.warnings = warnings;
     GenResult {

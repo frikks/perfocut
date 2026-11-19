@@ -5,6 +5,7 @@ pub mod export;
 pub mod gen;
 pub mod image;
 pub mod params;
+pub mod profiles;
 pub mod sketch;
 pub mod step;
 pub mod templates;
@@ -827,7 +828,57 @@ mod tests {
         // DXF: незамкнутые полилинии вместо entity CIRCLE
         let dxf = String::from_utf8(super::export_format(&r, "dxf").unwrap()).unwrap();
         assert!(!dxf.contains("CIRCLE"));
-        assert!(dxf.contains("POLYLINE"));
+        assert!(
+            dxf.contains("ARC"),
+            "M-joint circles must be exported as ARC entities"
+        );
+    }
+
+    #[test]
+    fn mounting_engraving_profiles_and_bridge_check() {
+        use profiles;
+        // Монтажные отверстия и гравировка попадают в экспорт
+        let p = Params {
+            mount_n: 4,
+            mount_d: 6.0,
+            mount_inset: 20.0,
+            engrave_text: "PANEL-01".into(),
+            outline: true,
+            ..Params::default()
+        };
+        let r = gen::generate(None, &p);
+        assert_eq!(r.stats.count, 4);
+        let dxf = String::from_utf8(super::export_format(&r, "dxf").unwrap()).unwrap();
+        assert!(dxf.contains("ENGRAVE"));
+        assert!(dxf.contains("PANEL-01"));
+        let svg = String::from_utf8(super::export_format(&r, "svg").unwrap()).unwrap();
+        assert!(svg.contains("id=\"engrave\""));
+        let gcode = String::from_utf8(super::export_format(&r, "gcode").unwrap()).unwrap();
+        assert!(gcode.contains("(ENGRAVE: PANEL-01)"));
+
+        // Профиль станка меняет G-code настройки
+        let mut q = Params::default();
+        profiles::find("grbl").unwrap().apply_to(&mut q);
+        assert_eq!(q.gc_on, "M3");
+        assert!(!q.gc_arcs);
+        assert_eq!(q.gc_decimals, 3);
+
+        // Проверка перемычек находит слишком близкие отверстия
+        let shapes = vec![
+            gen::Shape::Circle {
+                x: 0.0,
+                y: 0.0,
+                d: 10.0,
+            },
+            gen::Shape::Circle {
+                x: 12.0,
+                y: 0.0,
+                d: 10.0,
+            },
+        ];
+        let bad = gen::bridge_violations(&shapes, 5.0);
+        assert_eq!(bad.len(), 1, "{bad:?}");
+        assert!((bad[0].2 - 3.0).abs() < 1e-6);
     }
 
     #[test]

@@ -8,10 +8,11 @@ use crate::i18n::{self, fmt_n, fmt_time, t, tf};
 use crate::platform::{self, SaveOutcome};
 use crate::render::{self, Look, Rgb, Tf, View};
 use crate::saved::{self, Preset, Saved};
-use crate::{AppWindow, Bridge, Fmt, Prefs, SizeRow, StatsUI, Store, Template, Theme, KV};
+use crate::{AppWindow, Bridge, Fmt, Machine, Prefs, SizeRow, StatsUI, Store, Template, Theme, KV};
 use perfo_core::gen::{self, GenResult};
 use perfo_core::image::Gray;
 use perfo_core::params::Params;
+use perfo_core::profiles;
 use perfo_core::sketch::Sketch;
 use perfo_core::templates;
 use slint::{
@@ -199,6 +200,15 @@ pub fn run() -> Result<(), slint::PlatformError> {
         })
         .collect();
     store.set_templates(ModelRc::new(VecModel::from(tpl)));
+    let machines: Vec<Machine> = profiles::PROFILES
+        .iter()
+        .map(|m| Machine {
+            id: m.id.into(),
+            name: m.name.into(),
+            desc: m.desc.into(),
+        })
+        .collect();
+    store.set_machines(ModelRc::new(VecModel::from(machines)));
     refresh_presets(&saved, &store);
 
     bind(&ui);
@@ -341,6 +351,22 @@ fn bind(ui: &AppWindow) {
                 let p = t.apply_to(&st.p);
                 set_params(st, ui, p, true);
                 toast(st, ui, t.name, 2200);
+            }
+        });
+    });
+    s.on_apply_machine(|id| {
+        with(|st, ui| {
+            if let Some(m) = profiles::find(&id) {
+                let mut p = st.p.clone();
+                m.apply_to(&mut p);
+                set_params(st, ui, p, true);
+                ui.global::<Store>().set_machine_current(
+                    profiles::PROFILES
+                        .iter()
+                        .position(|x| x.id == m.id)
+                        .unwrap_or(0) as i32,
+                );
+                toast(st, ui, m.name, 2200);
             }
         });
     });

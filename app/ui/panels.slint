@@ -1076,8 +1076,85 @@ export component SettingsPanel inherits VerticalLayout {
     }
 
     Section {
+        title: @tr("Монтаж и гравировка");
+        open: false;
+        FieldRow {
+            label: @tr("Монтажных отверстий");
+            NumField {
+                value: Store.p.mount-n;
+                integer: true;
+                edited(v) => {
+                    Store.p.mount-n = Math.clamp(Math.round(v), 0, 8);
+                    Store.changed();
+                }
+            }
+        }
+        if Store.p.mount-n > 0: FieldRow {
+            label: @tr("Диаметр монтажных");
+            NumField {
+                value: Store.p.mount-d;
+                decimals: 1;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.p.mount-d = v;
+                    Store.changed();
+                }
+            }
+        }
+        if Store.p.mount-n > 0: FieldRow {
+            label: @tr("Отступ от кромки");
+            NumField {
+                value: Store.p.mount-inset;
+                decimals: 1;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.p.mount-inset = v;
+                    Store.changed();
+                }
+            }
+        }
+        Caption {
+            text: @tr("Надпись для гравировки");
+        }
+        TextField {
+            value: Store.p.engrave-text;
+            placeholder: @tr("Артикул или номер заказа");
+            edited(t) => {
+                Store.p.engrave-text = t;
+                Store.changed();
+            }
+        }
+        if Store.p.engrave-text != "": FieldRow {
+            label: @tr("Высота букв");
+            NumField {
+                value: Store.p.engrave-h;
+                decimals: 1;
+                unit: @tr("мм");
+                edited(v) => {
+                    Store.p.engrave-h = v;
+                    Store.changed();
+                }
+            }
+        }
+        Hint {
+            text: @tr("Надпись выгружается в слое ENGRAVE (DXF, SVG) и комментарием в G-code.");
+        }
+    }
+
+    Section {
         title: "G-code";
         open: false;
+        Caption {
+            text: @tr("Профиль станка");
+        }
+        Seg {
+            columns: 2;
+            items: ["CypCut", "NCStudio", "GRBL", "LinuxCNC"];
+            current: Store.machine-current;
+            select(i) => {
+                Store.apply-machine(i == 0 ? "cypcut" : i == 1 ? "ncstudio" : i == 2 ? "grbl" : "linuxcnc");
+            }
+        }
         Caption {
             text: @tr("Команды лазера");
         }

@@ -231,6 +231,9 @@ pub fn dxf(r: &GenResult) -> String {
             layers.push(l);
         }
     }
+    if !p.engrave_text.is_empty() {
+        layers.push("ENGRAVE".into());
+    }
     let mut o = String::with_capacity(r.shapes.len() * 90 + 2000);
     let mut g = |code: i32, val: &str| {
         o.push_str(&format!("{:>3}", code));
@@ -303,11 +306,38 @@ pub fn dxf(r: &GenResult) -> String {
         g(0, "SEQEND");
         g(8, layer);
     };
+    let arc =
+        |g: &mut dyn FnMut(i32, &str), layer: &str, cx: f64, cy: f64, r: f64, a0: f64, a1: f64| {
+            g(0, "ARC");
+            g(8, layer);
+            g(10, &n4(cx));
+            g(20, &n4(cy));
+            g(30, "0.0");
+            g(40, &n4(r));
+            g(50, &n4(a0.to_degrees()));
+            g(51, &n4(a1.to_degrees()));
+        };
     for s in &r.shapes {
         let l = lay_of(s);
         if p.mjoint_n > 0 && p.pattern != "lines" {
             for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
-                poly(&mut g, &l, seg, false);
+                if seg.len() < 2 {
+                    continue;
+                }
+                if let Shape::Circle { x, y, d } = s {
+                    let (cx, cy) = (*x, *y);
+                    let radius = d / 2.0;
+                    let a0 = (seg[0].1 - cy).atan2(seg[0].0 - cx).rem_euclid(2.0 * PI);
+                    let mut a1 = (seg[seg.len() - 1].1 - cy)
+                        .atan2(seg[seg.len() - 1].0 - cx)
+                        .rem_euclid(2.0 * PI);
+                    if a1 <= a0 {
+                        a1 += 2.0 * PI;
+                    }
+                    arc(&mut g, &l, cx, cy, radius, a0, a1);
+                } else {
+                    poly(&mut g, &l, seg, false);
+                }
             }
         } else {
             match s {
@@ -322,6 +352,15 @@ pub fn dxf(r: &GenResult) -> String {
                 Shape::Poly { pts, .. } => poly(&mut g, &l, pts, true),
             }
         }
+    }
+    if !p.engrave_text.is_empty() {
+        g(0, "TEXT");
+        g(8, "ENGRAVE");
+        g(10, &n4(w / 2.0));
+        g(20, &n4(p.mount_inset / 2.0 + p.engrave_h));
+        g(30, "0.0");
+        g(40, &n4(p.engrave_h));
+        g(1, &p.engrave_text);
     }
     if p.outline {
         if p.tab_n > 0 {
@@ -404,6 +443,16 @@ pub fn svg(r: &GenResult) -> String {
                 }
             }
         }
+    }
+    if !p.engrave_text.is_empty() {
+        let _ = writeln!(
+            o,
+            "<text id=\"engrave\" x=\"{}\" y=\"{}\" font-size=\"{}\" text-anchor=\"middle\">{}</text>",
+            n4(w / 2.0),
+            n4(h - p.mount_inset / 2.0),
+            n4(p.engrave_h),
+            xml_esc(&p.engrave_text)
+        );
     }
     o.push_str("</g>\n</g>\n</svg>\n");
     o
@@ -562,6 +611,9 @@ pub fn gcode(r: &GenResult) -> String {
                 }
             }
         }
+    }
+    if !p.engrave_text.is_empty() {
+        line(&mut o, &format!("(ENGRAVE: {})", p.engrave_text));
     }
     if p.outline {
         line(&mut o, "(contour)");

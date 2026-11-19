@@ -104,6 +104,13 @@ pub struct Params {
     pub comment: String,
     // Язык отчётов и предупреждений: ru | en
     pub lang: String,
+    // Монтажные отверстия и гравировка артикула
+    /// Число монтажных отверстий по углам: 0 — выключено.
+    pub mount_n: i64,
+    pub mount_d: f64,
+    pub mount_inset: f64,
+    pub engrave_text: String,
+    pub engrave_h: f64,
 }
 
 impl Default for Params {
@@ -183,6 +190,11 @@ impl Default for Params {
             email: String::new(),
             comment: String::new(),
             lang: "ru".into(),
+            mount_n: 0,
+            mount_d: 5.0,
+            mount_inset: 20.0,
+            engrave_text: String::new(),
+            engrave_h: 8.0,
         }
     }
 }
@@ -201,6 +213,10 @@ impl Params {
         p.tab_offset = fin(p.tab_offset, 0.0).clamp(0.0, 1.0);
         p.mjoint_n = p.mjoint_n.clamp(0, 24);
         p.mjoint_w = fin(p.mjoint_w, 0.5).clamp(0.05, 50.0);
+        p.mount_n = p.mount_n.clamp(0, 8);
+        p.mount_d = fin(p.mount_d, 5.0).clamp(0.5, 100.0);
+        p.mount_inset = fin(p.mount_inset, 20.0).clamp(1.0, 1000.0);
+        p.engrave_h = fin(p.engrave_h, 8.0).clamp(1.0, 100.0);
         p.img_scale = fin(p.img_scale, 1.0).clamp(0.05, 20.0);
         p.brightness = fin(p.brightness, 0.0).clamp(-1.0, 1.0);
         p.contrast = fin(p.contrast, 0.0).clamp(-1.0, 3.0);
