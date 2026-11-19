@@ -849,6 +849,36 @@ mod tests {
             let r = gen::generate(Some(&g), &p);
             assert!(r.stats.count > 20, "{grid}: {}", r.stats.count);
         }
+        // Разные сетки дают разные позиции отверстий
+        let centers_of = |grid: &str| {
+            let p = Params {
+                pattern: "dots".into(),
+                grid: grid.into(),
+                pitch: 24.0,
+                tone_cut: 0.0,
+                d_max: 4.0,
+                ..Params::default()
+            };
+            gen::generate(Some(&g), &p)
+                .shapes
+                .iter()
+                .take(12)
+                .map(|s| s.center())
+                .collect::<Vec<_>>()
+        };
+        let square = centers_of("square");
+        assert_ne!(
+            square,
+            centers_of("radial"),
+            "radial must differ from square"
+        );
+        assert_ne!(square, centers_of("hex"), "hex must differ from square");
+        assert_ne!(
+            square,
+            centers_of("oblique"),
+            "oblique must differ from square"
+        );
+
         // Адаптивная сетка не ставит отверстия ближе минимума (размер + перемычка)
         let p = Params {
             pattern: "dots".into(),

@@ -1,8 +1,6 @@
 // Цвета, размеры и шрифты интерфейса. Все компоненты берут значения только отсюда.
-import { Palette } from "std-widgets.slint";
-
 export global Theme {
-    // 0 основная (графит), 1 светлая, 2 как в системе, 3 AMOLED
+    // 0 HUD, 1 Blueprint, 2 Терминал, 3 Осциллограф, 4 Промышленная, 5 AMOLED
     in-out property <int> mode: 0;
     // Акцентный цвет: 0 цитрус, 1 изумруд, 2 лазурь, 3 аметист, 4 роза, 5 магма
     in-out property <int> accent: 0;
@@ -11,21 +9,27 @@ export global Theme {
     // Системный масштаб шрифта Android
     in-out property <float> font-scale: 1.0;
 
-    out property <bool> dark: mode == 2 ? Palette.color-scheme != ColorScheme.light : mode != 1;
-    out property <bool> amoled: mode == 3;
+    out property <bool> dark: true;
+    out property <bool> amoled: mode == 5;
 
-    out property <color> bg0: !dark ? #ffffff : amoled ? #000000 : #0f0f10;
-    out property <color> bg: !dark ? #f3f3f2 : amoled ? #000000 : #141415;
-    out property <color> card: !dark ? #f7f7f6 : amoled ? #0b0b0c : #19191b;
-    out property <color> raised: !dark ? #ffffff : amoled ? #141415 : #232325;
-    out property <color> raised2: !dark ? #efefed : amoled ? #1d1d1f : #2c2c2f;
-    out property <color> line: dark ? #ededed14 : #18181b1a;
-    out property <color> line2: dark ? #ededed24 : #18181b2e;
-    out property <color> field-line: dark ? (amoled ? #ededed4d : #ededed42) : #18181b57;
-    out property <color> field-hover: dark ? #ededed6b : #18181b85;
-    out property <color> t1: dark ? #ededed : #18181b;
-    out property <color> t2: dark ? #a1a1a6 : #52525a;
-    out property <color> t3: dark ? #85858b : #71717a;
+    // Палитры техно-тем: каждая задаёт фон, панели и сетку; акцент задаётся отдельно
+    out property <color> bg0: mode == 0 ? #01070a : mode == 1 ? #06182a : mode == 2 ? #000000
+        : mode == 3 ? #080a0c : mode == 4 ? #15181a : #000000;
+    out property <color> bg: mode == 0 ? #020b0e : mode == 1 ? #071e33 : mode == 2 ? #000000
+        : mode == 3 ? #0a0e11 : mode == 4 ? #1a1c1e : #000000;
+    out property <color> card: mode == 0 ? #04191f : mode == 1 ? #08253e : mode == 2 ? #010703
+        : mode == 3 ? #0d1618 : mode == 4 ? #181a1c : #0b0b0c;
+    out property <color> raised: mode == 0 ? #041419 : mode == 1 ? #08253e : mode == 2 ? #020b04
+        : mode == 3 ? #0d1316 : mode == 4 ? #232629 : #141415;
+    out property <color> raised2: mode == 0 ? #0a2c33 : mode == 1 ? #0d3555 : mode == 2 ? #063018
+        : mode == 3 ? #14231c : mode == 4 ? #2e3235 : #1d1d1f;
+    out property <color> line: #ffffff14;
+    out property <color> line2: #ffffff24;
+    out property <color> field-line: amoled ? #ffffff4d : #ffffff42;
+    out property <color> field-hover: #ffffff6b;
+    out property <color> t1: #ededed;
+    out property <color> t2: #a1a1a6;
+    out property <color> t3: #85858b;
     // Акцент: цитрус, изумруд, лазурь, аметист, роза, магма
     out property <color> acc: accent == 1 ? #2fbf8f
         : accent == 2 ? #4aa8ff
@@ -77,15 +81,17 @@ export global Theme {
     out property <color> glass-shadow: dark ? #00000080 : #18181b26;
     out property <color> glow: acc.with-alpha(0.20);
     out property <length> radius-lg: 16px;
-    // Графит и сигнал: оболочка «бумага»/графит и тёмные панели с акцентной кромкой
-    out property <color> shell: !dark ? #ded5c9 : amoled ? #000000 : #0f0f10;
-    out property <color> shell-raised: !dark ? #f7f4ef : amoled ? #0a0a0a : #141415;
-    out property <color> panel: #141416;
-    out property <color> panel-edge: #3a3a3e;
+    // Оболочка и панели каждой техно-темы; акцент окрашивает кромки и активные состояния
+    out property <color> shell: bg0;
+    out property <color> shell-raised: bg;
+    out property <color> panel: card;
+    out property <color> panel-edge: mode == 0 ? #164a55 : mode == 1 ? #2f6d99 : mode == 2 ? #1f8a4c
+        : mode == 3 ? #2c4a3c : mode == 4 ? #3c4145 : #333338;
     out property <color> panel-ink: #ededed;
     out property <color> panel-muted: #a1a1a6;
-    out property <color> shell-ink: !dark ? #3c3934 : #ededed;
-    out property <color> grid-line: !dark ? #e2dbd0 : #ffffff12;
+    out property <color> shell-ink: #ededed;
+    out property <color> grid-line: mode == 0 ? #0c3b45 : mode == 1 ? #1a4a70 : mode == 2 ? #0b3a1f
+        : mode == 3 ? #1c382b : mode == 4 ? #1d2123 : #ffffff12;
     out property <length> panel-bar: 3px;
     out property <color> seg-on: !dark ? #ffffff : amoled ? #2a2a2d : #38383c;
     out property <color> bar: !dark ? #c7c7cc : amoled ? #3d3d42 : #4a4a4f;

@@ -143,13 +143,21 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let mut p = saved.params.clone().unwrap_or_default();
     p.lang = saved.lang.clone();
     fix_default_name(&mut p, en);
-    saved.theme = saved.theme.clamp(0, 3);
+    let mut migrated = false;
+    if !saved.theme_v2 {
+        // Старые темы 0..3 заменяем на AMOLED, чтобы не «перепрыгивать» на случайную техно-тему
+        saved.theme = 5;
+        saved.theme_v2 = true;
+        migrated = true;
+    }
+    saved.theme = saved.theme.clamp(0, 5);
     saved.accent = saved.accent.clamp(0, 5);
     saved.view_mode = saved.view_mode.clamp(0, 2);
     // Раз в жизни обновляем старое значение по умолчанию: теперь «Контуры» открываются первыми
     if !saved.view_mode_v2 {
         saved.view_mode = 1;
         saved.view_mode_v2 = true;
+        migrated = true;
     }
     let sheet = Rgb::parse(&saved.sheet_color).unwrap_or(SHEET_DEFAULT);
     let back = Rgb::parse(&saved.back_color).unwrap_or(BACK_DEFAULT);
@@ -163,6 +171,9 @@ pub fn run() -> Result<(), slint::PlatformError> {
     ui.global::<Theme>().set_mode(saved.theme);
     ui.global::<Theme>().set_accent(saved.accent);
     platform::init(&ui);
+    if migrated {
+        saved.store();
+    }
 
     let store = ui.global::<Store>();
     store.set_p(convert::to_par(&p));
@@ -309,6 +320,9 @@ fn bind(ui: &AppWindow) {
     });
     s.on_set_tab_step(|v| {
         with(|st, ui| set_tab_step(st, ui, f64::from(v)));
+    });
+    s.on_set_grid(|g| {
+        with(|st, ui| set_grid(st, ui, &g));
     });
     s.on_set_mjoint_step(|v| {
         with(|st, ui| set_mjoint_step(st, ui, f64::from(v)));
@@ -678,6 +692,13 @@ fn set_tab_step(st: &mut State, ui: &AppWindow, v: f64) {
     set_params(st, ui, p, true);
 }
 
+/// Смена сетки узора: обновляем параметр и пересчитываем результат с синхронизацией UI.
+fn set_grid(st: &mut State, ui: &AppWindow, grid: &str) {
+    let mut p = st.p.clone();
+    p.grid = grid.to_string();
+    set_params(st, ui, p, true);
+}
+
 /// Шаг микроджоинтов: длина окружности минимального отверстия / количество.
 fn set_mjoint_step(st: &mut State, ui: &AppWindow, v: f64) {
     let per = PI * st.p.d_min.max(0.1);
@@ -870,7 +891,7 @@ fn reset(st: &mut State, ui: &AppWindow) {
 
 fn prefs_changed(st: &mut State, ui: &AppWindow) {
     let pr = ui.global::<Prefs>();
-    st.saved.theme = pr.get_theme().clamp(0, 3);
+    st.saved.theme = pr.get_theme().clamp(0, 5);
     st.saved.accent = pr.get_accent().clamp(0, 5);
     st.saved.vibro = pr.get_vibro();
     let lang = if pr.get_lang() == 1 { "en" } else { "ru" };

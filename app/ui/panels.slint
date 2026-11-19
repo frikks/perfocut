@@ -405,7 +405,7 @@ export component SettingsPanel inherits VerticalLayout {
                     : Store.p.grid == "adaptive" ? 9
                     : 1;
                 select(i) => {
-                    Store.p.grid = i == 0 ? "square"
+                    Store.set-grid(i == 0 ? "square"
                         : i == 2 ? "tri90"
                         : i == 3 ? "rect"
                         : i == 4 ? "oblique"
@@ -414,8 +414,7 @@ export component SettingsPanel inherits VerticalLayout {
                         : i == 7 ? "radial"
                         : i == 8 ? "mosaic"
                         : i == 9 ? "adaptive"
-                        : "tri";
-                    Store.changed();
+                        : "tri");
                 }
             }
             if Store.p.pattern == "dots" && Store.p.grid == "rect": FieldRow {

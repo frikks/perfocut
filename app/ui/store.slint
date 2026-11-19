@@ -34,6 +34,8 @@ export global Store {
     // Шаг недорезов: вычисляется из периметра и количества, редактирование шага меняет количество
     in-out property <float> tab-step;
     callback set-tab-step(float);
+    // Смена сетки: принудительная синхронизация параметров и пересчёт узора
+    callback set-grid(string);
     // Шаг микроджоинтов по минимальному диаметру отверстия
     in-out property <float> mjoint-step;
     callback set-mjoint-step(float);

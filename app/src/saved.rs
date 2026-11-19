@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 #[serde(default)]
 pub struct Saved {
     pub theme: i32,
+    /// Признак миграции на шесть техно-тем (0..5)
+    pub theme_v2: bool,
     /// Акцентный цвет: 0 цитрус, 1 изумруд, 2 лазурь, 3 аметист, 4 роза, 5 магма
     pub accent: i32,
     /// "ru" или "en"; пусто при первом запуске — тогда язык системы
@@ -96,6 +98,7 @@ impl Default for Saved {
     fn default() -> Self {
         Saved {
             theme: 0,
+            theme_v2: false,
             accent: 0,
             lang: String::new(),
             vibro: true,

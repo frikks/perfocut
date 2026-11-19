@@ -1284,7 +1284,8 @@ export component AppWindow inherits Window {
                     }
                     Seg {
                         columns: 2;
-                        items: [@tr("Основная"), @tr("Светлая"), @tr("Как в системе"), "AMOLED"];
+                        items: [@tr("HUD"), @tr("Blueprint"), @tr("Терминал"),
+                                @tr("Осциллограф"), @tr("Промышленная"), "AMOLED"];
                         current: Prefs.theme;
                         select(i) => {
                             Prefs.theme = i;

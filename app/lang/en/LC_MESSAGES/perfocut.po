@@ -600,6 +600,15 @@ msgstr "Phone"
 msgid "Тема"
 msgstr "Theme"
 
+msgid "Терминал"
+msgstr "Terminal"
+
+msgid "Осциллограф"
+msgstr "Oscilloscope"
+
+msgid "Промышленная"
+msgstr "Industrial"
+
 msgid "Толщина металла"
 msgstr "Metal thickness"
 
