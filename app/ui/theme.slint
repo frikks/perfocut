@@ -77,6 +77,16 @@ export global Theme {
     out property <color> glass-shadow: dark ? #00000080 : #18181b26;
     out property <color> glow: acc.with-alpha(0.20);
     out property <length> radius-lg: 16px;
+    // Графит и сигнал: оболочка «бумага»/графит и тёмные панели с акцентной кромкой
+    out property <color> shell: !dark ? #ded5c9 : amoled ? #000000 : #0f0f10;
+    out property <color> shell-raised: !dark ? #f7f4ef : amoled ? #0a0a0a : #141415;
+    out property <color> panel: #141416;
+    out property <color> panel-edge: #3a3a3e;
+    out property <color> panel-ink: #ededed;
+    out property <color> panel-muted: #a1a1a6;
+    out property <color> shell-ink: !dark ? #3c3934 : #ededed;
+    out property <color> grid-line: !dark ? #e2dbd0 : #ffffff12;
+    out property <length> panel-bar: 3px;
     out property <color> seg-on: !dark ? #ffffff : amoled ? #2a2a2d : #38383c;
     out property <color> bar: !dark ? #c7c7cc : amoled ? #3d3d42 : #4a4a4f;
     out property <color> toast: !dark ? #18181b : amoled ? #1d1d1f : #2c2c2f;

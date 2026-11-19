@@ -27,10 +27,10 @@ export component Btn inherits Rectangle {
     border-radius: Theme.radius;
     opacity: enabled ? 1 : 0.45;
     background: kind == 1 ? (ta.pressed ? Theme.acc.darker(12%) : ta.has-hover ? Theme.acc-hover : @linear-gradient(135deg, Theme.acc-hover, Theme.acc))
-        : kind == 2 ? (ta.pressed ? Theme.raised2 : ta.has-hover ? Theme.glass-shine : transparent)
-        : (ta.pressed ? Theme.raised2 : ta.has-hover ? Theme.glass-shine : Theme.glass);
+        : kind == 2 ? (ta.pressed ? Theme.panel : ta.has-hover ? Theme.panel-edge : transparent)
+        : (ta.pressed ? Theme.acc.darker(70%) : ta.has-hover ? Theme.panel-edge : !Theme.dark ? Theme.panel : Theme.raised);
     border-width: kind == 0 || framed ? 1px : 0px;
-    border-color: kind == 1 ? transparent : Theme.glass-edge;
+    border-color: kind == 1 ? transparent : Theme.panel-edge;
     accessible-role: button;
     accessible-label: root.text != "" ? root.text : root.tip;
     accessible-action-default => {
@@ -49,12 +49,12 @@ export component Btn inherits Rectangle {
             alignment: center;
             Icon {
                 source: root.icon;
-                tint: root.kind == 1 ? Theme.acc-ink : Theme.t1;
+                tint: root.kind == 1 ? Theme.acc-ink : Theme.panel-ink;
             }
         }
         if root.text != "": Text {
             text: root.text;
-            color: root.kind == 1 ? Theme.acc-ink : Theme.t1;
+            color: root.kind == 1 ? Theme.acc-ink : Theme.panel-ink;
             font-size: Theme.fs;
             font-weight: 500;
             vertical-alignment: center;
@@ -83,10 +83,10 @@ export component Seg inherits Rectangle {
     property <int> rows: Math.ceil(items.length / Math.max(1, cols));
     property <length> cell-h: Theme.row - 4px;
     property <length> cell-w: (self.width - 6px + 2px) / root.cols;
-    border-radius: Theme.radius;
-    background: Theme.glass;
+    border-radius: 6px;
+    background: Theme.panel;
     border-width: 1px;
-    border-color: Theme.glass-edge;
+    border-color: Theme.panel-edge;
     height: rows * cell-h + (rows - 1) * 2px + 6px;
     // Анимированный индикатор вместо резкой замены фона
     if root.animated: Rectangle {
@@ -108,9 +108,9 @@ export component Seg inherits Rectangle {
         width: (parent.width - 6px + 2px) / root.cols - 2px;
         height: root.cell-h;
         border-radius: 7px;
-        background: i == root.current && !root.animated ? Theme.seg-on : ta.has-hover ? Theme.hover-surface : transparent;
+        background: i == root.current && !root.animated ? Theme.acc-soft : ta.has-hover ? Theme.panel-edge : transparent;
         border-width: i == root.current && !Theme.dark ? 1px : 0px;
-        border-color: Theme.line2;
+        border-color: Theme.acc;
         accessible-role: button;
         accessible-label: it;
         accessible-action-default => {
@@ -124,7 +124,7 @@ export component Seg inherits Rectangle {
             x: 6px;
             width: parent.width - 12px;
             text: it;
-            color: i == root.current ? Theme.t1 : Theme.t2;
+            color: i == root.current ? Theme.panel-ink : Theme.panel-muted;
             font-size: Theme.fs-s + 1px;
             font-weight: i == root.current ? 500 : 400;
             horizontal-alignment: center;
@@ -172,7 +172,7 @@ export component Check inherits Rectangle {
         }
         Text {
             text: root.text;
-            color: Theme.t1;
+            color: Theme.panel-ink;
             font-size: Theme.fs;
             vertical-alignment: center;
             wrap: word-wrap;
@@ -193,9 +193,9 @@ component FieldBox inherits Rectangle {
     in property <bool> focused;
     in property <bool> hover;
     border-radius: Theme.radius;
-    background: Theme.glass-strong;
+    background: Theme.dark ? Theme.raised : #0d0d0e;
     border-width: 1px;
-    border-color: focused ? Theme.focus : hover ? Theme.field-hover : Theme.glass-edge;
+    border-color: focused ? Theme.acc : hover ? Theme.field-hover : Theme.panel-edge;
     animate border-color { duration: 120ms; }
     if focused: Rectangle {
         x: -3px;
@@ -248,7 +248,7 @@ export component NumField inherits Rectangle {
         enabled: root.enabled;
         font-family: Theme.mono;
         font-size: Theme.fs-m;
-        color: Theme.t1;
+        color: !Theme.dark ? Theme.panel-ink : Theme.t1;
         selection-background-color: Theme.acc.with-alpha(0.35);
         selection-foreground-color: Theme.t1;
         vertical-alignment: center;
@@ -279,7 +279,7 @@ export component NumField inherits Rectangle {
         x: parent.width - self.width - 10px;
         height: parent.height;
         text: root.unit;
-        color: Theme.t3;
+        color: Theme.panel-muted;
         font-family: Theme.mono;
         font-size: Theme.fs-s;
         vertical-alignment: center;
@@ -317,7 +317,7 @@ export component TextField inherits Rectangle {
         width: parent.width - 20px;
         height: root.multi ? self.preferred-height : parent.height;
         text: root.placeholder;
-        color: Theme.t3;
+        color: Theme.panel-muted;
         font-size: Theme.fs;
         font-family: root.mono ? Theme.mono : Theme.sans;
         vertical-alignment: root.multi ? top : center;
@@ -330,7 +330,7 @@ export component TextField inherits Rectangle {
         text: root.value;
         font-size: root.mono ? Theme.fs-m : Theme.fs;
         font-family: root.mono ? Theme.mono : Theme.sans;
-        color: Theme.t1;
+        color: !Theme.dark ? Theme.panel-ink : Theme.t1;
         selection-background-color: Theme.acc.with-alpha(0.35);
         selection-foreground-color: Theme.t1;
         vertical-alignment: root.multi ? top : center;
@@ -363,7 +363,7 @@ export component FieldRow inherits Rectangle {
         spacing: 12px;
         Text {
             text: root.label;
-            color: Theme.t2;
+            color: Theme.panel-muted;
             font-size: Theme.fs;
             vertical-alignment: center;
             wrap: word-wrap;
@@ -401,14 +401,14 @@ export component Slide inherits Rectangle {
         HorizontalLayout {
             Text {
                 text: root.label;
-                color: Theme.t2;
+                color: Theme.panel-muted;
                 font-size: Theme.fs;
                 horizontal-stretch: 1;
                 overflow: elide;
             }
             Text {
                 text: root.shown;
-                color: Theme.t3;
+                color: Theme.panel-muted;
                 font-family: Theme.mono;
                 font-size: Theme.fs-s;
                 horizontal-alignment: right;
@@ -513,36 +513,39 @@ export component Section inherits Rectangle {
     in property <string> meta;
     in-out property <bool> open: true;
     min-height: lay.preferred-height;
-    background: Theme.glass;
-    border-radius: Theme.radius-lg;
+    background: Theme.panel;
+    border-radius: 6px;
     border-width: 1px;
-    border-color: Theme.glass-edge;
+    border-color: Theme.panel-edge;
     lay := VerticalLayout {
         Rectangle {
-            height: Theme.touch ? 36px : 40px;
-            background: Theme.glass-shine;
+            height: Theme.touch ? 36px : 38px;
             Rectangle {
-                y: 0; height: 1px; width: parent.width;
-                background: Theme.glass-shine;
+                x: 0; y: 0;
+                width: parent.width;
+                height: Theme.panel-bar;
+                background: Theme.acc;
             }
             HorizontalLayout {
-                padding-left: 16px;
-                padding-right: 16px;
+                padding-left: 13px;
+                padding-right: 13px;
                 spacing: 8px;
                 VerticalLayout {
                     alignment: center;
                     Icon {
                         source: @image-url("icons/chevron.svg");
-                        tint: root.open ? Theme.acc : Theme.t3;
+                        tint: root.open ? Theme.acc : Theme.panel-muted;
                         transform-rotation: root.open ? 90deg : 0deg;
                         animate transform-rotation { duration: 140ms; easing: ease-out; }
                     }
                 }
                 Text {
                     text: root.title;
-                    color: Theme.t1;
-                    font-size: Theme.fs-h;
-                    font-weight: 500;
+                    color: Theme.panel-ink;
+                    font-family: Theme.mono;
+                    font-size: Theme.fs-s + 1px;
+                    font-weight: 600;
+                    letter-spacing: 0.6px;
                     vertical-alignment: center;
                     horizontal-stretch: 1;
                     wrap: no-wrap;
@@ -550,7 +553,7 @@ export component Section inherits Rectangle {
                 }
                 Text {
                     text: root.meta;
-                    color: Theme.t3;
+                    color: Theme.acc-text;
                     font-family: Theme.mono;
                     font-size: Theme.fs-s;
                     vertical-alignment: center;
@@ -585,14 +588,14 @@ export component Section inherits Rectangle {
 
 // Подпись группы внутри раздела
 export component Caption inherits Text {
-    color: Theme.t3;
+    color: Theme.panel-muted;
     font-size: Theme.fs-s;
     vertical-alignment: bottom;
     min-height: Theme.touch ? 18px : 18px;
 }
 
 export component Hint inherits Text {
-    color: Theme.t3;
+    color: Theme.panel-muted;
     font-size: Theme.fs-s;
     wrap: word-wrap;
     // Запас на 3–4 строки: при узкой панели перенос не должен «съедать» соседние строки
@@ -706,8 +709,8 @@ export component Swatch inherits Rectangle {
 // и длинная строка из двух-трёх строк наезжала на следующий блок.
 export component Bullet inherits Rectangle {
     in property <string> text;
-    in property <color> dot: Theme.t3;
-    in property <color> ink: Theme.t1;
+    in property <color> dot: Theme.panel-muted;
+    in property <color> ink: Theme.panel-ink;
     height: bt.preferred-height;
     Rectangle {
         x: 0;

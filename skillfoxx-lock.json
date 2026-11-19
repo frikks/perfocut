@@ -1,0 +1,86 @@
+{
+  "entries": {
+    "skills/ui-craft": {
+      "agents": [
+        "vscode",
+        "gemini-cli",
+        "opencode"
+      ],
+      "cliVersion": "0.4.0",
+      "commitSha": "49b751742b013ebb3e0495eb7992423185f04be0",
+      "contentDigest": "sha256:68a8e261ecfb1b12c02577c382da58d6bdcfe09d1f8e5c07cc27094c900709ec",
+      "installedAt": "2026-11-19T18:43:50.798Z",
+      "items": [
+        {
+          "agent": "*",
+          "kind": "skill",
+          "link": "canonical",
+          "path": ".agents/skills/ui-craft"
+        },
+        {
+          "agent": "vscode",
+          "kind": "skill",
+          "link": "copy",
+          "path": ".github/skills/ui-craft"
+        },
+        {
+          "agent": "*",
+          "kind": "skill",
+          "link": "canonical",
+          "path": ".agents/skills/codex-skills-ui-craft"
+        },
+        {
+          "agent": "vscode",
+          "kind": "skill",
+          "link": "copy",
+          "path": ".github/skills/codex-skills-ui-craft"
+        },
+        {
+          "agent": "*",
+          "kind": "skill",
+          "link": "canonical",
+          "path": ".agents/skills/gemini-skills-ui-craft"
+        },
+        {
+          "agent": "vscode",
+          "kind": "skill",
+          "link": "copy",
+          "path": ".github/skills/gemini-skills-ui-craft"
+        },
+        {
+          "agent": "*",
+          "kind": "skill",
+          "link": "canonical",
+          "path": ".agents/skills/opencode-skills-ui-craft"
+        },
+        {
+          "agent": "vscode",
+          "kind": "skill",
+          "link": "copy",
+          "path": ".github/skills/opencode-skills-ui-craft"
+        },
+        {
+          "agent": "*",
+          "kind": "skill",
+          "link": "canonical",
+          "path": ".agents/skills/cli-assets-claude-skills-ui-craft"
+        },
+        {
+          "agent": "vscode",
+          "kind": "skill",
+          "link": "copy",
+          "path": ".github/skills/cli-assets-claude-skills-ui-craft"
+        }
+      ],
+      "recipeHash": "sha256:f35c041a0dc851f015c6968e0be13ccf53e26d3c30236cb2f662b1f201c8979f",
+      "risk": "medium",
+      "scope": "project",
+      "section": "skills",
+      "slug": "ui-craft",
+      "status": "ai",
+      "updatedAt": "2026-11-19T18:43:50.798Z",
+      "vars": []
+    }
+  },
+  "lockfileVersion": 1
+}

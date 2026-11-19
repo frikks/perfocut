@@ -1178,42 +1178,44 @@ export component SettingsPanel inherits VerticalLayout {
 component Stat inherits Rectangle {
     in property <string> label;
     in property <string> value;
-    border-radius: Theme.radius-lg;
-    background: Theme.glass;
+    border-radius: 6px;
+    background: Theme.panel;
     border-width: 1px;
-    border-color: Theme.glass-edge;
+    border-color: Theme.panel-edge;
     min-height: lay.preferred-height;
     horizontal-stretch: 1;
     Rectangle {
-        x: 12px; y: 0;
-        width: 28px;
-        height: 2px;
+        x: 0; y: 0;
+        width: parent.width;
+        height: Theme.panel-bar;
         background: Theme.acc;
-        opacity: 0.8;
     }
     lay := VerticalLayout {
-        padding: 12px;
-        spacing: 4px;
+        padding: 10px;
+        spacing: 3px;
         Text {
             text: root.label;
-            color: Theme.t3;
+            color: Theme.panel-muted;
+            font-family: Theme.mono;
             font-size: Theme.fs-s;
             overflow: elide;
         }
         Text {
             text: root.value;
-            color: Theme.t1;
+            color: Theme.acc-text;
             font-family: Theme.mono;
-            font-size: Theme.fs-h + 1px;
+            font-size: Theme.fs-h + 2px;
             overflow: elide;
         }
     }
 }
 
 component Head inherits Text {
-    color: Theme.t2;
+    color: Theme.panel-muted;
+    font-family: Theme.mono;
     font-size: Theme.fs-s + 1px;
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: 0.6px;
 }
 
 export component SummaryPanel inherits VerticalLayout {
@@ -1229,7 +1231,7 @@ export component SummaryPanel inherits VerticalLayout {
             alignment: start;
             Text {
                 text: Store.stats.has ? Store.stats.cost : "—";
-                color: Theme.t1;
+                color: Theme.acc-text;
                 font-family: Theme.mono;
                 font-size: Theme.fs-xl;
             }
@@ -1356,10 +1358,10 @@ export component ExportPanel inherits VerticalLayout {
     }
     for f[i] in Store.formats: Rectangle {
         min-height: Theme.touch ? 60px : 48px;
-        border-radius: 10px;
-        background: ta.has-hover ? Theme.raised : Theme.card;
+        border-radius: 6px;
+        background: ta.has-hover ? Theme.panel-edge : Theme.panel;
         border-width: 1px;
-        border-color: Theme.line;
+        border-color: Theme.panel-edge;
         ta := TouchArea {
             mouse-cursor: pointer;
             clicked => {
@@ -1377,9 +1379,9 @@ export component ExportPanel inherits VerticalLayout {
                     width: Theme.touch ? 22px : 16px;
                     height: self.width;
                     border-radius: 4px;
-                    background: f.on ? Theme.acc : Theme.raised;
+                    background: f.on ? Theme.acc : Theme.panel-edge;
                     border-width: f.on ? 0px : 1px;
-                    border-color: Theme.field-line;
+                    border-color: Theme.panel-edge;
                     if f.on: Image {
                         width: parent.width - 2px;
                         height: self.width;
@@ -1394,13 +1396,13 @@ export component ExportPanel inherits VerticalLayout {
                 spacing: 1px;
                 Text {
                     text: f.title;
-                    color: Theme.t1;
+                    color: Theme.panel-ink;
                     font-size: Theme.fs;
                     font-weight: 500;
                 }
                 Text {
                     text: f.note;
-                    color: Theme.t3;
+                    color: Theme.panel-muted;
                     font-size: Theme.fs-s;
                     overflow: elide;
                 }

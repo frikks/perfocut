@@ -44,7 +44,7 @@ component Splash inherits Rectangle {
         root.appear = 1;
         root.load = 1;
     }
-    background: Theme.bg0;
+    background: Theme.shell;
     TouchArea {
         enabled: root.shown;
         clicked => {
@@ -347,12 +347,11 @@ component Header inherits Rectangle {
     in property <length> pad-l;
     in property <length> pad-r;
     callback settings();
-    background: @linear-gradient(180deg, Theme.glass-strong, Theme.glass);
+    background: Theme.shell-raised;
     Rectangle {
         y: parent.height - 1px;
-        height: 1px;
-        background: @linear-gradient(90deg, transparent, Theme.acc, transparent);
-        opacity: 0.6;
+        height: 2px;
+        background: Theme.acc;
     }
     HorizontalLayout {
         padding-left: 16px + root.pad-l;
@@ -440,7 +439,7 @@ component DimLabel inherits Rectangle {
     width: t.preferred-width + 8px;
     height: t.preferred-height + 4px;
     border-radius: 4px;
-    background: Theme.bg0;
+    background: Theme.shell;
     t := Text {
         text: root.text;
         color: Theme.t2;
@@ -465,7 +464,7 @@ component Stage inherits Rectangle {
     callback pick-color(int);
     out property <length> cw: canvas.width;
     out property <length> ch: canvas.height;
-    background: Theme.bg0;
+    background: Theme.shell;
     changed drawing-now => {
         if !self.drawing-now {
             root.brush-open = false;
@@ -474,11 +473,11 @@ component Stage inherits Rectangle {
     VerticalLayout {
         Rectangle {
             height: Store.drawing && root.compact ? Math.max(Theme.row, 38px) : Theme.row + (Theme.touch ? 10px : 16px);
-            background: Theme.glass;
+            background: Theme.shell-raised;
             Rectangle {
                 y: parent.height - 1px;
                 height: 1px;
-                background: Theme.glass-edge;
+                background: Theme.grid-line;
             }
             if Store.drawing: DrawTools {
                 compact: root.compact;
@@ -558,11 +557,11 @@ component Stage inherits Rectangle {
         }
         if Store.drawing && !root.compact: Rectangle {
             height: bb.preferred-height;
-            background: Theme.glass;
+            background: Theme.shell-raised;
             Rectangle {
                 y: parent.height - 1px;
                 height: 1px;
-                background: Theme.glass-edge;
+                background: Theme.grid-line;
             }
             bb := BrushBar { }
         }
@@ -694,7 +693,7 @@ component Stage inherits Rectangle {
                 width: Math.min(parent.width - 24px, hint-t.preferred-width + 24px);
                 height: hint-t.preferred-height + 12px;
                 border-radius: 8px;
-                background: Theme.bg.with-alpha(0.9);
+                background: Theme.shell.with-alpha(0.9);
                 border-width: 1px;
                 border-color: Theme.line;
                 hint-t := Text {
@@ -714,7 +713,7 @@ component Stage inherits Rectangle {
                 width: hud.preferred-width + 16px;
                 height: hud.preferred-height + 10px;
                 border-radius: 8px;
-                background: Theme.bg.with-alpha(0.88);
+                background: Theme.shell.with-alpha(0.88);
                 border-width: 1px;
                 border-color: Theme.line;
                 hud := Text {
@@ -737,7 +736,7 @@ component Stage inherits Rectangle {
                 }
             }
             if !Store.has-image: Rectangle {
-                background: Theme.bg0;
+                background: Theme.shell;
                 TouchArea { }
                 VerticalLayout {
                     alignment: center;
@@ -939,7 +938,7 @@ export component AppWindow inherits Window {
     min-width: 360px;
     // Телефон в альбомной ориентации: окно бывает ниже 520 px, веб не должен растягивать холст
     min-height: 360px;
-    background: @linear-gradient(180deg, Theme.bg0, Theme.bg 55%, Theme.bg0);
+    background: Theme.shell;
     forward-focus: fs;
 
     in-out property <int> tab: 0;
@@ -1098,7 +1097,7 @@ export component AppWindow inherits Window {
                 y: root.head-h;
                 width: root.left-w;
                 height: parent.height - root.head-h;
-                background: Theme.bg;
+                background: Theme.shell;
                 left := Flickable {
                     width: parent.width - 1px;
                     height: parent.height;
@@ -1121,7 +1120,7 @@ export component AppWindow inherits Window {
                 y: root.head-h;
                 width: root.right-w;
                 height: parent.height - root.head-h;
-                background: Theme.bg;
+                background: Theme.shell;
                 Rectangle {
                     x: 0;
                     width: 1px;
@@ -1168,7 +1167,7 @@ export component AppWindow inherits Window {
                 y: root.head-h + root.stage-h;
                 width: parent.width;
                 height: parent.height - root.head-h - root.stage-h;
-                background: Theme.bg;
+                background: Theme.shell;
                 VerticalLayout {
                     padding-left: root.inset-left;
                     padding-right: root.inset-right;
