@@ -660,6 +660,12 @@ msgstr "mounting holes"
 msgid "гравировка"
 msgstr "engraving"
 
+msgid "Шаблоны"
+msgstr "Templates"
+
+msgid "18 готовых узоров. Один клик применяет шаблон — лист, картинка, металл и цены сохраняются."
+msgstr "18 ready patterns. One click applies a template — sheet, image, metal and prices are kept."
+
 msgid "Терминал"
 msgstr "Terminal"
 

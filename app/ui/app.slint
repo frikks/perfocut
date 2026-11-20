@@ -7,7 +7,7 @@ import { AboutSlint } from "std-widgets.slint";
 import { Theme, Bridge, Kb } from "theme.slint";
 import { Store, Prefs, Par, KV, SizeRow, StatsUI, Fmt } from "store.slint";
 import { Btn, Seg, Check, Icon, Modal, Swatch, Hint, Caption, TextField } from "widgets.slint";
-import { SettingsPanel, SummaryPanel, ExportPanel } from "panels.slint";
+import { SettingsPanel, TemplatesPanel, SummaryPanel, ExportPanel } from "panels.slint";
 import { DrawTools, BrushBar, BrushPopup } from "draw.slint";
 
 export { Theme, Bridge, Kb, Store, Prefs, Par, KV, SizeRow, StatsUI, Fmt }
@@ -942,6 +942,7 @@ export component AppWindow inherits Window {
     forward-focus: fs;
 
     in-out property <int> tab: 0;
+    in-out property <int> left-tab: 0;
     in-out property <int> color-target: -1;
     in-out property <bool> settings-open;
     in-out property <bool> info-open;
@@ -1098,14 +1099,33 @@ export component AppWindow inherits Window {
                 width: root.left-w;
                 height: parent.height - root.head-h;
                 background: Theme.shell;
-                left := Flickable {
-                    width: parent.width - 1px;
-                    height: parent.height;
-                    content-height: lp.preferred-height;
-                    content-width: self.width;
-                    lp := SettingsPanel {
-                        x: 0;
-                        width: left.width;
+                VerticalLayout {
+                    Rectangle {
+                        height: Theme.row + 8px;
+                        HorizontalLayout {
+                            padding: 4px;
+                            Seg {
+                                items: [@tr("Настройки"), @tr("Шаблоны")];
+                                current: root.left-tab;
+                                select(i) => { root.left-tab = i; left.content-y = 0; }
+                            }
+                        }
+                    }
+                    left := Flickable {
+                        vertical-stretch: 1;
+                        content-height: (root.left-tab == 0 ? settings.preferred-height : templates.preferred-height);
+                        content-width: self.width;
+                        settings := SettingsPanel {
+                            x: 0;
+                            width: left.width;
+                            visible: root.left-tab == 0;
+                        }
+                        templates := TemplatesPanel {
+                            x: 0;
+                            width: left.width;
+                            height: 100%;
+                            visible: root.left-tab == 1;
+                        }
                     }
                 }
                 Rectangle {
@@ -1186,7 +1206,7 @@ export component AppWindow inherits Window {
                         HorizontalLayout {
                             padding: 8px;
                             Seg {
-                                items: [@tr("Настройки"), @tr("Итог"), @tr("Экспорт")];
+                                items: [@tr("Настройки"), @tr("Шаблоны"), @tr("Итог"), @tr("Экспорт")];
                                 current: root.tab;
                                 select(i) => {
                                     root.tab = i;
@@ -1203,8 +1223,11 @@ export component AppWindow inherits Window {
                             x: 0;
                             width: flick.width;
                             if root.tab == 0: SettingsPanel { }
-                            if root.tab == 1: SummaryPanel { }
-                            if root.tab == 2: ExportPanel { }
+                            if root.tab == 1: TemplatesPanel {
+                                vertical-stretch: 1;
+                            }
+                            if root.tab == 2: SummaryPanel { }
+                            if root.tab == 3: ExportPanel { }
                             Rectangle {
                                 height: root.kb-open ? 240px : 24px;
                             }

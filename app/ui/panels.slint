@@ -8,24 +8,24 @@ component TemplateCard inherits Rectangle {
     in property <string> desc;
     in property <string> preview;
     callback clicked();
-    min-width: 96px;
-    min-height: 78px;
-    border-radius: 6px;
+    min-width: 52px;
+    min-height: 44px;
+    border-radius: 4px;
     background: Theme.panel;
     border-width: 1px;
     border-color: Theme.panel-edge;
     VerticalLayout {
-        padding: 5px;
-        spacing: 2px;
+        padding: 3px;
+        spacing: 1px;
         Rectangle {
-            height: 32px;
+            height: 16px;
             clip: true;
             if root.preview == "lines": VerticalLayout {
                 for k in 3: Rectangle {
-                    height: 4px;
-                    width: parent.width - 6px;
-                    x: 3px;
-                    border-radius: 2px;
+                    height: 2px;
+                    width: parent.width - 4px;
+                    x: 2px;
+                    border-radius: 1px;
                     background: Theme.acc;
                     opacity: 0.8;
                 }
@@ -35,10 +35,10 @@ component TemplateCard inherits Rectangle {
                     property <int> c: Math.mod(i, 3);
                     property <int> r: Math.floor(i / 3);
                     property <bool> shift: root.preview == "tri" || root.preview == "hex" || root.preview == "rhomb";
-                    x: 8px + self.c * 11px + (self.shift && self.r == 1 ? 5px : 0px);
-                    y: 2px + self.r * 10px;
-                    width: root.preview == "rings" ? 14px - self.r * 2px : 5px;
-                    height: root.preview == "rings" ? 14px - self.r * 2px : 5px;
+                    x: 4px + self.c * 6px + (self.shift && self.r == 1 ? 3px : 0px);
+                    y: 1px + self.r * 5px;
+                    width: root.preview == "rings" ? 8px - self.r * 1px : 3px;
+                    height: root.preview == "rings" ? 8px - self.r * 1px : 3px;
                     border-radius: root.preview == "rings" ? self.width / 2 : 3px;
                     border-width: root.preview == "rings" ? 1px : 0px;
                     border-color: Theme.acc;
@@ -51,15 +51,47 @@ component TemplateCard inherits Rectangle {
             text: root.name;
             color: Theme.panel-ink;
             font-family: Theme.mono;
-            font-size: Theme.fs-s;
+            font-size: Theme.fs-s - 2px;
             wrap: word-wrap;
             horizontal-alignment: center;
             vertical-alignment: center;
+            overflow: elide;
         }
     }
     TouchArea {
         mouse-cursor: pointer;
         clicked => { root.clicked(); }
+    }
+}
+
+// Панель библиотеки шаблонов: 6 строк по 3 компактные карточки, прокрутка всем списком
+export component TemplatesPanel inherits Flickable {
+    content-height: lay.preferred-height + 24px;
+    content-width: self.width;
+    lay := VerticalLayout {
+        width: root.width;
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        spacing: 6px;
+        Text {
+            text: @tr("18 готовых узоров. Один клик применяет шаблон — лист, картинка, металл и цены сохраняются.");
+            color: Theme.panel-muted;
+            font-size: Theme.fs-s;
+            wrap: word-wrap;
+            min-height: 30px;
+        }
+        for row in [0, 1, 2, 3, 4, 5]: HorizontalLayout {
+            spacing: 6px;
+            for col in [0, 1, 2]: TemplateCard {
+                property <int> idx: row * 3 + col;
+                name: Store.templates[idx].name;
+                desc: Store.templates[idx].desc;
+                preview: Store.templates[idx].preview;
+                clicked => { Store.apply-template(Store.templates[idx].id); }
+            }
+        }
     }
 }
 
@@ -302,41 +334,6 @@ export component SettingsPanel inherits VerticalLayout {
                 Store.p.negative = i == 1;
                 Store.changed();
             }
-        }
-    }
-
-    Section {
-        title: @tr("Библиотека шаблонов");
-        meta: "18";
-        open: false;
-        Hint {
-            text: @tr("Один клик применяет готовый узор. Размер листа, картинка, металл и цены сохраняются.");
-        }
-        // Явные строки: GridLayout внутри вложенного Flickable не передаёт preferred-height,
-        // из-за чего библиотека не прокручивалась и карточки налезали на соседний раздел.
-        // Внутренний Flickable с фиксированной высотой: прокрутка карточек работает
-        // независимо от внешнего Flickable панели настроек (и на Windows, и на Android).
-        Flickable {
-            height: 250px;
-            content-height: 510px;
-            content-width: self.width;
-            VerticalLayout {
-                width: root.width - 32px;
-                spacing: 6px;
-                for row in [0, 1, 2, 3, 4, 5]: HorizontalLayout {
-                    spacing: 6px;
-                    for col in [0, 1, 2]: TemplateCard {
-                        property <int> idx: row * 3 + col;
-                        name: Store.templates[idx].name;
-                        desc: Store.templates[idx].desc;
-                        preview: Store.templates[idx].preview;
-                        clicked => { Store.apply-template(Store.templates[idx].id); }
-                    }
-                }
-            }
-        }
-        Hint {
-            text: @tr("Прокрутите список вниз, чтобы увидеть все шаблоны.");
         }
     }
 
