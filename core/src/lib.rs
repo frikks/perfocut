@@ -835,6 +835,54 @@ mod tests {
     }
 
     #[test]
+    fn target_open_and_export_layers() {
+        use std::f64::consts::PI;
+        let g = gradient(200, 120);
+        // Автоподбор приближает процент перфорации к цели
+        let p = Params {
+            pattern: "dots".into(),
+            grid: "square".into(),
+            tone_cut: 0.0,
+            d_min: 3.0,
+            d_max: 8.0,
+            target_open: 20.0,
+            ..Params::default()
+        };
+        let q = gen::fit_target_open(Some(&g), &p);
+        let r0 = gen::generate(Some(&g), &p);
+        let r1 = gen::generate(Some(&g), &q);
+        assert!(
+            (r1.stats.open_area_pct - 20.0).abs() < (r0.stats.open_area_pct - 20.0).abs() + 1e-9,
+            "fit should not be worse: {} -> {}, target 20",
+            r0.stats.open_area_pct,
+            r1.stats.open_area_pct
+        );
+
+        // Слои экспорта: отключение контура и монтажа убирает их из файлов
+        let mut m = Params {
+            mount_n: 4,
+            mount_d: 6.0,
+            engrave_text: "AAA".into(),
+            outline: true,
+            ..Params::default()
+        };
+        let full = gen::generate(None, &m);
+        let full_dxf = String::from_utf8(super::export_format(&full, "dxf").unwrap()).unwrap();
+        assert!(full_dxf.contains("CONTOUR"));
+        assert!(full_dxf.contains("ENGRAVE"));
+        m.layer_contour = false;
+        m.layer_mount = false;
+        m.layer_engrave = false;
+        m.layer_holes = false;
+        let cut = gen::generate(None, &m);
+        let cut_dxf = String::from_utf8(super::export_format(&cut, "dxf").unwrap()).unwrap();
+        assert!(!cut_dxf.contains("CONTOUR"));
+        assert!(!cut_dxf.contains("ENGRAVE"));
+        assert!(!cut_dxf.contains("CIRCLE"));
+        let _ = PI;
+    }
+
+    #[test]
     fn mounting_engraving_profiles_and_bridge_check() {
         use profiles;
         // Монтажные отверстия и гравировка попадают в экспорт

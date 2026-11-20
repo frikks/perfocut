@@ -633,6 +633,33 @@ msgstr "Letter height"
 msgid "Надпись выгружается в слое ENGRAVE (DXF, SVG) и комментарием в G-code."
 msgstr "Text is exported on the ENGRAVE layer (DXF, SVG) and as a G-code comment."
 
+msgid "Прокрутите список вниз, чтобы увидеть все шаблоны."
+msgstr "Scroll down to see all templates."
+
+msgid "Шаг и размер подобраны"
+msgstr "Pitch and size fitted"
+
+msgid "Целевая перфорация"
+msgstr "Target open area"
+
+msgid "Подобрать шаг и размер"
+msgstr "Fit pitch and size"
+
+msgid "Слои экспорта"
+msgstr "Export layers"
+
+msgid "контур листа"
+msgstr "sheet outline"
+
+msgid "отверстия узора"
+msgstr "pattern holes"
+
+msgid "монтажные отверстия"
+msgstr "mounting holes"
+
+msgid "гравировка"
+msgstr "engraving"
+
 msgid "Терминал"
 msgstr "Terminal"
 

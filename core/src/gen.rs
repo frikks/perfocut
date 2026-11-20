@@ -698,6 +698,35 @@ fn dot_shape(
     }
 }
 
+/// Подбирает шаг и размер отверстий под целевой процент перфорации.
+/// Перебирает несколько масштабов и возвращает ближайший к цели вариант; если цель недостижима — лучший.
+pub fn fit_target_open(img: Option<&Gray>, params: &Params) -> Params {
+    let target = params.target_open;
+    if target <= 0.0 {
+        return params.clone();
+    }
+    let mut best = params.clone();
+    let mut best_err = f64::INFINITY;
+    let mut k = 1.7;
+    for _ in 0..8 {
+        let mut q = params.clone();
+        q.pitch = (params.pitch * k).clamp(1.0, 1000.0);
+        q.d_min = params.d_min * k;
+        q.d_max = params.d_max * k;
+        q.line_pitch = (params.line_pitch * k).clamp(1.0, 1000.0);
+        q.w_min = params.w_min * k;
+        q.w_max = params.w_max * k;
+        let r = generate(img, &q);
+        let err = (r.stats.open_area_pct - target).abs();
+        if err < best_err {
+            best_err = err;
+            best = q;
+        }
+        k *= 0.78;
+    }
+    best
+}
+
 pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
     let p = params.sanitized();
     let en = p.lang == "en";

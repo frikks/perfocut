@@ -212,11 +212,29 @@ pub fn shape_segments(s: &Shape, n: i64, w: f64) -> Vec<Vec<(f64, f64)>> {
     split_closed(&shape_outline(s), n as usize, w)
 }
 
+/// Отверстия для экспорта: без монтажных, если их слой выключен.
+fn hole_shapes(r: &GenResult) -> &[Shape] {
+    if !r.params.layer_holes {
+        return &[];
+    }
+    let n = if r.params.layer_mount {
+        0
+    } else {
+        r.params.mount_n.max(0) as usize
+    };
+    let len = r.shapes.len().saturating_sub(n);
+    &r.shapes[..len]
+}
+
 // ---------------- DXF (R12, AC1009) ----------------
 pub fn dxf(r: &GenResult) -> String {
     let p = &r.params;
     let (w, h) = (p.sheet_w, p.sheet_h);
-    let mut layers: Vec<String> = vec!["CONTOUR".into()];
+    let mut layers: Vec<String> = if p.outline && p.layer_contour {
+        vec!["CONTOUR".into()]
+    } else {
+        Vec::new()
+    };
     let by_layers = p.dxf_layers && p.pattern != "lines" && r.stats.by_size.len() <= 64;
     let lay_of = |s: &Shape| -> String {
         if by_layers {
@@ -225,13 +243,13 @@ pub fn dxf(r: &GenResult) -> String {
             "HOLES".into()
         }
     };
-    for s in &r.shapes {
+    for s in hole_shapes(r) {
         let l = lay_of(s);
         if !layers.contains(&l) {
             layers.push(l);
         }
     }
-    if !p.engrave_text.is_empty() {
+    if p.layer_engrave && !p.engrave_text.is_empty() {
         layers.push("ENGRAVE".into());
     }
     let mut o = String::with_capacity(r.shapes.len() * 90 + 2000);
@@ -317,7 +335,7 @@ pub fn dxf(r: &GenResult) -> String {
             g(50, &n4(a0.to_degrees()));
             g(51, &n4(a1.to_degrees()));
         };
-    for s in &r.shapes {
+    for s in hole_shapes(r) {
         let l = lay_of(s);
         if p.mjoint_n > 0 && p.pattern != "lines" {
             for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
@@ -353,7 +371,7 @@ pub fn dxf(r: &GenResult) -> String {
             }
         }
     }
-    if !p.engrave_text.is_empty() {
+    if p.layer_engrave && !p.engrave_text.is_empty() {
         g(0, "TEXT");
         g(8, "ENGRAVE");
         g(10, &n4(w / 2.0));
@@ -362,7 +380,7 @@ pub fn dxf(r: &GenResult) -> String {
         g(40, &n4(p.engrave_h));
         g(1, &p.engrave_text);
     }
-    if p.outline {
+    if p.outline && p.layer_contour {
         if p.tab_n > 0 {
             for seg in &sheet_paths(w, h, p.tab_n, p.tab_w, p.tab_offset) {
                 poly(&mut g, "CONTOUR", seg, false);
@@ -388,7 +406,7 @@ pub fn svg(r: &GenResult) -> String {
         w = n4(w),
         h = n4(h)
     );
-    if p.outline {
+    if p.outline && p.layer_contour {
         if p.tab_n > 0 {
             let mut d = String::new();
             for seg in &sheet_paths(w, h, p.tab_n, p.tab_w, p.tab_offset) {
@@ -411,7 +429,7 @@ pub fn svg(r: &GenResult) -> String {
         }
     }
     o.push_str("<g id=\"holes\">\n");
-    for s in &r.shapes {
+    for s in hole_shapes(r) {
         if p.mjoint_n > 0 && p.pattern != "lines" {
             for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
                 let _ = write!(o, "<path d=\"M");
@@ -444,7 +462,7 @@ pub fn svg(r: &GenResult) -> String {
             }
         }
     }
-    if !p.engrave_text.is_empty() {
+    if p.layer_engrave && !p.engrave_text.is_empty() {
         let _ = writeln!(
             o,
             "<text id=\"engrave\" x=\"{}\" y=\"{}\" font-size=\"{}\" text-anchor=\"middle\">{}</text>",
@@ -519,7 +537,7 @@ pub fn gcode(r: &GenResult) -> String {
             f(w),
             f(h),
             r.shapes.len()
-                + if p.outline {
+                + if p.outline && p.layer_contour {
                     if p.tab_n > 0 {
                         sheet_paths(w, h, p.tab_n, p.tab_w, p.tab_offset).len()
                     } else {
@@ -574,7 +592,7 @@ pub fn gcode(r: &GenResult) -> String {
         line(o, &p.gc_off);
     };
 
-    for s in &r.shapes {
+    for s in hole_shapes(r) {
         if p.mjoint_n > 0 && p.pattern != "lines" {
             // Разрезанная дуга: врезка в металле на начале каждого отрезка
             for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
@@ -612,10 +630,10 @@ pub fn gcode(r: &GenResult) -> String {
             }
         }
     }
-    if !p.engrave_text.is_empty() {
+    if p.layer_engrave && !p.engrave_text.is_empty() {
         line(&mut o, &format!("(ENGRAVE: {})", p.engrave_text));
     }
-    if p.outline {
+    if p.outline && p.layer_contour {
         line(&mut o, "(contour)");
         if p.tab_n > 0 {
             for seg in &sheet_paths(w, h, p.tab_n, p.tab_w, p.tab_offset) {
@@ -656,7 +674,7 @@ pub fn plt(r: &GenResult) -> String {
         }
         o.push_str(NL);
     };
-    for s in &r.shapes {
+    for s in hole_shapes(r) {
         if p.mjoint_n > 0 && p.pattern != "lines" {
             for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
                 put(seg, &mut o, false);
@@ -668,7 +686,7 @@ pub fn plt(r: &GenResult) -> String {
             }
         }
     }
-    if p.outline {
+    if p.outline && p.layer_contour {
         if p.tab_n > 0 {
             for seg in &sheet_paths(p.sheet_w, p.sheet_h, p.tab_n, p.tab_w, p.tab_offset) {
                 put(seg, &mut o, false);
@@ -713,7 +731,7 @@ pub fn eps(r: &GenResult) -> String {
             " stroke\n"
         });
     };
-    for s in &r.shapes {
+    for s in hole_shapes(r) {
         if p.mjoint_n > 0 && p.pattern != "lines" {
             for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
                 poly(&mut o, seg, false);
@@ -727,7 +745,7 @@ pub fn eps(r: &GenResult) -> String {
             }
         }
     }
-    if p.outline {
+    if p.outline && p.layer_contour {
         if p.tab_n > 0 {
             for seg in &sheet_paths(w, h, p.tab_n, p.tab_w, p.tab_offset) {
                 poly(&mut o, seg, false);
@@ -749,7 +767,7 @@ pub fn pdf(r: &GenResult) -> Vec<u8> {
     let _ = writeln!(c, "{} 0 0 {} 0 0 cm 0.1 w 0 0 0 RG", n4(k), n4(k));
     let kk = 0.552_284_75;
     let f = |v: f64| num(v, 3);
-    for s in &r.shapes {
+    for s in hole_shapes(r) {
         if p.mjoint_n > 0 && p.pattern != "lines" {
             for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
                 let _ = write!(c, "{} {} m", f(seg[0].0), f(seg[0].1));
@@ -783,7 +801,7 @@ pub fn pdf(r: &GenResult) -> Vec<u8> {
             }
         }
     }
-    if p.outline {
+    if p.outline && p.layer_contour {
         if p.tab_n > 0 {
             for seg in &sheet_paths(w, h, p.tab_n, p.tab_w, p.tab_offset) {
                 let _ = write!(c, "{} {} m", f(seg[0].0), f(seg[0].1));

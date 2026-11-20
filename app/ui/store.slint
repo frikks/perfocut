@@ -14,6 +14,8 @@ export struct Par {
     origin: string, dxf-layers: bool,
     name: string, order-no: string, client: string, phone: string, email: string, comment: string,
     mount-n: int, mount-d: float, mount-inset: float, engrave-text: string, engrave-h: float,
+    target-open: float,
+    layer-contour: bool, layer-holes: bool, layer-mount: bool, layer-engrave: bool,
 }
 
 export struct KV { k: string, v: string }
@@ -45,6 +47,8 @@ export global Store {
     // Профили станков
     in property <[Machine]> machines;
     callback apply-machine(string);
+    // Подбор шага и размера под целевой процент перфорации
+    callback fit-open();
     in-out property <int> machine-current;
     // Шаг микроджоинтов по минимальному диаметру отверстия
     in-out property <float> mjoint-step;

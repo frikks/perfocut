@@ -373,6 +373,17 @@ fn bind(ui: &AppWindow) {
     s.on_set_mjoint_step(|v| {
         with(|st, ui| set_mjoint_step(st, ui, f64::from(v)));
     });
+    s.on_fit_open(|| {
+        with(|st, ui| {
+            if st.p.target_open <= 0.0 {
+                return;
+            }
+            let img = st.pic.as_ref().map(|pic| pic.gray.as_ref());
+            let p = gen::fit_target_open(img, &st.p);
+            set_params(st, ui, p, true);
+            toast(st, ui, &t("Шаг и размер подобраны"), 2200);
+        });
+    });
     s.on_apply_preset(|i| {
         with(|st, ui| apply_preset(st, ui, i));
     });

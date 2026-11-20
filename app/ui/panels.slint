@@ -312,14 +312,31 @@ export component SettingsPanel inherits VerticalLayout {
         Hint {
             text: @tr("Один клик применяет готовый узор. Размер листа, картинка, металл и цены сохраняются.");
         }
-        GridLayout {
-            spacing: 6px;
-            for t in Store.templates: TemplateCard {
-                name: t.name;
-                desc: t.desc;
-                preview: t.preview;
-                clicked => { Store.apply-template(t.id); }
+        // Явные строки: GridLayout внутри вложенного Flickable не передаёт preferred-height,
+        // из-за чего библиотека не прокручивалась и карточки налезали на соседний раздел.
+        // Внутренний Flickable с фиксированной высотой: прокрутка карточек работает
+        // независимо от внешнего Flickable панели настроек (и на Windows, и на Android).
+        Flickable {
+            height: 250px;
+            content-height: 510px;
+            content-width: self.width;
+            VerticalLayout {
+                width: root.width - 32px;
+                spacing: 6px;
+                for row in [0, 1, 2, 3, 4, 5]: HorizontalLayout {
+                    spacing: 6px;
+                    for col in [0, 1, 2]: TemplateCard {
+                        property <int> idx: row * 3 + col;
+                        name: Store.templates[idx].name;
+                        desc: Store.templates[idx].desc;
+                        preview: Store.templates[idx].preview;
+                        clicked => { Store.apply-template(Store.templates[idx].id); }
+                    }
+                }
             }
+        }
+        Hint {
+            text: @tr("Прокрутите список вниз, чтобы увидеть все шаблоны.");
         }
     }
 
@@ -782,6 +799,22 @@ export component SettingsPanel inherits VerticalLayout {
                         Store.changed();
                     }
                 }
+            }
+            if Store.p.pattern != "lines": FieldRow {
+                label: @tr("Целевая перфорация");
+                NumField {
+                    value: Store.p.target-open;
+                    decimals: 0;
+                    unit: "%";
+                    edited(v) => {
+                        Store.p.target-open = Math.clamp(v, 0, 90);
+                        Store.changed();
+                    }
+                }
+            }
+            if Store.p.pattern != "lines" && Store.p.target-open > 0: Btn {
+                text: @tr("Подобрать шаг и размер");
+                clicked => { Store.fit-open(); }
             }
             if !(Store.p.pattern == "dots" && Store.p.size-mode == "dense") && Store.p.pattern != "stipple": Check {
                 text: @tr("Только заданные размеры");
@@ -1508,6 +1541,29 @@ export component SummaryPanel inherits VerticalLayout {
 export component ExportPanel inherits VerticalLayout {
     padding: Theme.touch ? 12px : 16px;
     spacing: Theme.touch ? 6px : 8px;
+    Head {
+        text: @tr("Слои экспорта");
+    }
+    Check {
+        text: "CONTOUR · " + @tr("контур листа");
+        checked: Store.p.layer-contour;
+        toggled(b) => { Store.p.layer-contour = b; Store.changed(); }
+    }
+    Check {
+        text: "HOLES · " + @tr("отверстия узора");
+        checked: Store.p.layer-holes;
+        toggled(b) => { Store.p.layer-holes = b; Store.changed(); }
+    }
+    Check {
+        text: "MOUNT · " + @tr("монтажные отверстия");
+        checked: Store.p.layer-mount;
+        toggled(b) => { Store.p.layer-mount = b; Store.changed(); }
+    }
+    Check {
+        text: "ENGRAVE · " + @tr("гравировка");
+        checked: Store.p.layer-engrave;
+        toggled(b) => { Store.p.layer-engrave = b; Store.changed(); }
+    }
     Head {
         text: @tr("Форматы");
     }

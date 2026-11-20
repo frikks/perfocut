@@ -52,10 +52,10 @@ par_conv!(
     num: sheet_w, sheet_h, border, img_scale, img_dx, img_dy, brightness, contrast, gamma, tone_cut,
         pitch, angle, offset_x, offset_y, grid_aspect, d_min, d_max, quant, line_pitch, line_angle, w_min, w_max,
         wave_len, wave_amp, step, thickness, min_k, bridge, kerf, shape_aspect, star_inner, jitter, density, cut_speed, rapid_speed, pierce_time,
-        price_m, price_pierce, price_kg, price_fixed, tab_w, tab_offset, mjoint_w, mount_d, mount_inset, engrave_h;
+        price_m, price_pierce, price_kg, price_fixed, tab_w, tab_offset, mjoint_w, mount_d, mount_inset, engrave_h, target_open;
     text: fit, pattern, grid, shape, size_mode, fixed_sizes, currency, gc_on, gc_off, gc_header, gc_footer,
         origin, name, order_no, client, phone, email, comment, engrave_text;
-    flag: outline, negative, fixed, wave, gc_arcs, gc_numbers, dxf_layers;
+    flag: outline, negative, fixed, wave, gc_arcs, gc_numbers, dxf_layers, layer_contour, layer_holes, layer_mount, layer_engrave;
 );
 
 #[cfg(test)]

@@ -111,6 +111,13 @@ pub struct Params {
     pub mount_inset: f64,
     pub engrave_text: String,
     pub engrave_h: f64,
+    /// Целевой процент открытой площади; 0 — автоподбор выключен.
+    pub target_open: f64,
+    // Слои экспорта
+    pub layer_contour: bool,
+    pub layer_holes: bool,
+    pub layer_mount: bool,
+    pub layer_engrave: bool,
 }
 
 impl Default for Params {
@@ -195,6 +202,11 @@ impl Default for Params {
             mount_inset: 20.0,
             engrave_text: String::new(),
             engrave_h: 8.0,
+            target_open: 0.0,
+            layer_contour: true,
+            layer_holes: true,
+            layer_mount: true,
+            layer_engrave: true,
         }
     }
 }
@@ -217,6 +229,7 @@ impl Params {
         p.mount_d = fin(p.mount_d, 5.0).clamp(0.5, 100.0);
         p.mount_inset = fin(p.mount_inset, 20.0).clamp(1.0, 1000.0);
         p.engrave_h = fin(p.engrave_h, 8.0).clamp(1.0, 100.0);
+        p.target_open = fin(p.target_open, 0.0).clamp(0.0, 90.0);
         p.img_scale = fin(p.img_scale, 1.0).clamp(0.05, 20.0);
         p.brightness = fin(p.brightness, 0.0).clamp(-1.0, 1.0);
         p.contrast = fin(p.contrast, 0.0).clamp(-1.0, 3.0);
