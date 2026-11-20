@@ -200,6 +200,7 @@ pub fn run() -> Result<(), slint::PlatformError> {
         })
         .collect();
     store.set_templates(ModelRc::new(VecModel::from(tpl)));
+    store.set_current_template(saved.template_id.clone().into());
     let machines: Vec<Machine> = profiles::PROFILES
         .iter()
         .map(|m| Machine {
@@ -350,6 +351,9 @@ fn bind(ui: &AppWindow) {
             if let Some(t) = templates::find(&id) {
                 let p = t.apply_to(&st.p);
                 set_params(st, ui, p, true);
+                st.saved.template_id = id.to_string();
+                st.saved.store();
+                ui.global::<Store>().set_current_template(id.into());
                 toast(st, ui, t.name, 2200);
             }
         });

@@ -44,6 +44,8 @@ export global Store {
     // Библиотека готовых шаблонов перфорации
     in property <[Template]> templates;
     callback apply-template(string);
+    // Идентификатор последнего применённого шаблона (для подсветки)
+    in-out property <string> current-template;
     // Профили станков
     in property <[Machine]> machines;
     callback apply-machine(string);

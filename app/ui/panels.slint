@@ -7,13 +7,14 @@ component TemplateCard inherits Rectangle {
     in property <string> name;
     in property <string> desc;
     in property <string> preview;
+    in property <bool> active: false;
     callback clicked();
     min-width: 52px;
     min-height: 44px;
     border-radius: 4px;
-    background: Theme.panel;
-    border-width: 1px;
-    border-color: Theme.panel-edge;
+    background: root.active ? Theme.acc-soft : Theme.panel;
+    border-width: root.active ? 2px : 1px;
+    border-color: root.active ? Theme.acc : Theme.panel-edge;
     VerticalLayout {
         padding: 3px;
         spacing: 1px;
@@ -47,15 +48,24 @@ component TemplateCard inherits Rectangle {
                 }
             }
         }
-        Text {
-            text: root.name;
-            color: Theme.panel-ink;
-            font-family: Theme.mono;
-            font-size: Theme.fs-s - 2px;
-            wrap: word-wrap;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-            overflow: elide;
+        HorizontalLayout {
+            spacing: 2px;
+            Text {
+                text: root.name;
+                color: Theme.panel-ink;
+                font-family: Theme.mono;
+                font-size: Theme.fs-s - 2px;
+                wrap: word-wrap;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            if root.active: Rectangle {
+                width: 6px;
+                height: 6px;
+                border-radius: 3px;
+                background: Theme.acc;
+            }
         }
     }
     TouchArea {
@@ -89,6 +99,7 @@ export component TemplatesPanel inherits Flickable {
                 name: Store.templates[idx].name;
                 desc: Store.templates[idx].desc;
                 preview: Store.templates[idx].preview;
+                active: Store.current-template == Store.templates[idx].id;
                 clicked => { Store.apply-template(Store.templates[idx].id); }
             }
         }
