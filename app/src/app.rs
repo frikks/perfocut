@@ -353,7 +353,7 @@ fn bind(ui: &AppWindow) {
                 set_params(st, ui, p, true);
                 st.saved.template_id = id.to_string();
                 st.saved.store();
-                ui.global::<Store>().set_current_template(id.into());
+                ui.global::<Store>().set_current_template(id);
                 toast(st, ui, t.name, 2200);
             }
         });
