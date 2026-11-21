@@ -60,6 +60,7 @@ pub fn init(ui: &AppWindow) {
     prefs.set_is_phone(touch);
     prefs.set_can_minimize(false);
     prefs.set_can_drop(!touch);
+    prefs.set_local_files(false);
     ui.global::<Theme>().set_touch(touch);
     let Some(doc) = window().and_then(|w| w.document()) else {
         return;

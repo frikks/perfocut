@@ -34,6 +34,7 @@ pub fn init(ui: &AppWindow) {
     use slint::winit_030::{EventResult, WinitWindowAccessor};
     let prefs = ui.global::<Prefs>();
     prefs.set_can_drop(true);
+    prefs.set_local_files(true);
     prefs.set_can_minimize(true);
     ui.window().on_winit_window_event(|_w, ev| {
         if let WindowEvent::DroppedFile(path) = ev {

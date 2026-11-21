@@ -60,6 +60,7 @@ pub fn init(ui: &AppWindow) {
     prefs.set_is_phone(true);
     prefs.set_can_minimize(true);
     prefs.set_can_drop(false);
+    prefs.set_local_files(false);
     let theme = ui.global::<Theme>();
     theme.set_touch(true);
     if let Some(k) = with_activity(|env, act| env.call_method(act, "fontScale", "()F", &[])?.f()) {

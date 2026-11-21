@@ -135,6 +135,19 @@ footer{padding:28px 0;color:var(--muted);font-size:12px;border-top:1px solid var
 .foot-in a:hover{color:var(--accent)}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--accent);color:#1b1209;padding:11px 20px;border-radius:9px;font-weight:700;opacity:0;transition:.3s;z-index:99}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+.demo-grid{display:grid;grid-template-columns:290px 1fr;gap:16px}
+@media(max-width:850px){.demo-grid{grid-template-columns:1fr}}
+.demo-panel{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:18px}
+.demo-panel label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
+.demo-panel input[type=range]{width:100%;accent-color:var(--accent)}
+.demo-val{float:right;color:var(--accent);font-family:var(--mono)}
+.demo-panel select,.demo-panel button{width:100%;padding:9px;border-radius:8px;background:var(--bg);color:var(--text);border:1px solid var(--line);margin-top:10px}
+.demo-panel button{background:var(--accent);color:#1b1209;font-weight:700;cursor:pointer}
+.demo-stage{border:1px solid var(--line);border-radius:12px;background:#0a1418;display:grid;place-items:center;padding:16px}
+.demo-stage canvas{max-width:100%;border:1px solid var(--line);box-shadow:0 16px 40px #0008;background:#cdd3d1}
+.demo-stats{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;color:var(--muted);font-size:12px}
+.demo-stats b{color:var(--cyan);font-family:var(--mono)}
 </style>
 </head>
 <body>
@@ -142,7 +155,7 @@ footer{padding:28px 0;color:var(--muted);font-size:12px;border-top:1px solid var
 <header><div class="wrap header-in">
   <a class="logo" href="#top"><img src="screenshots/logo-simple.svg" alt="PerfoCut"><div>PerfoCut<small>PERFORATION STUDIO</small></div></a>
   <nav>
-    <a href="#features">Возможности</a>
+    <a href="#demo">Демо</a><a href="#features">Возможности</a>
     <a href="#gallery">Скриншоты</a>
     <a href="#manual">Мануал</a>
     <a class="btn-top" href="#download">Скачать</a>
@@ -160,7 +173,7 @@ footer{padding:28px 0;color:var(--muted);font-size:12px;border-top:1px solid var
     <p class="lead">PerfoCut превращает фото, логотип или рисунок в перфорацию для лазерной резки металла. Подбирает отверстия по тону, проверяет перемычки, считает длину реза и стоимость — и выгружает DXF, G-code, SVG и ещё 8 форматов.</p>
     <div class="cta">
       <a class="btn primary" href="#download">⬇ Скачать бесплатно</a>
-      <a class="btn" href="#features">Смотреть возможности</a><a class="btn" href="demo.html">Живое демо</a>
+      <a class="btn" href="#features">Смотреть возможности</a>
     </div>
     <div class="version">Одна версия для трёх платформ · работает офлайн · <b>RU / EN</b></div>
   </div>
@@ -168,10 +181,39 @@ footer{padding:28px 0;color:var(--muted);font-size:12px;border-top:1px solid var
     <img src="screenshots/contours.png" alt="PerfoCut: перфорация по картинке">
     <div class="scanline"></div>
   </div>
-<div class="badge" style="margin-top:10px"><img src="screenshots/splash.gif" alt="Анимация при запуске" style="width:100%;border-radius:8px;border:1px solid var(--line)"></div></div></section>
+</div></section>
 
+
+<section class="block" id="demo"><div class="wrap">
+  <div class="kicker">01 / Живое демо</div>
+  <h2>Попробуйте прямо<br>на этой странице</h2>
+  <p class="sub">Двигайте ползунки — узор и цифры пересчитываются в браузере. Упрощённая модель ядра; точный результат — в приложении.</p>
+  <div class="demo-grid">
+    <div class="demo-panel">
+      <label>Размер отверстия <span class="demo-val" id="d-vSize">6 мм</span></label>
+      <input type="range" id="d-size" min="2" max="16" step="0.5" value="6">
+      <label>Шаг сетки <span class="demo-val" id="d-vPitch">14 мм</span></label>
+      <input type="range" id="d-pitch" min="6" max="40" step="1" value="14">
+      <label>Тон <span class="demo-val" id="d-vTone">50%</span></label>
+      <input type="range" id="d-tone" min="0" max="100" step="1" value="50">
+      <label>Поворот <span class="demo-val" id="d-vAngle">0°</span></label>
+      <input type="range" id="d-angle" min="0" max="90" step="1" value="0">
+      <label>Сетка</label>
+      <select id="d-grid"><option value="square">Квадратная</option><option value="tri">Треугольная</option><option value="hex">Шестиугольная</option><option value="radial">Радиальная</option></select>
+      <button id="d-reset">Сбросить</button>
+    </div>
+    <div>
+      <div class="demo-stage"><canvas id="d-cv" width="700" height="440"></canvas></div>
+      <div class="demo-stats">
+        <span>отверстий <b id="d-nHoles">0</b></span>
+        <span>перфорация <b id="d-nOpen">0%</b></span>
+        <span>шаг/диаметр <b id="d-nRatio">0</b></span>
+      </div>
+    </div>
+  </div>
+</div></section>
 <section class="block" id="features"><div class="wrap">
-  <div class="kicker">01 / Возможности</div>
+  <div class="kicker">02 / Возможности</div>
   <h2>Всё для перфорации —<br>в одном приложении</h2>
   <p class="sub">От картинки до готового файла для станка: настройка узора, проверка под лазер и расчёт заказа.</p>
   <div class="fgrid">
@@ -185,7 +227,7 @@ footer{padding:28px 0;color:var(--muted);font-size:12px;border-top:1px solid var
 
   <div class="feat">
     <div>
-      <div class="kicker">02 / Узор</div>
+      <div class="kicker">Узор</div>
       <h2>Сетка, которая<br>слушается тона</h2>
       <ul>
         <li><b>10 типов сеток</b> — от классической треугольной до адаптивной с минимальной дистанцией</li>
@@ -200,7 +242,7 @@ footer{padding:28px 0;color:var(--muted);font-size:12px;border-top:1px solid var
   <div class="feat">
     <figure class="shot"><img src="screenshots/contours.png" alt="Контуры для резки"><figcaption>Режим «Контуры»: то, что увидит станок</figcaption></figure>
     <div>
-      <div class="kicker">03 / Подготовка</div>
+      <div class="kicker">Подготовка</div>
       <h2>Проверка до резки,<br>а не после</h2>
       <ul>
         <li><b>Минимальная перемычка</b> — предупреждение с координатами, где тесно</li>
@@ -210,10 +252,10 @@ footer{padding:28px 0;color:var(--muted);font-size:12px;border-top:1px solid var
       </ul>
     </div>
   </div>
-<div class="badge" style="margin-top:10px"><img src="screenshots/splash.gif" alt="Анимация при запуске" style="width:100%;border-radius:8px;border:1px solid var(--line)"></div></div></section>
+</div></section>
 
 <section class="block" id="gallery"><div class="wrap">
-  <div class="kicker">04 / Скриншоты</div>
+  <div class="kicker">04 / Галерея</div>
   <h2>Интерфейс в деле</h2>
   <p class="sub">Снимки текущей версии: рабочий стол, телефон, рисование и результат.</p>
   <div class="gallery">
@@ -227,7 +269,7 @@ footer{padding:28px 0;color:var(--muted);font-size:12px;border-top:1px solid var
     <div class="gitem"><img src="screenshots/phone-summary.png" alt="Телефон: итог"><span>Телефон: итог</span></div>
     <div class="gitem"><img src="screenshots/phone-drawing.png" alt="Телефон: рисование"><span>Телефон: рисование</span></div>
   </div>
-<div class="badge" style="margin-top:10px"><img src="screenshots/splash.gif" alt="Анимация при запуске" style="width:100%;border-radius:8px;border:1px solid var(--line)"></div></div></section>
+</div></section>
 
 <section class="block"><div class="wrap">
   <div class="kicker">05 / Как это работает</div>
@@ -239,7 +281,11 @@ footer{padding:28px 0;color:var(--muted);font-size:12px;border-top:1px solid var
     <div class="step"><i>04</i><b>Итог</b><span>Проверки, длина реза, время и стоимость</span></div>
     <div class="step"><i>05</i><b>Экспорт</b><span>DXF, G-code, SVG… или заказ .perfo</span></div>
   </div>
-<div class="badge" style="margin-top:10px"><img src="screenshots/splash.gif" alt="Анимация при запуске" style="width:100%;border-radius:8px;border:1px solid var(--line)"></div></div></section>
+  <div style="max-width:640px;margin:28px auto 0;border:1px solid var(--line);border-radius:12px;overflow:hidden">
+    <img src="screenshots/splash.gif" alt="Сплеш при запуске" style="width:100%;display:block">
+  </div>
+  <p style="text-align:center;color:var(--muted);font-size:12px;margin-top:8px">Сплеш при запуске: сканирующая матрица перфорации</p>
+</div></section>
 
 <section class="block" id="manual"><div class="wrap">
   <div class="kicker">06 / Мануал</div>
@@ -303,7 +349,7 @@ footer{padding:28px 0;color:var(--muted);font-size:12px;border-top:1px solid var
     <p><b>Только контур?</b> Отключите слои HOLES, MOUNT, ENGRAVE в «Экспорте».</p>
     <p><b>Нужен интернет?</b> Нет, вся обработка локальная; сеть только для проверки обновлений.</p>
   </div></details>
-<div class="badge" style="margin-top:10px"><img src="screenshots/splash.gif" alt="Анимация при запуске" style="width:100%;border-radius:8px;border:1px solid var(--line)"></div></div></section>
+</div></section>
 
 <section class="block download" id="download"><div class="wrap">
   <div class="kicker">07 / Скачать</div>
@@ -315,7 +361,7 @@ footer{padding:28px 0;color:var(--muted);font-size:12px;border-top:1px solid var
     <div class="dcard"><div class="ico">◈</div><h3>Браузер</h3><p>Один HTML-файл, работает офлайн</p><a class="btn primary" href="https://github.com/frikks/perfocut/releases/latest/download/PerfoCut.html">▶ Открыть Web</a></div>
   </div>
   <p style="text-align:center;color:var(--muted);font-size:12px;margin-top:18px">Контрольные суммы: <a href="https://github.com/frikks/perfocut/releases/latest/download/SHA256SUMS.txt" style="color:var(--accent)">SHA256SUMS.txt</a> · <a href="https://github.com/frikks/perfocut/releases" style="color:var(--accent)">Все релизы</a></p>
-<div class="badge" style="margin-top:10px"><img src="screenshots/splash.gif" alt="Анимация при запуске" style="width:100%;border-radius:8px;border:1px solid var(--line)"></div></div></section>
+</div></section>
 
 <footer><div class="wrap foot-in">
   <span>© 2026 @Frikks</span>
@@ -330,6 +376,46 @@ footer{padding:28px 0;color:var(--muted);font-size:12px;border-top:1px solid var
 document.querySelectorAll('a[href^="http"]').forEach(a=>{
   a.addEventListener('click',()=>{ /* внешние ссылки открываются Normally */ });
 });
+</script>
+<script>
+const cv=document.getElementById('d-cv'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+function draw(){
+  const W=cv.width,H=cv.height,pad=18;
+  const size=+$('d-size').value,pitch=+$('d-pitch').value,tone=+$('d-tone').value/100,ang=+$('d-angle').value*Math.PI/180,grid=$('d-grid').value;
+  $('d-vSize').textContent=size+' мм';$('d-vPitch').textContent=pitch+' мм';$('d-vTone').textContent=$('d-tone').value+'%';$('d-vAngle').textContent=$('d-angle').value+'°';
+  ctx.clearRect(0,0,W,H);ctx.fillStyle='#cdd3d1';ctx.fillRect(0,0,W,H);
+  // лист
+  const sx=pad,sy=pad,sw=W-2*pad,sh=H-2*pad;
+  ctx.strokeStyle='#8a9490';ctx.strokeRect(sx,sy,sw,sh);
+  let n=0;const pts=[];
+  const ca=Math.cos(ang),sa=Math.sin(ang);
+  for(let y=-sh;y<sh*2;y+=pitch){
+    for(let x=-sw;x<sw*2;x+=pitch){
+      let lx=x,ly=y;
+      if(grid==='tri') lx+=(Math.round(y/pitch)%2)?pitch/2:0;
+      if(grid==='hex'){lx+=(Math.round(y/pitch)%2)?pitch*0.75:0;ly*=0.87}
+      if(grid==='radial'){const r=Math.hypot(x,y);if(r>sw/2)continue;lx=x;ly=y}
+      const rx=sx+sw/2+(lx*ca-ly*sa),ry=sy+sh/2+(lx*sa+ly*ca);
+      if(rx<sx+4||rx>sx+sw-4||ry<sy+4||ry>sy+sh-4)continue;
+      // тональное поле: тёмный центр, светлые края
+      const dx=(rx-sx-sw/2)/(sw/2),dy=(ry-sy-sh/2)/(sh/2);
+      const t=Math.max(0,1-Math.hypot(dx,dy)/1.3);
+      if(t<tone*0.55)continue;
+      const r=1+t*(size/2);
+      pts.push([rx,ry,r]);n++;
+    }
+  }
+  ctx.fillStyle='#e8833a';
+  for(const [x,y,r] of pts){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
+  const area=pts.reduce((a,p)=>a+Math.PI*p[2]*p[2],0);
+  $('d-nHoles').textContent=n.toLocaleString('ru-RU');
+  $('d-nOpen').textContent=(area/(sw*sh)*100).toFixed(1)+'%';
+  $('d-nRatio').textContent=(pitch/size).toFixed(2);
+}
+['d-size','d-pitch','d-tone','d-angle','d-grid'].forEach(id=>$(id).addEventListener('input',draw));
+$('d-reset').addEventListener('click',()=>{$('d-size').value=6;$('d-pitch').value=14;$('d-tone').value=50;$('d-angle').value=0;$('d-grid').value='square';draw()});
+draw();
 </script>
 </body>
 </html>

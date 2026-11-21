@@ -648,6 +648,15 @@ msgstr "Batch process folder"
 msgid "Обработано файлов: {n}"
 msgstr "Files processed: {n}"
 
+msgid "Настройки узора"
+msgstr "Pattern settings"
+
+msgid "Точно сбросить?"
+msgstr "Really reset?"
+
+msgid "Сбросить настройки"
+msgstr "Reset settings"
+
 msgid "Загрузить профиль JSON"
 msgstr "Load profile JSON"
 

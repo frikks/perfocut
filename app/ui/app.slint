@@ -946,6 +946,7 @@ export component AppWindow inherits Window {
     in-out property <int> color-target: -1;
     in-out property <bool> settings-open;
     in-out property <bool> info-open;
+    property <bool> confirm-reset: false;
     // Сплэш при запуске: ставится из программы, закрывается тапом или сама
     in-out property <bool> splash;
     out property <bool> wide: self.width >= 960px;
@@ -1296,6 +1297,7 @@ export component AppWindow inherits Window {
                 info-btn: true;
                 close => {
                     root.settings-open = false;
+                    root.confirm-reset = false;
                 }
                 info => {
                     root.info-open = true;
@@ -1314,6 +1316,25 @@ export component AppWindow inherits Window {
                             Prefs.theme = i;
                             Theme.mode = i;
                             Prefs.changed();
+                        }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 4px;
+                    Caption {
+                        text: @tr("Настройки узора");
+                    }
+                    Btn {
+                        text: root.confirm-reset ? @tr("Точно сбросить?") : @tr("Сбросить настройки");
+                        kind: 1;
+                        clicked => {
+                            if root.confirm-reset {
+                                Store.reset();
+                                root.confirm-reset = false;
+                                root.settings-open = false;
+                            } else {
+                                root.confirm-reset = true;
+                            }
                         }
                     }
                 }
