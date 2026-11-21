@@ -108,6 +108,16 @@ pub fn batch_process(dir: &str, params: &perfo_core::params::Params) -> Result<u
     Ok(done)
 }
 
+#[cfg(not(target_os = "windows"))]
+pub fn pick_folder() -> Option<String> {
+    None
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn batch_process(_dir: &str, _params: &perfo_core::params::Params) -> Result<usize, String> {
+    Err(t("Пакетная обработка доступна только на Windows").into())
+}
+
 pub fn save_file(name: &str, _mime: &str, bytes: Vec<u8>) -> SaveOutcome {
     let ext = name
         .rsplit_once('.')

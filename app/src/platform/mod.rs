@@ -30,6 +30,16 @@ mod desktop;
 #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
 pub use desktop::*;
 
+/// Пакетная обработка папки: только на настольных системах.
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+pub fn pick_folder() -> Option<String> {
+    None
+}
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+pub fn batch_process(_dir: &str, _params: &perfo_core::params::Params) -> Result<usize, String> {
+    Err("Пакетная обработка доступна только на компьютере".into())
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 mod clock {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -43,7 +53,7 @@ mod clock {
 
     /// Текущее время UTC в виде 2026-01-31T12:00:00Z
     pub fn now_iso() -> String {
-        let secs = SystemTime::now()
+        let secs = std::time::SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0);
