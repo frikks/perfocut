@@ -88,7 +88,7 @@ pub struct Format {
     pub on: bool,
 }
 
-pub const FORMATS: [Format; 12] = [
+pub const FORMATS: [Format; 13] = [
     Format {
         id: "dxf",
         ext: "dxf",
@@ -172,6 +172,13 @@ pub const FORMATS: [Format; 12] = [
         title: "Паспорт заказа",
         note: "Текст с расчётом",
         on: true,
+    },
+    Format {
+        id: "passport",
+        ext: "html",
+        title: "Паспорт A4",
+        note: "Печать в PDF из браузера",
+        on: false,
     },
 ];
 
@@ -283,6 +290,7 @@ pub fn order_bytes(
         z.add("preview.png", &encode_png(&pm)?);
         for (name, id) in [
             ("report.txt", "report"),
+            ("passport.html", "passport"),
             ("stats.json", "stats"),
             ("cut.dxf", "dxf"),
         ] {

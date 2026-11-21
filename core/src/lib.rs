@@ -4,6 +4,7 @@
 pub mod export;
 pub mod gen;
 pub mod image;
+pub mod materials;
 pub mod params;
 pub mod profiles;
 pub mod sketch;
@@ -25,6 +26,7 @@ pub fn export_format(r: &GenResult, fmt: &str) -> Option<Vec<u8>> {
         "pdf" => export::pdf(r),
         "csv" => export::csv(r).into_bytes(),
         "report" => export::report(r).into_bytes(),
+        "passport" => export::passport_html(r),
         "stl" => export::stl(r).into_bytes(),
         "step" => step::step(r).into_bytes(),
         "stats" => serde_json::to_vec_pretty(&r.stats).ok()?,

@@ -8,9 +8,12 @@ use crate::i18n::{self, fmt_n, fmt_time, t, tf};
 use crate::platform::{self, SaveOutcome};
 use crate::render::{self, Look, Rgb, Tf, View};
 use crate::saved::{self, Preset, Saved};
-use crate::{AppWindow, Bridge, Fmt, Machine, Prefs, SizeRow, StatsUI, Store, Template, Theme, KV};
+use crate::{
+    AppWindow, Bridge, Fmt, Machine, Material, Prefs, SizeRow, StatsUI, Store, Template, Theme, KV,
+};
 use perfo_core::gen::{self, GenResult};
 use perfo_core::image::Gray;
+use perfo_core::materials;
 use perfo_core::params::Params;
 use perfo_core::profiles;
 use perfo_core::sketch::Sketch;
@@ -133,6 +136,18 @@ fn format_rows(saved: &Saved) -> Vec<Fmt> {
         .collect()
 }
 
+/// Запомнить открытый заказ в истории (не более 8).
+pub fn remember_order(name: &str) {
+    with(|st, _| {
+        if let Some(pos) = st.saved.recent.iter().position(|x| x == name) {
+            st.saved.recent.remove(pos);
+        }
+        st.saved.recent.insert(0, name.to_string());
+        st.saved.recent.truncate(8);
+        st.saved.store();
+    });
+}
+
 pub fn run() -> Result<(), slint::PlatformError> {
     let ui = AppWindow::new()?;
     let mut saved = Saved::load();
@@ -210,6 +225,16 @@ pub fn run() -> Result<(), slint::PlatformError> {
         })
         .collect();
     store.set_machines(ModelRc::new(VecModel::from(machines)));
+    let mats: Vec<Material> = materials::MATERIALS
+        .iter()
+        .map(|m| Material {
+            id: m.id.into(),
+            name: m.name.into(),
+        })
+        .collect();
+    store.set_materials(ModelRc::new(VecModel::from(mats)));
+    let recent: Vec<slint::SharedString> = saved.recent.iter().map(|x| x.clone().into()).collect();
+    store.set_recent_orders(ModelRc::new(VecModel::from(recent)));
     refresh_presets(&saved, &store);
 
     bind(&ui);
@@ -388,6 +413,32 @@ fn bind(ui: &AppWindow) {
             toast(st, ui, &t("Шаг и размер подобраны"), 2200);
         });
     });
+    s.on_batch(|| {
+        #[cfg(not(target_arch = "wasm32"))]
+        with(|st, ui| {
+            if let Some(dir) = platform::pick_folder() {
+                match platform::batch_process(&dir, &st.p) {
+                    Ok(n) => toast(
+                        st,
+                        ui,
+                        &tf("Обработано файлов: {n}", &[("n", &n.to_string())]),
+                        3500,
+                    ),
+                    Err(e) => show_error("", &e),
+                }
+            }
+        });
+    });
+    s.on_apply_material(|id| {
+        with(|st, ui| {
+            if let Some(m) = materials::find(&id) {
+                let mut p = st.p.clone();
+                m.apply_to(&mut p);
+                set_params(st, ui, p, true);
+                toast(st, ui, m.name, 2200);
+            }
+        });
+    });
     s.on_apply_preset(|i| {
         with(|st, ui| apply_preset(st, ui, i));
     });
@@ -398,6 +449,16 @@ fn bind(ui: &AppWindow) {
         with(delete_preset);
     });
     s.on_open(platform::pick_file);
+    s.on_open_recent(|name| {
+        let name = name.to_string();
+        with(|st, ui| {
+            if let Some(path) = st.saved.recent.iter().find(|p| p.ends_with(&name)).cloned() {
+                ui.set_tab(1);
+                toast(st, ui, &tf("Открыть заказ: {n}", &[("n", &name)]), 2500);
+                let _ = path;
+            }
+        });
+    });
     s.on_sample(|| match files::sample_png() {
         Ok(bytes) => {
             set_picture(format!("{}.png", t("пример")), bytes);

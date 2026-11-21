@@ -483,6 +483,26 @@ fn xml_esc(s: &str) -> String {
         .replace('"', "&quot;")
 }
 
+/// Паспорт заказа в HTML: красивый A4, печатается в PDF из браузера.
+pub fn passport_html(r: &GenResult) -> Vec<u8> {
+    let text = report(r);
+    let p = &r.params;
+    let body: String = text
+        .lines()
+        .map(|l| format!("<div>{}</div>", xml_esc(l)))
+        .collect();
+    let html = format!(
+        "<!doctype html><html lang=\"ru\"><meta charset=\"utf-8\"><title>Паспорт заказа</title>\
+<style>body{{font:14px/1.6 Consolas,monospace;max-width:760px;margin:40px auto;color:#222}}\
+h1{{font-size:22px;border-bottom:2px solid #e8833a;padding-bottom:8px}}\
+div{{white-space:pre-wrap}}@media print{{body{{margin:0}}}}</style>\
+<h1>PerfoCut — паспорт заказа</h1><p>Изделие: {}</p><pre>{}</pre></html>",
+        xml_esc(&p.name),
+        body
+    );
+    html.into_bytes()
+}
+
 // ---------------- G-code ----------------
 
 /// Центроид площади многоугольника: для вогнутых контуров точка врезки остаётся в металле,

@@ -10,6 +10,8 @@ pub struct Saved {
     pub theme: i32,
     /// Последний применённый шаблон перфорации
     pub template_id: String,
+    /// Недавние заказы: имя и путь к файлу .perfo
+    pub recent: Vec<String>,
     /// Признак миграции на шесть техно-тем (0..5)
     pub theme_v2: bool,
     /// Акцентный цвет: 0 цитрус, 1 изумруд, 2 лазурь, 3 аметист, 4 роза, 5 магма
@@ -102,6 +104,7 @@ impl Default for Saved {
             theme: 0,
             theme_v2: false,
             template_id: String::new(),
+            recent: Vec::new(),
             accent: 0,
             lang: String::new(),
             vibro: true,

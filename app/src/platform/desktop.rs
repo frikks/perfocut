@@ -18,7 +18,13 @@ fn file_name(p: &Path) -> String {
 
 fn open_path(path: &Path) {
     match std::fs::read(path) {
-        Ok(bytes) => crate::app::open_bytes(file_name(path), bytes),
+        Ok(bytes) => {
+            let name = file_name(path);
+            if name.ends_with(".perfo") || name.ends_with(".zip") {
+                crate::app::remember_order(&name);
+            }
+            crate::app::open_bytes(name, bytes)
+        }
         Err(e) => crate::app::show_error(&t("Не удалось открыть файл: "), &e.to_string()),
     }
 }
@@ -58,6 +64,48 @@ pub fn pick_file() {
     if let Some(path) = picked {
         open_path(&path);
     }
+}
+
+/// Выбрать папку с картинками для пакетной обработки.
+pub fn pick_folder() -> Option<String> {
+    rfd::FileDialog::new()
+        .pick_folder()
+        .map(|p| p.display().to_string())
+}
+
+/// Пакетно обработать все картинки в папке: для каждой — генерация и экспорт DXF+CSV рядом.
+pub fn batch_process(dir: &str, params: &perfo_core::params::Params) -> Result<usize, String> {
+    use perfo_core::{export, gen, image::Gray};
+    let root = std::path::Path::new(dir);
+    let mut done = 0usize;
+    for entry in std::fs::read_dir(root).map_err(|e| e.to_string())? {
+        let path = entry.map_err(|e| e.to_string())?.path();
+        if !path.is_file() {
+            continue;
+        }
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        if !["jpg", "jpeg", "png", "webp", "bmp", "gif", "tiff"].contains(&ext.as_str()) {
+            continue;
+        }
+        let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+        let decoded = match crate::files::decode(&bytes) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+        let r = gen::generate(Some(&decoded.gray), params);
+        if r.stats.count == 0 {
+            continue;
+        }
+        let base = path.with_extension("");
+        std::fs::write(base.with_extension("dxf"), export::dxf(&r)).map_err(|e| e.to_string())?;
+        std::fs::write(base.with_extension("csv"), export::csv(&r)).map_err(|e| e.to_string())?;
+        done += 1;
+    }
+    Ok(done)
 }
 
 pub fn save_file(name: &str, _mime: &str, bytes: Vec<u8>) -> SaveOutcome {

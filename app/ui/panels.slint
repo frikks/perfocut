@@ -943,6 +943,20 @@ export component SettingsPanel inherits VerticalLayout {
         title: @tr("Металл и лазер");
         meta: Store.metal-meta;
         open: false;
+        Caption {
+            text: @tr("Материал и цена за кг");
+        }
+        Seg {
+            columns: 3;
+            items: ["Сталь 1", "Сталь 2", "Сталь 3", "Нерж. 1,5", "Алюминий", "Оцинковка", "Медь 1", "Своё"];
+            current: 7;
+            select(i) => {
+                if i < 7 {
+                    Store.apply-material(i == 0 ? "steel1" : i == 1 ? "steel2" : i == 2 ? "steel3"
+                        : i == 3 ? "inox15" : i == 4 ? "aluminium" : i == 5 ? "galvanized" : "copper");
+                }
+            }
+        }
         if Store.preset-names.length > 0: Seg {
             columns: 2;
             items: Store.preset-names;
@@ -1550,6 +1564,18 @@ export component ExportPanel inherits VerticalLayout {
     padding: Theme.touch ? 12px : 16px;
     spacing: Theme.touch ? 6px : 8px;
     Head {
+        text: @tr("Недавние заказы");
+    }
+    if Store.recent-orders.length > 0: VerticalLayout {
+        for name in Store.recent-orders: Btn {
+            text: name;
+            clicked => { Store.open-recent(name); }
+        }
+    }
+    if Store.recent-orders.length == 0: Hint {
+        text: @tr("Откройте файл .perfo — он появится здесь.");
+    }
+    Head {
         text: @tr("Слои экспорта");
     }
     Check {
@@ -1574,6 +1600,10 @@ export component ExportPanel inherits VerticalLayout {
     }
     Head {
         text: @tr("Форматы");
+    }
+    Btn {
+        text: @tr("Пакетная обработка папки");
+        clicked => { Store.batch(); }
     }
     for f[i] in Store.formats: Rectangle {
         min-height: Theme.touch ? 60px : 48px;

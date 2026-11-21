@@ -22,6 +22,7 @@ export struct KV { k: string, v: string }
 export struct SizeRow { label: string, frac: float, n: string }
 export struct Template { id: string, name: string, desc: string, preview: string }
 export struct Machine { id: string, name: string, desc: string }
+export struct Material { id: string, name: string }
 export struct StatsUI {
     has: bool, cost: string, currency: string, rows: [KV],
     count: string, pierces: string, cut: string, time: string, open: string, mass: string,
@@ -51,6 +52,14 @@ export global Store {
     callback apply-machine(string);
     // Подбор шага и размера под целевой процент перфорации
     callback fit-open();
+    // Пакетная обработка папки с картинками (только desktop)
+    callback batch();
+    // История заказов
+    in property <[string]> recent-orders;
+    callback open-recent(string);
+    // Справочник материалов с плотностью и ценой
+    in property <[Material]> materials;
+    callback apply-material(string);
     in-out property <int> machine-current;
     // Шаг микроджоинтов по минимальному диаметру отверстия
     in-out property <float> mjoint-step;

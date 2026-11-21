@@ -636,6 +636,21 @@ msgstr "Text is exported on the ENGRAVE layer (DXF, SVG) and as a G-code comment
 msgid "Прокрутите список вниз, чтобы увидеть все шаблоны."
 msgstr "Scroll down to see all templates."
 
+msgid "Недавние заказы"
+msgstr "Recent orders"
+
+msgid "Откройте файл .perfo — он появится здесь."
+msgstr "Open a .perfo file — it will appear here."
+
+msgid "Пакетная обработка папки"
+msgstr "Batch process folder"
+
+msgid "Обработано файлов: {n}"
+msgstr "Files processed: {n}"
+
+msgid "Материал и цена за кг"
+msgstr "Material and price per kg"
+
 msgid "Шаг и размер подобраны"
 msgstr "Pitch and size fitted"
 
