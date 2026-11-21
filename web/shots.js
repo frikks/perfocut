@@ -141,18 +141,6 @@ const scenes = {
     await u.shot('lines-light');
     await u.close();
   },
-  async 'drawing'(b) {
-    const u = await open(b, DESK);
-    await u.click(D.draw, 2000);
-    await paint(u);
-    await u.page.mouse.move(700, 470);
-    await sleep(500);
-    await u.page.screenshot({ path: path.join(out, 'drawing.png') });
-    console.log('  drawing.png');
-    await u.click(D.done, 6000);
-    await u.shot('drawing-result');
-    await u.close();
-  },
   async 'phone-settings'(b) {
     const u = await open(b, PHONE);
     await u.click(P.example, 6000);
