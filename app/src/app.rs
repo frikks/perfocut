@@ -9,7 +9,8 @@ use crate::platform::{self, SaveOutcome};
 use crate::render::{self, Look, Rgb, Tf, View};
 use crate::saved::{self, Preset, Saved};
 use crate::{
-    AppWindow, Bridge, Fmt, Machine, Material, Prefs, SizeRow, StatsUI, Store, Template, Theme, KV,
+    AppWindow, Bridge, Fmt, Machine, Material, Prefs, SizeRow, StatsUI, Store, Template,
+    TemplateRow, Theme, KV,
 };
 use perfo_core::gen::{self, GenResult};
 use perfo_core::image::Gray;
@@ -136,6 +137,47 @@ fn format_rows(saved: &Saved) -> Vec<Fmt> {
         .collect()
 }
 
+/// Перестроить сетку карточек с учётом категории и поиска.
+fn rebuild_template_rows(ui: &AppWindow, category: &str, query: &str) {
+    let empty = Template {
+        id: "".into(),
+        name: "".into(),
+        desc: "".into(),
+        preview: "".into(),
+        category: "".into(),
+    };
+    let query = query.trim().to_lowercase();
+    let mut items: Vec<Template> = templates::TEMPLATES
+        .iter()
+        .filter(|t| category.is_empty() || t.category() == category)
+        .filter(|t| {
+            query.is_empty()
+                || t.name.to_lowercase().contains(&query)
+                || t.desc.to_lowercase().contains(&query)
+        })
+        .map(|t| Template {
+            id: t.id.into(),
+            name: t.name.into(),
+            desc: t.desc.into(),
+            preview: t.preview.into(),
+            category: t.category().into(),
+        })
+        .collect();
+    while items.len() % 3 != 0 {
+        items.push(empty.clone());
+    }
+    let rows: Vec<TemplateRow> = items
+        .chunks(3)
+        .map(|c| TemplateRow {
+            a: c[0].clone(),
+            b: c[1].clone(),
+            c: c[2].clone(),
+        })
+        .collect();
+    ui.global::<Store>()
+        .set_template_rows(ModelRc::new(VecModel::from(rows)));
+}
+
 /// Запомнить открытый заказ в истории (не более 8).
 pub fn remember_order(name: &str) {
     with(|st, _| {
@@ -212,9 +254,11 @@ pub fn run() -> Result<(), slint::PlatformError> {
             name: t.name.into(),
             desc: t.desc.into(),
             preview: t.preview.into(),
+            category: t.category().into(),
         })
         .collect();
-    store.set_templates(ModelRc::new(VecModel::from(tpl)));
+    store.set_templates(ModelRc::new(VecModel::from(tpl.clone())));
+    rebuild_template_rows(&ui, "", "");
     store.set_current_template(saved.template_id.clone().into());
     let machines: Vec<Machine> = profiles::PROFILES
         .iter()
@@ -370,6 +414,36 @@ fn bind(ui: &AppWindow) {
     });
     s.on_set_grid(|g| {
         with(|st, ui| set_grid(st, ui, &g));
+    });
+    s.on_load_profile(|| {
+        with(|st, ui| {
+            if let Some(text) = platform::load_profile_text() {
+                match profiles::CustomProfile::from_json(&text) {
+                    Ok(profile) => {
+                        let name = profile.name.clone();
+                        let mut p = st.p.clone();
+                        profile.apply_to(&mut p);
+                        set_params(st, ui, p, true);
+                        toast(st, ui, &tf("Профиль: {n}", &[("n", &name)]), 2500);
+                    }
+                    Err(e) => show_error("", &e),
+                }
+            }
+        });
+    });
+    s.on_set_template_category(|cat| {
+        let cat = cat.to_string();
+        with(|_st, ui| {
+            let q = ui.global::<Store>().get_template_query();
+            rebuild_template_rows(ui, &cat, &q);
+        });
+    });
+    s.on_set_template_query(|q| {
+        let q = q.to_string();
+        with(|_st, ui| {
+            let cat = ui.global::<Store>().get_template_category();
+            rebuild_template_rows(ui, &cat, &q);
+        });
     });
     s.on_apply_template(|id| {
         with(|st, ui| {

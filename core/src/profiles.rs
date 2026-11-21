@@ -1,6 +1,7 @@
-//! Профили станков: готовые настройки G-code для популярных систем управления.
+//! Профили станков: готовые настройки G-code и пользовательский JSON.
 
 use crate::params::Params;
+use serde::Deserialize;
 
 #[derive(Clone, Debug)]
 pub struct Profile {
@@ -75,4 +76,53 @@ impl Profile {
 
 pub fn find(id: &str) -> Option<&'static Profile> {
     PROFILES.iter().find(|p| p.id == id)
+}
+
+/// Пользовательский профиль из JSON: можно добавить свой станок без пересборки.
+#[derive(Clone, Debug, Deserialize)]
+pub struct CustomProfile {
+    pub name: String,
+    #[serde(default = "default_on")]
+    pub on: String,
+    #[serde(default = "default_off")]
+    pub off: String,
+    #[serde(default = "default_header")]
+    pub header: String,
+    #[serde(default = "default_footer")]
+    pub footer: String,
+    #[serde(default)]
+    pub arcs: bool,
+    #[serde(default = "default_decimals")]
+    pub decimals: u32,
+}
+
+fn default_on() -> String {
+    "M3".into()
+}
+fn default_off() -> String {
+    "M5".into()
+}
+fn default_header() -> String {
+    "G21\nG90\nG17".into()
+}
+fn default_footer() -> String {
+    "M30".into()
+}
+fn default_decimals() -> u32 {
+    3
+}
+
+impl CustomProfile {
+    pub fn from_json(text: &str) -> Result<Self, String> {
+        serde_json::from_str(text).map_err(|e| e.to_string())
+    }
+
+    pub fn apply_to(&self, p: &mut Params) {
+        p.gc_on = self.on.clone();
+        p.gc_off = self.off.clone();
+        p.gc_header = self.header.clone();
+        p.gc_footer = self.footer.clone();
+        p.gc_arcs = self.arcs;
+        p.gc_decimals = self.decimals;
+    }
 }

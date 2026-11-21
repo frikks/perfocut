@@ -66,6 +66,14 @@ pub fn pick_file() {
     }
 }
 
+/// Выбрать JSON-файл с пользовательским профилем G-code.
+pub fn load_profile_text() -> Option<String> {
+    let path = rfd::FileDialog::new()
+        .add_filter("JSON", &["json"])
+        .pick_file()?;
+    std::fs::read_to_string(path).ok()
+}
+
 /// Выбрать папку с картинками для пакетной обработки.
 pub fn pick_folder() -> Option<String> {
     rfd::FileDialog::new()
@@ -75,7 +83,7 @@ pub fn pick_folder() -> Option<String> {
 
 /// Пакетно обработать все картинки в папке: для каждой — генерация и экспорт DXF+CSV рядом.
 pub fn batch_process(dir: &str, params: &perfo_core::params::Params) -> Result<usize, String> {
-    use perfo_core::{export, gen, image::Gray};
+    use perfo_core::{export, gen};
     let root = std::path::Path::new(dir);
     let mut done = 0usize;
     for entry in std::fs::read_dir(root).map_err(|e| e.to_string())? {

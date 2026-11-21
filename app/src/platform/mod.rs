@@ -32,6 +32,11 @@ pub use desktop::*;
 
 /// Пакетная обработка папки: только на настольных системах.
 #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+pub fn load_profile_text() -> Option<String> {
+    None
+}
+
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
 pub fn pick_folder() -> Option<String> {
     None
 }

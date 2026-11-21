@@ -20,7 +20,8 @@ export struct Par {
 
 export struct KV { k: string, v: string }
 export struct SizeRow { label: string, frac: float, n: string }
-export struct Template { id: string, name: string, desc: string, preview: string }
+export struct Template { id: string, name: string, desc: string, preview: string, category: string }
+export struct TemplateRow { a: Template, b: Template, c: Template }
 export struct Machine { id: string, name: string, desc: string }
 export struct Material { id: string, name: string }
 export struct StatsUI {
@@ -45,8 +46,16 @@ export global Store {
     // Библиотека готовых шаблонов перфорации
     in property <[Template]> templates;
     callback apply-template(string);
+    // Строки по 3 карточки + фильтр категории и поиск
+    in property <[TemplateRow]> template-rows;
+    in-out property <string> template-category;
+    in-out property <string> template-query;
+    callback set-template-category(string);
+    callback set-template-query(string);
     // Идентификатор последнего применённого шаблона (для подсветки)
     in-out property <string> current-template;
+    // Пользовательский профиль G-code из JSON
+    callback load-profile();
     // Профили станков
     in property <[Machine]> machines;
     callback apply-machine(string);

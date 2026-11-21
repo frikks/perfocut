@@ -432,6 +432,16 @@ pub static TEMPLATES: &[Template] = &[
 ];
 
 impl Template {
+    /// Категория по id — не меняет статические данные шаблонов.
+    pub fn category(&self) -> &'static str {
+        match self.id {
+            "speaker" | "micro" | "large" => "dynamic",
+            "vent" | "louver" | "galvanized" => "vent",
+            "radial" | "mosaic" | "rhomb" | "sine" | "rings" | "stipple" | "star" => "decor",
+            _ => "structure",
+        }
+    }
+
     /// Применяет шаблон, сохраняя лист, картинку, металл, цены и язык.
     pub fn apply_to(&self, base: &Params) -> Params {
         let mut p = base.clone();

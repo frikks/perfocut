@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'demo.html'
       - '.nojekyll'
       - 'screenshots/**'
       - 'docs/landing/**'
@@ -31,7 +32,7 @@ jobs:
       - name: Собрать статический сайт
         run: |
           mkdir -p _site
-          cp index.html .nojekyll _site/
+          cp index.html demo.html .nojekyll _site/
           cp -r screenshots _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

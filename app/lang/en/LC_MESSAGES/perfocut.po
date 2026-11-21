@@ -648,6 +648,24 @@ msgstr "Batch process folder"
 msgid "Обработано файлов: {n}"
 msgstr "Files processed: {n}"
 
+msgid "Загрузить профиль JSON"
+msgstr "Load profile JSON"
+
+msgid "Профиль: {n}"
+msgstr "Profile: {n}"
+
+msgid "Поиск по шаблонам"
+msgstr "Search templates"
+
+msgid "Динамики"
+msgstr "Speakers"
+
+msgid "Вентиляция"
+msgstr "Ventilation"
+
+msgid "Декор"
+msgstr "Decor"
+
 msgid "Материал и цена за кг"
 msgstr "Material and price per kg"
 

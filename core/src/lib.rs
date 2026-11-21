@@ -953,6 +953,11 @@ mod tests {
         assert_eq!(q.grid, "tri");
         assert_eq!(q.d_max, 12.0);
         assert_eq!(templates::TEMPLATES.len(), 18);
+        let mut cats = std::collections::BTreeSet::new();
+        for x in templates::TEMPLATES {
+            cats.insert(x.category());
+        }
+        assert_eq!(cats.len(), 4, "{cats:?}");
     }
 
     #[test]

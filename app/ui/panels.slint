@@ -86,21 +86,33 @@ export component TemplatesPanel inherits Flickable {
         padding-bottom: 10px;
         spacing: 6px;
         Text {
-            text: @tr("18 готовых узоров. Один клик применяет шаблон — лист, картинка, металл и цены сохраняются.");
+            text: @tr("Один клик применяет шаблон — лист, картинка, металл и цены сохраняются.");
             color: Theme.panel-muted;
             font-size: Theme.fs-s;
             wrap: word-wrap;
-            min-height: 30px;
+            min-height: 18px;
         }
-        for row in [0, 1, 2, 3, 4, 5]: HorizontalLayout {
+        TextField {
+            value: Store.template-query;
+            placeholder: @tr("Поиск по шаблонам");
+            edited(t) => { Store.set-template-query(t); }
+        }
+        Seg {
+            items: [@tr("Все"), @tr("Динамики"), @tr("Вентиляция"), @tr("Декор"), @tr("Лист")];
+            current: 0;
+            select(i) => {
+                Store.set-template-category(i == 0 ? "" : i == 1 ? "dynamic" : i == 2 ? "vent" : i == 3 ? "decor" : "structure");
+            }
+        }
+        for row in Store.template-rows: HorizontalLayout {
             spacing: 6px;
-            for col in [0, 1, 2]: TemplateCard {
-                property <int> idx: row * 3 + col;
-                name: Store.templates[idx].name;
-                desc: Store.templates[idx].desc;
-                preview: Store.templates[idx].preview;
-                active: Store.current-template == Store.templates[idx].id;
-                clicked => { Store.apply-template(Store.templates[idx].id); }
+            for t in [row.a, row.b, row.c]: TemplateCard {
+                name: t.name;
+                desc: t.desc;
+                preview: t.preview;
+                visible: t.id != "";
+                active: t.id != "" && Store.current-template == t.id;
+                clicked => { if t.id != "" { Store.apply-template(t.id); } }
             }
         }
     }
@@ -1201,6 +1213,10 @@ export component SettingsPanel inherits VerticalLayout {
         open: false;
         Caption {
             text: @tr("Профиль станка");
+        }
+        Btn {
+            text: @tr("Загрузить профиль JSON");
+            clicked => { Store.load-profile(); }
         }
         Seg {
             columns: 2;
