@@ -1404,12 +1404,19 @@ export component SettingsPanel inherits VerticalLayout {
 component Stat inherits Rectangle {
     in property <string> label;
     in property <string> value;
-    border-radius: 6px;
+    border-radius: Theme.radius;
     background: Theme.panel;
     border-width: 1px;
-    border-color: Theme.panel-edge;
+    border-color: Theme.neon-cyan-soft;
     min-height: lay.preferred-height;
     horizontal-stretch: 1;
+    // Свечение верхней кромки — лазерная линия на каждой карточке итога
+    Rectangle {
+        x: 0; y: -4px;
+        width: parent.width;
+        height: Theme.panel-bar + 8px;
+        background: Theme.glow;
+    }
     Rectangle {
         x: 0; y: 0;
         width: parent.width;
@@ -1420,17 +1427,21 @@ component Stat inherits Rectangle {
         padding: 10px;
         spacing: 3px;
         Text {
+            // Подпись — капс-стиль Inter с трекингом, значение — только моно
             text: root.label;
             color: Theme.panel-muted;
-            font-family: Theme.mono;
+            font-family: Theme.sans;
             font-size: Theme.fs-s;
+            font-weight: 600;
+            letter-spacing: 0.8px;
             overflow: elide;
         }
         Text {
             text: root.value;
             color: Theme.acc-text;
             font-family: Theme.mono;
-            font-size: Theme.fs-h + 2px;
+            font-size: Theme.fs-h + 3px;
+            font-weight: 700;
             overflow: elide;
         }
     }

@@ -348,10 +348,25 @@ component Header inherits Rectangle {
     in property <length> pad-r;
     callback settings();
     background: Theme.shell-raised;
+    // Дыхание лазерной линии: единственная декоративная анимация — сигнал «программа жива»
+    property <bool> beam-bright: true;
+    Timer {
+        interval: 1700ms;
+        triggered => { root.beam-bright = !root.beam-bright; }
+    }
     Rectangle {
         y: parent.height - 1px;
         height: 2px;
         background: Theme.acc;
+        opacity: root.beam-bright ? 1 : 0.4;
+        animate opacity { duration: 1700ms; easing: ease-in-out; }
+    }
+    Rectangle {
+        y: parent.height - 1px;
+        height: 6px;
+        background: Theme.glow;
+        opacity: root.beam-bright ? 0.7 : 0.15;
+        animate opacity { duration: 1700ms; easing: ease-in-out; }
     }
     HorizontalLayout {
         padding-left: 16px + root.pad-l;

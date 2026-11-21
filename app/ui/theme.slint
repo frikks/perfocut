@@ -13,42 +13,43 @@ export global Theme {
     out property <bool> amoled: mode == 5;
 
     // Палитры техно-тем: каждая задаёт фон, панели и сетку; акцент задаётся отдельно
-    out property <color> bg0: mode == 0 ? #01070a : mode == 1 ? #06182a : mode == 2 ? #000000
+    // Режим 0 (HUD) — Open Design "neon": глубокий фиолетовый мрак и лазерное свечение.
+    out property <color> bg0: mode == 0 ? #090513 : mode == 1 ? #06182a : mode == 2 ? #000000
         : mode == 3 ? #080a0c : mode == 4 ? #15181a : #000000;
-    out property <color> bg: mode == 0 ? #020b0e : mode == 1 ? #071e33 : mode == 2 ? #000000
+    out property <color> bg: mode == 0 ? #0D081F : mode == 1 ? #071e33 : mode == 2 ? #000000
         : mode == 3 ? #0a0e11 : mode == 4 ? #1a1c1e : #000000;
-    out property <color> card: mode == 0 ? #04191f : mode == 1 ? #08253e : mode == 2 ? #010703
+    out property <color> card: mode == 0 ? #171029 : mode == 1 ? #08253e : mode == 2 ? #010703
         : mode == 3 ? #0d1618 : mode == 4 ? #181a1c : #0b0b0c;
-    out property <color> raised: mode == 0 ? #041419 : mode == 1 ? #08253e : mode == 2 ? #020b04
+    out property <color> raised: mode == 0 ? #1E1636 : mode == 1 ? #08253e : mode == 2 ? #020b04
         : mode == 3 ? #0d1316 : mode == 4 ? #232629 : #141415;
-    out property <color> raised2: mode == 0 ? #0a2c33 : mode == 1 ? #0d3555 : mode == 2 ? #063018
+    out property <color> raised2: mode == 0 ? #2E2152 : mode == 1 ? #0d3555 : mode == 2 ? #063018
         : mode == 3 ? #14231c : mode == 4 ? #2e3235 : #1d1d1f;
     out property <color> line: #ffffff14;
     out property <color> line2: #ffffff24;
     out property <color> field-line: amoled ? #ffffff4d : #ffffff42;
     out property <color> field-hover: #ffffff6b;
-    out property <color> t1: #ededed;
-    out property <color> t2: #a1a1a6;
-    out property <color> t3: #85858b;
+    out property <color> t1: #F4F1FF;
+    out property <color> t2: #BCB4DB;
+    out property <color> t3: #857CB4;
     // Акцент: цитрус, изумруд, лазурь, аметист, роза, магма
     out property <color> acc: accent == 1 ? #2fbf8f
         : accent == 2 ? #4aa8ff
         : accent == 3 ? #9d7bff
         : accent == 4 ? #ef5f96
         : accent == 5 ? #ef5350
-        : #e8833a;
+        : #B8FF3D;
     out property <color> acc-hover: !dark ? (accent == 1 ? #27a87e
         : accent == 2 ? #3591f0
         : accent == 3 ? #8658f0
         : accent == 4 ? #e14a86
         : accent == 5 ? #e03e38
-        : #dc7429)
+        : #9BE32C)
         : (accent == 1 ? #46d3a2
         : accent == 2 ? #66b8ff
         : accent == 3 ? #ae92ff
         : accent == 4 ? #f97ab0
         : accent == 5 ? #ff6b66
-        : #ef9150);
+        : #D4FF80);
     out property <color> acc-ink: accent == 1 ? #082018
         : accent == 2 ? #0a1a2b
         : accent == 3 ? #180f2b
@@ -60,18 +61,19 @@ export global Theme {
         : accent == 3 ? #6f3fd6
         : accent == 4 ? #c93a74
         : accent == 5 ? #b3322c
-        : #b45a17)
+        : #8FD420)
         : (accent == 1 ? #6fdcb4
         : accent == 2 ? #85bcff
         : accent == 3 ? #bda2ff
         : accent == 4 ? #fa92bd
         : accent == 5 ? #ff8079
-        : #f0a36b);
+        : #D4FF80);
     // Семантические токены: фокус, мягкий акцент, поверхность наведения, радиус и сетка отступов
     out property <color> focus: acc;
     out property <color> acc-soft: acc.with-alpha(0.14);
     out property <color> hover-surface: dark ? #ffffff0f : #0000000a;
-    out property <length> radius: 10px;
+    // Неон: мягкие углы, чтобы свечение кромок выглядело цельно
+    out property <length> radius: 8px;
     out property <length> gap: 8px;
     // Стеклянная консоль: полупрозрачные слои, кромки, тени и мягкое свечение
     out property <color> glass: dark ? #ffffff0a : #ffffffb8;
@@ -79,18 +81,21 @@ export global Theme {
     out property <color> glass-edge: dark ? #ffffff1f : #00000024;
     out property <color> glass-shine: dark ? #ffffff12 : #ffffff66;
     out property <color> glass-shadow: dark ? #00000080 : #18181b26;
-    out property <color> glow: acc.with-alpha(0.20);
-    out property <length> radius-lg: 16px;
+    // Свечение лазера: основной акцент и холодный лазерно-циановый контур
+    out property <color> glow: acc.with-alpha(0.34);
+    out property <color> neon-cyan: #00E5FF;
+    out property <color> neon-cyan-soft: #00E5FF40;
+    out property <length> radius-lg: 12px;
     // Оболочка и панели каждой техно-темы; акцент окрашивает кромки и активные состояния
     out property <color> shell: bg0;
     out property <color> shell-raised: bg;
     out property <color> panel: card;
-    out property <color> panel-edge: mode == 0 ? #164a55 : mode == 1 ? #2f6d99 : mode == 2 ? #1f8a4c
+    out property <color> panel-edge: mode == 0 ? #3B2E66 : mode == 1 ? #2f6d99 : mode == 2 ? #1f8a4c
         : mode == 3 ? #2c4a3c : mode == 4 ? #3c4145 : #333338;
     out property <color> panel-ink: #ededed;
     out property <color> panel-muted: #a1a1a6;
     out property <color> shell-ink: #ededed;
-    out property <color> grid-line: mode == 0 ? #0c3b45 : mode == 1 ? #1a4a70 : mode == 2 ? #0b3a1f
+    out property <color> grid-line: mode == 0 ? #2A1F4D : mode == 1 ? #1a4a70 : mode == 2 ? #0b3a1f
         : mode == 3 ? #1c382b : mode == 4 ? #1d2123 : #ffffff12;
     out property <length> panel-bar: 3px;
     out property <color> seg-on: !dark ? #ffffff : amoled ? #2a2a2d : #38383c;
@@ -99,8 +104,8 @@ export global Theme {
     out property <color> toast-text: !dark ? #fafafa : #ededed;
     out property <color> dim: dark ? #ededed47 : #18181b59;
     out property <color> scrim: !dark ? #18181b6b : amoled ? #000000b8 : #00000099;
-    out property <color> warn: dark ? #d9a441 : #b7791f;
-    out property <color> ok: dark ? #4cc38a : #2f9e6b;
+    out property <color> warn: dark ? #FFB020 : #b7791f;
+    out property <color> ok: dark ? #39FF88 : #2f9e6b;
 
     out property <length> row: touch ? Math.max(34px, fs * 2.1) : 32px;
     // Поля ввода ниже обычных строк: больше настроек помещается без прокрутки

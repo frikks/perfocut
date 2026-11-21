@@ -26,11 +26,13 @@ export component Btn inherits Rectangle {
     horizontal-stretch: stretch ? 1 : 0;
     border-radius: Theme.radius;
     opacity: enabled ? 1 : 0.45;
-    background: kind == 1 ? (ta.pressed ? Theme.acc.darker(12%) : ta.has-hover ? Theme.acc-hover : @linear-gradient(135deg, Theme.acc-hover, Theme.acc))
+    // Flat fill only — mission-control: градиенты не несут информации
+    background: kind == 1 ? (ta.pressed ? Theme.acc.darker(12%) : ta.has-hover ? Theme.acc-hover : Theme.acc)
         : kind == 2 ? (ta.pressed ? Theme.panel : ta.has-hover ? Theme.panel-edge : transparent)
         : (ta.pressed ? Theme.acc.darker(70%) : ta.has-hover ? Theme.panel-edge : !Theme.dark ? Theme.panel : Theme.raised);
-    border-width: kind == 0 || framed ? 1px : 0px;
-    border-color: kind == 1 ? transparent : Theme.panel-edge;
+    border-width: kind == 1 ? 1px : kind == 0 || framed ? 1px : 0px;
+    // Главная кнопка: лаймовая заливка в холодном лазерно-циановом контуре
+    border-color: kind == 1 ? Theme.neon-cyan-soft : Theme.panel-edge;
     accessible-role: button;
     accessible-label: root.text != "" ? root.text : root.tip;
     accessible-action-default => {
@@ -590,6 +592,8 @@ export component Section inherits Rectangle {
 export component Caption inherits Text {
     color: Theme.panel-muted;
     font-size: Theme.fs-s;
+    font-weight: 600;
+    letter-spacing: 0.8px;
     vertical-alignment: bottom;
     min-height: Theme.touch ? 18px : 18px;
 }
