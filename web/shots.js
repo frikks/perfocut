@@ -108,7 +108,7 @@ async function paint(u) {
 }
 
 // Точки окна телефона 412 × 892
-const P = { example: [350, 568], draw: [205, 626], summary: [206, 457], size: { y: 161, x0: 22, x1: 122 } };
+const P = { example: [135, 320], draw: [102, 346], summary: [257, 440], size: { y: 745, x0: 38, x1: 122 } };
 
 const scenes = {
   async 'desktop'(b) {
@@ -133,12 +133,16 @@ const scenes = {
     await u.close();
   },
   async 'lines-light'(b) {
-    const u = await open(b, DESK, 'light');
-    await u.theme(D.themeLight);
+    const u = await open(b, DESK);
     await u.click(D.example, 6000);
-    await u.wheel([158, 500], 700, 1500);
-    await u.click(D.lines, 6000);
     await u.shot('lines-light');
+    await u.close();
+  },
+  async 'settings'(b) {
+    const u = await open(b, DESK);
+    await u.click(D.example, 6000);
+    await u.click(D.gear, 900);
+    await u.shot('settings');
     await u.close();
   },
   async 'phone-settings'(b) {
