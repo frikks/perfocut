@@ -2,16 +2,25 @@
 
 use super::SaveOutcome;
 use crate::{AppWindow, Prefs, Theme};
-use jni::objects::{JByteArray, JClass, JObject, JString, JValue};
+use jni::objects::{JByteArray, JClass, JObject, JObjectArray, JString, JValue};
 use jni::{JNIEnv, JavaVM};
 use slint::ComponentHandle;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 static VM: AtomicUsize = AtomicUsize::new(0);
 static ACTIVITY: AtomicUsize = AtomicUsize::new(0);
 static DATA_DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
+
+type ProfileCb = Box<dyn FnOnce(Option<Vec<u8>>) + Send + 'static>;
+type BatchCb = Box<dyn FnOnce(Vec<(String, Vec<u8>)>) + Send + 'static>;
+static PROFILE_CB: OnceLock<Mutex<Option<ProfileCb>>> = OnceLock::new();
+static BATCH_CB: OnceLock<Mutex<Option<BatchCb>>> = OnceLock::new();
+
+fn slot<T>(s: &'static OnceLock<Mutex<Option<T>>>) -> &'static Mutex<Option<T>> {
+    s.get_or_init(|| Mutex::new(None))
+}
 
 /// Запоминает Java-машину и активность до запуска интерфейса.
 pub fn set_app(app: &slint::android::AndroidApp) {
@@ -60,7 +69,6 @@ pub fn init(ui: &AppWindow) {
     prefs.set_is_phone(true);
     prefs.set_can_minimize(true);
     prefs.set_can_drop(false);
-    prefs.set_local_files(false);
     let theme = ui.global::<Theme>();
     theme.set_touch(true);
     if let Some(k) = with_activity(|env, act| env.call_method(act, "fontScale", "()F", &[])?.f()) {
@@ -70,6 +78,18 @@ pub fn init(ui: &AppWindow) {
 
 pub fn pick_file() {
     call_void("pickFile", "()V", &[]);
+}
+
+/// Выбрать JSON-профиль: Java вернёт байты через onProfilePicked.
+pub fn pick_profile_file(cb: impl FnOnce(Option<Vec<u8>>) + Send + 'static) {
+    *slot(&PROFILE_CB).lock().unwrap() = Some(Box::new(cb));
+    call_void("pickProfile", "()V", &[]);
+}
+
+/// Выбрать несколько картинок: Java вернёт имена и байты через onBatchPicked.
+pub fn pick_batch_files(cb: impl FnOnce(Vec<(String, Vec<u8>)>) + Send + 'static) {
+    *slot(&BATCH_CB).lock().unwrap() = Some(Box::new(cb));
+    call_void("pickBatch", "()V", &[]);
 }
 
 pub fn save_file(name: &str, mime: &str, bytes: Vec<u8>) -> SaveOutcome {
@@ -243,4 +263,52 @@ pub extern "system" fn Java_com_perfocut_app_MainActivity_onFilePicked<'l>(
         return;
     };
     let _ = slint::invoke_from_event_loop(move || crate::app::open_bytes(name, bytes));
+}
+
+/// Java передал байты выбранного JSON-профиля (пустой массив = отмена).
+#[no_mangle]
+pub extern "system" fn Java_com_perfocut_app_MainActivity_onProfilePicked<'l>(
+    env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    data: JByteArray<'l>,
+) {
+    let bytes = env.convert_byte_array(&data).unwrap_or_default();
+    let cb = slot(&PROFILE_CB).lock().unwrap().take();
+    if let Some(cb) = cb {
+        let _ = slint::invoke_from_event_loop(move || {
+            cb(if bytes.is_empty() { None } else { Some(bytes) })
+        });
+    }
+}
+
+/// Java передал имена и байты картинок для пакетной обработки.
+#[no_mangle]
+pub extern "system" fn Java_com_perfocut_app_MainActivity_onBatchPicked<'l>(
+    mut env: JNIEnv<'l>,
+    _class: JClass<'l>,
+    names: JObjectArray<'l>,
+    datas: JObjectArray<'l>,
+) {
+    let mut files: Vec<(String, Vec<u8>)> = Vec::new();
+    if let Ok(n) = env.get_array_length(&names) {
+        for i in 0..n {
+            let Ok(name_obj) = env.get_object_array_element(&names, i) else {
+                continue;
+            };
+            let name = env
+                .get_string(&JString::from(name_obj))
+                .map(Into::into)
+                .unwrap_or_else(|_| "file".to_owned());
+            let Ok(data_obj) = env.get_object_array_element(&datas, i) else {
+                continue;
+            };
+            if let Ok(bytes) = env.convert_byte_array(&JByteArray::from(data_obj)) {
+                files.push((name, bytes));
+            }
+        }
+    }
+    let cb = slot(&BATCH_CB).lock().unwrap().take();
+    if let Some(cb) = cb {
+        let _ = slint::invoke_from_event_loop(move || cb(files));
+    }
 }

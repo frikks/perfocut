@@ -1214,7 +1214,7 @@ export component SettingsPanel inherits VerticalLayout {
         Caption {
             text: @tr("Профиль станка");
         }
-        if Prefs.local-files: Btn {
+        Btn {
             text: @tr("Загрузить профиль JSON");
             clicked => { Store.load-profile(); }
         }
@@ -1617,7 +1617,7 @@ export component ExportPanel inherits VerticalLayout {
     Head {
         text: @tr("Форматы");
     }
-    if Prefs.local-files: Btn {
+    Btn {
         text: @tr("Пакетная обработка папки");
         clicked => { Store.batch(); }
     }

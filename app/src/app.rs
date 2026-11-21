@@ -179,6 +179,7 @@ fn rebuild_template_rows(ui: &AppWindow, category: &str, query: &str) {
 }
 
 /// Запомнить открытый заказ в истории (не более 8).
+#[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
 pub fn remember_order(name: &str) {
     with(|st, _| {
         if let Some(pos) = st.saved.recent.iter().position(|x| x == name) {
@@ -392,6 +393,56 @@ fn start_worker() -> std::sync::mpsc::Sender<Job> {
     tx
 }
 
+/// Применить текст JSON-профиля к текущим настройкам G-code.
+fn apply_profile_text(text: &str) {
+    match profiles::CustomProfile::from_json(text) {
+        Ok(profile) => {
+            let name = profile.name.clone();
+            with(|st, ui| {
+                let mut p = st.p.clone();
+                profile.apply_to(&mut p);
+                set_params(st, ui, p, true);
+                toast(st, ui, &tf("Профиль: {n}", &[("n", &name)]), 2500);
+            });
+        }
+        Err(e) => show_error("", &e),
+    }
+}
+
+/// Пакетная обработка выбранных файлов (Android/Web): DXF и CSV через save_file.
+#[cfg(any(target_os = "android", target_arch = "wasm32"))]
+fn batch_from_files(p: &Params, files: &[(String, Vec<u8>)]) -> usize {
+    use perfo_core::export;
+    let mut done = 0usize;
+    for (i, (name, bytes)) in files.iter().enumerate() {
+        let Ok(decoded) = files::decode(bytes) else {
+            continue;
+        };
+        let r = gen::generate(Some(&decoded.gray), p);
+        if r.stats.count == 0 {
+            continue;
+        }
+        let stem = name.rsplit_once('.').map(|(b, _)| b).unwrap_or(name);
+        let stem = if stem.is_empty() {
+            format!("batch_{}", i + 1)
+        } else {
+            stem.to_owned()
+        };
+        let _ = platform::save_file(
+            &format!("{stem}.dxf"),
+            "application/dxf",
+            export::dxf(&r).into_bytes(),
+        );
+        let _ = platform::save_file(
+            &format!("{stem}.csv"),
+            "text/csv",
+            export::csv(&r).into_bytes(),
+        );
+        done += 1;
+    }
+    done
+}
+
 fn bind(ui: &AppWindow) {
     let b = ui.global::<Bridge>();
     b.on_fmt(|v, d| i18n::fmt_field(f64::from(v), d.clamp(0, 6) as usize).into());
@@ -416,18 +467,14 @@ fn bind(ui: &AppWindow) {
         with(|st, ui| set_grid(st, ui, &g));
     });
     s.on_load_profile(|| {
-        with(|st, ui| {
-            if let Some(text) = platform::load_profile_text() {
-                match profiles::CustomProfile::from_json(&text) {
-                    Ok(profile) => {
-                        let name = profile.name.clone();
-                        let mut p = st.p.clone();
-                        profile.apply_to(&mut p);
-                        set_params(st, ui, p, true);
-                        toast(st, ui, &tf("Профиль: {n}", &[("n", &name)]), 2500);
-                    }
-                    Err(e) => show_error("", &e),
-                }
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+        if let Some(text) = platform::load_profile_text() {
+            apply_profile_text(&text);
+        }
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        platform::pick_profile_file(|bytes| {
+            if let Some(bytes) = bytes {
+                apply_profile_text(&String::from_utf8_lossy(&bytes));
             }
         });
     });
@@ -488,7 +535,7 @@ fn bind(ui: &AppWindow) {
         });
     });
     s.on_batch(|| {
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
         with(|st, ui| {
             if let Some(dir) = platform::pick_folder() {
                 match platform::batch_process(&dir, &st.p) {
@@ -501,6 +548,23 @@ fn bind(ui: &AppWindow) {
                     Err(e) => show_error("", &e),
                 }
             }
+        });
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        platform::pick_batch_files(|files| {
+            with(|st, ui| {
+                let p = st.p.clone();
+                let n = batch_from_files(&p, &files);
+                if n == 0 && !files.is_empty() {
+                    toast(st, ui, &t("Не удалось обработать файлы"), 3500);
+                    return;
+                }
+                toast(
+                    st,
+                    ui,
+                    &tf("Обработано файлов: {n}", &[("n", &n.to_string())]),
+                    3500,
+                );
+            });
         });
     });
     s.on_apply_material(|id| {

@@ -38,6 +38,8 @@ import java.util.Locale;
 public class MainActivity extends NativeActivity {
     private static final int PICK = 41;
     private static final int PERM_WRITE = 42;
+    private static final int PICK_PROFILE = 43;
+    private static final int PICK_BATCH = 44;
     private Vibrator vibrator;
     /** Номер скачивания в DownloadManager; -1, пока ничего не качали */
     private long downloadId = -1;
@@ -52,6 +54,8 @@ public class MainActivity extends NativeActivity {
     }
 
     private static native void onFilePicked(String name, byte[] data);
+    private static native void onProfilePicked(byte[] data);
+    private static native void onBatchPicked(String[] names, byte[][] datas);
     private static native void onUpdateInfo(String json);
     private static native void onDownloadDone(String file);
 
@@ -121,29 +125,103 @@ public class MainActivity extends NativeActivity {
         }});
     }
 
+    /** Выбрать JSON-профиль станка. */
+    public void pickProfile() {
+        runOnUiThread(new Runnable() { @Override public void run() {
+            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            i.setType("*/*");
+            try {
+                startActivityForResult(i, PICK_PROFILE);
+            } catch (Exception e) {
+                Toast.makeText(MainActivity.this, String.valueOf(e.getMessage()), Toast.LENGTH_LONG).show();
+            }
+        }});
+    }
+
+    /** Выбрать несколько картинок для пакетной обработки. */
+    public void pickBatch() {
+        runOnUiThread(new Runnable() { @Override public void run() {
+            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            i.setType("image/*");
+            i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            try {
+                startActivityForResult(Intent.createChooser(i, null), PICK_BATCH);
+            } catch (Exception e) {
+                Toast.makeText(MainActivity.this, String.valueOf(e.getMessage()), Toast.LENGTH_LONG).show();
+            }
+        }});
+    }
+
+    /** Прочитать выбранный Uri: имя файла и байты. */
+    private Picked readUri(Uri uri) throws Exception {
+        String name = "file";
+        Cursor c = getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null);
+        if (c != null) {
+            if (c.moveToFirst() && !c.isNull(0)) name = c.getString(0);
+            c.close();
+        }
+        InputStream in = getContentResolver().openInputStream(uri);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[65536];
+        int n;
+        while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+        in.close();
+        Picked p = new Picked();
+        p.name = name;
+        p.data = out.toByteArray();
+        return p;
+    }
+
+    private static class Picked {
+        String name;
+        byte[] data;
+    }
+
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
-        if (req != PICK) {
+        if (req != PICK && req != PICK_PROFILE && req != PICK_BATCH) {
             super.onActivityResult(req, res, data);
             return;
         }
-        if (res != RESULT_OK || data == null || data.getData() == null) return;
+        if (res != RESULT_OK || data == null) return;
+        final int request = req;
+
+        if (req == PICK_BATCH) {
+            final java.util.List<Uri> uris = new java.util.ArrayList<Uri>();
+            if (data.getClipData() != null) {
+                for (int i = 0; i < data.getClipData().getItemCount(); i++) {
+                    uris.add(data.getClipData().getItemAt(i).getUri());
+                }
+            } else if (data.getData() != null) {
+                uris.add(data.getData());
+            }
+            new Thread(new Runnable() { @Override public void run() {
+                String[] names = new String[uris.size()];
+                byte[][] arrays = new byte[uris.size()][];
+                for (int i = 0; i < uris.size(); i++) {
+                    try {
+                        Picked p = readUri(uris.get(i));
+                        names[i] = p.name;
+                        arrays[i] = p.data;
+                    } catch (Exception e) {
+                        names[i] = "file";
+                        arrays[i] = new byte[0];
+                    }
+                }
+                onBatchPicked(names, arrays);
+            }}).start();
+            return;
+        }
+
         final Uri uri = data.getData();
+        if (uri == null) return;
         new Thread(new Runnable() { @Override public void run() {
             try {
-                String name = "file";
-                Cursor c = getContentResolver().query(uri, new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null);
-                if (c != null) {
-                    if (c.moveToFirst() && !c.isNull(0)) name = c.getString(0);
-                    c.close();
-                }
-                InputStream in = getContentResolver().openInputStream(uri);
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                byte[] buf = new byte[65536];
-                int n;
-                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-                in.close();
-                onFilePicked(name, out.toByteArray());
+                Picked p = readUri(uri);
+                if (request == PICK_PROFILE) onProfilePicked(p.data);
+                else onFilePicked(p.name, p.data);
             } catch (final Exception e) {
                 runOnUiThread(new Runnable() { @Override public void run() {
                     Toast.makeText(MainActivity.this, String.valueOf(e.getMessage()), Toast.LENGTH_LONG).show();

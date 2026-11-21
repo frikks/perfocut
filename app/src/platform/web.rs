@@ -31,6 +31,77 @@ fn read_file(f: web_sys::File) {
     });
 }
 
+/// Доставить результат асинхронного выбора файла в цикл событий Slint.
+fn deliver<T: Send + 'static>(cb: impl FnOnce(T) + Send + 'static, value: T) {
+    let _ = slint::invoke_from_event_loop(move || cb(value));
+}
+
+/// Общий выбор файлов через скрытый input. Результат — имя и байты каждого файла.
+fn pick_files(
+    accept: &str,
+    multiple: bool,
+    cb: impl FnOnce(Vec<(String, Vec<u8>)>) + Send + 'static,
+) {
+    let Some(doc) = window().and_then(|w| w.document()) else {
+        deliver(cb, Vec::new());
+        return;
+    };
+    let Ok(input) = doc
+        .create_element("input")
+        .map(|e| e.unchecked_into::<web_sys::HtmlInputElement>())
+    else {
+        deliver(cb, Vec::new());
+        return;
+    };
+    input.set_type("file");
+    input.set_accept(accept);
+    input.set_multiple(multiple);
+    let inp = input.clone();
+    let on = Closure::once(move || {
+        let mut files: Vec<web_sys::File> = Vec::new();
+        if let Some(list) = inp.files() {
+            for i in 0..list.length() {
+                if let Some(f) = list.get(i) {
+                    files.push(f);
+                }
+            }
+        }
+        wasm_bindgen_futures::spawn_local(async move {
+            let mut out: Vec<(String, Vec<u8>)> = Vec::with_capacity(files.len());
+            for f in files {
+                if let Ok(buf) = JsFuture::from(f.array_buffer()).await {
+                    let bytes = js_sys::Uint8Array::new(&buf).to_vec();
+                    out.push((f.name(), bytes));
+                }
+            }
+            deliver(cb, out);
+        });
+    });
+    input.set_onchange(Some(on.as_ref().unchecked_ref()));
+    on.forget();
+    input.click();
+}
+
+/// Выбрать JSON-профиль станка. Байты уходят в колбэк (браузер читает файл асинхронно).
+pub fn pick_profile_file(cb: impl FnOnce(Option<Vec<u8>>) + Send + 'static) {
+    pick_files(".json,application/json", false, move |mut files| {
+        cb(if files.is_empty() {
+            None
+        } else {
+            Some(files.remove(0).1)
+        });
+    });
+}
+
+/// Выбрать несколько картинок для пакетной обработки.
+pub fn pick_batch_files(cb: impl FnOnce(Vec<(String, Vec<u8>)>) + Send + 'static) {
+    pick_files(
+        "image/*,.jpg,.jpeg,.png,.webp,.bmp,.gif,.tif,.tiff",
+        true,
+        cb,
+    );
+}
+
 fn fit_to_viewport(ui: &AppWindow) {
     let Some(w) = window() else { return };
     let size = |v: Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue>| {
@@ -60,7 +131,6 @@ pub fn init(ui: &AppWindow) {
     prefs.set_is_phone(touch);
     prefs.set_can_minimize(false);
     prefs.set_can_drop(!touch);
-    prefs.set_local_files(false);
     ui.global::<Theme>().set_touch(touch);
     let Some(doc) = window().and_then(|w| w.document()) else {
         return;

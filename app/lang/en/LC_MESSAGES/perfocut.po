@@ -645,6 +645,9 @@ msgstr "Open a .perfo file — it will appear here."
 msgid "Пакетная обработка папки"
 msgstr "Batch process folder"
 
+msgid "Не удалось обработать файлы"
+msgstr "Could not process the files"
+
 msgid "Обработано файлов: {n}"
 msgstr "Files processed: {n}"
 

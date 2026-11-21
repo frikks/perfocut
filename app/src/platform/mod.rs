@@ -30,21 +30,6 @@ mod desktop;
 #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
 pub use desktop::*;
 
-/// Пакетная обработка папки: только на настольных системах.
-#[cfg(any(target_os = "android", target_arch = "wasm32"))]
-pub fn load_profile_text() -> Option<String> {
-    None
-}
-
-#[cfg(any(target_os = "android", target_arch = "wasm32"))]
-pub fn pick_folder() -> Option<String> {
-    None
-}
-#[cfg(any(target_os = "android", target_arch = "wasm32"))]
-pub fn batch_process(_dir: &str, _params: &perfo_core::params::Params) -> Result<usize, String> {
-    Err("Пакетная обработка доступна только на компьютере".into())
-}
-
 #[cfg(not(target_arch = "wasm32"))]
 mod clock {
     use std::time::{SystemTime, UNIX_EPOCH};
