@@ -162,6 +162,12 @@ msgstr "Image"
 msgid "Изумруд"
 msgstr "Emerald"
 
+msgid "Скрыть панель"
+msgstr "Hide panel"
+
+msgid "Показать панель"
+msgstr "Show panel"
+
 msgid "Итог"
 msgstr "Summary"
 
