@@ -9,8 +9,8 @@ use crate::platform::{self, SaveOutcome};
 use crate::render::{self, Look, Rgb, Tf, View};
 use crate::saved::{self, Preset, Saved};
 use crate::{
-    AppWindow, Bridge, Fmt, Machine, Material, Prefs, SizeRow, StatsUI, Store, Template,
-    TemplateRow, Theme, KV,
+    AppWindow, Bridge, Fmt, Machine, Material, OverlapPoint, Prefs, SizeRow, StatsUI, Store,
+    Template, TemplateRow, Theme, KV,
 };
 use perfo_core::gen::{self, GenResult};
 use perfo_core::image::Gray;
@@ -481,7 +481,19 @@ fn bind(ui: &AppWindow) {
     s.on_set_template_category(|cat| {
         let cat = cat.to_string();
         with(|_st, ui| {
-            let q = ui.global::<Store>().get_template_query();
+            let store = ui.global::<Store>();
+            let q = store.get_template_query();
+            store.set_template_category_index(if cat.is_empty() {
+                0
+            } else if cat == "dynamic" {
+                1
+            } else if cat == "vent" {
+                2
+            } else if cat == "decor" {
+                3
+            } else {
+                4
+            });
             rebuild_template_rows(ui, &cat, &q);
         });
     });
@@ -490,6 +502,34 @@ fn bind(ui: &AppWindow) {
         with(|_st, ui| {
             let cat = ui.global::<Store>().get_template_category();
             rebuild_template_rows(ui, &cat, &q);
+        });
+    });
+    s.on_fix_overlaps(|| {
+        with(|st, ui| {
+            let Some(r) = st.res.clone() else { return };
+            if r.stats.overlaps == 0 {
+                toast(st, ui, &t("Наложений нет"), 2200);
+                return;
+            }
+            let p = gen::fix_overlaps(&st.p, &r.shapes);
+            set_params(st, ui, p, true);
+            toast(st, ui, &t("Наложения убраны"), 2500);
+        });
+    });
+    s.on_remove_overlap(|x, y| {
+        with(|st, ui| {
+            let mut p = st.p.clone();
+            p.excluded.push((x as f64, y as f64));
+            set_params(st, ui, p, true);
+            toast(st, ui, &t("Отверстие удалено"), 2200);
+        });
+    });
+    s.on_reset_exclusions(|| {
+        with(|st, ui| {
+            let mut p = st.p.clone();
+            p.excluded.clear();
+            set_params(st, ui, p, true);
+            toast(st, ui, &t("Все отверстия возвращены"), 2200);
         });
     });
     s.on_apply_template(|id| {
@@ -1439,6 +1479,17 @@ fn stats_ui(st: &State) -> StatsUI {
         .collect();
     s.rows = ModelRc::new(VecModel::from(rows));
     s.count = fmt_n(x.count as f64, 0).into();
+    s.overlaps = x.overlaps as i32;
+    s.overlap_points = ModelRc::new(VecModel::from(
+        x.overlap_points
+            .iter()
+            .map(|(px, py, pr)| OverlapPoint {
+                x: *px as f32,
+                y: *py as f32,
+                r: *pr as f32,
+            })
+            .collect::<Vec<_>>(),
+    ));
     s.pierces = fmt_n(x.pierces as f64, 0).into();
     s.cut = format!("{} {}", fmt_n(x.cut_len_m, 1), t("м")).into();
     s.time = format!("≈ {}", fmt_time(x.time_min)).into();

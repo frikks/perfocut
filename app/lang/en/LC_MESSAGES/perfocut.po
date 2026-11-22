@@ -162,12 +162,6 @@ msgstr "Image"
 msgid "Изумруд"
 msgstr "Emerald"
 
-msgid "Скрыть панель"
-msgstr "Hide panel"
-
-msgid "Показать панель"
-msgstr "Show panel"
-
 msgid "Итог"
 msgstr "Summary"
 
@@ -290,39 +284,6 @@ msgstr "Sheet weight"
 
 msgid "Масштаб"
 msgstr "Scale"
-
-msgid "Компоновка"
-msgstr "Layout"
-
-msgid "Студия"
-msgstr "Studio"
-
-msgid "Мастер"
-msgstr "Wizard"
-
-msgid "Кокпит"
-msgstr "Cockpit"
-
-msgid "Шаг"
-msgstr "Step"
-
-msgid "Картинка"
-msgstr "Image"
-
-msgid "Результат"
-msgstr "Result"
-
-msgid "Назад"
-msgstr "Back"
-
-msgid "Далее"
-msgstr "Next"
-
-msgid "Панель настроек"
-msgstr "Settings panel"
-
-msgid "Инспектор"
-msgstr "Inspector"
 
 msgid "Металл"
 msgstr "Metal"
@@ -689,6 +650,48 @@ msgstr "Could not process the files"
 
 msgid "Обработано файлов: {n}"
 msgstr "Files processed: {n}"
+
+msgid "Как было"
+msgstr "Original"
+
+msgid "Лента"
+msgstr "Ribbon"
+
+msgid "НАЛОЖЕНИЯ:"
+msgstr "OVERLAPS:"
+
+msgid "Убрать наложения"
+msgstr "Fix overlaps"
+
+msgid "Уменьшить размер и увеличить шаг, чтобы отверстия не пересекались"
+msgstr "Shrink holes and increase pitch to remove overlaps"
+
+msgid "Наложений нет"
+msgstr "No overlaps"
+
+msgid "Удалить выбранное"
+msgstr "Delete selected"
+
+msgid "Вернуть все"
+msgstr "Restore all"
+
+msgid "Отверстие удалено"
+msgstr "Hole removed"
+
+msgid "Все отверстия возвращены"
+msgstr "All holes restored"
+
+msgid "Наложения убраны"
+msgstr "Overlaps removed"
+
+msgid "Проверка: ошибок нет"
+msgstr "Check: no issues"
+
+msgid "ПРОВЕРКА:"
+msgstr "CHECK:"
+
+msgid "Подробнее"
+msgstr "Details"
 
 msgid "Настройки узора"
 msgstr "Pattern settings"

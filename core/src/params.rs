@@ -9,6 +9,8 @@ pub struct Params {
     pub sheet_w: f64,
     pub sheet_h: f64,
     pub border: f64,
+    /// Отверстия, удалённые вручную (координаты центра в мм): движок их не создаёт
+    pub excluded: Vec<(f64, f64)>,
     pub outline: bool,
     /// Число усиков (мостиков) на контуре листа: контур режется с разрывами,
     /// лист держится на усиках. 0 — контур режется целиком.
@@ -126,6 +128,7 @@ impl Default for Params {
             sheet_w: 1000.0,
             sheet_h: 600.0,
             border: 20.0,
+            excluded: Vec::new(),
             outline: true,
             tab_n: 0,
             tab_w: 5.0,

@@ -99,8 +99,12 @@ export component TemplatesPanel inherits Flickable {
         }
         Seg {
             items: [@tr("Все"), @tr("Динамики"), @tr("Вентиляция"), @tr("Декор"), @tr("Лист")];
-            current: 0;
+            current: Store.template-category-index;
             select(i) => {
+                // «Все» сбрасывает и категорию, и поисковый запрос
+                if i == 0 {
+                    Store.set-template-query("");
+                }
                 Store.set-template-category(i == 0 ? "" : i == 1 ? "dynamic" : i == 2 ? "vent" : i == 3 ? "decor" : "structure");
             }
         }
@@ -1568,21 +1572,6 @@ export component SummaryPanel inherits VerticalLayout {
         }
         if Store.stats.sizes-note != "": Hint {
             text: Store.stats.sizes-note;
-        }
-    }
-    VerticalLayout {
-        spacing: 8px;
-        Head {
-            text: @tr("Проверка под лазер");
-        }
-        if Store.stats.warnings.length == 0: Bullet {
-            text: Store.stats.ok-line;
-            dot: Theme.ok;
-            ink: Theme.t2;
-        }
-        for w in Store.stats.warnings: Bullet {
-            text: w;
-            dot: Theme.warn;
         }
     }
 }

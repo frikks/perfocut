@@ -100,6 +100,12 @@ pub struct Stats {
     pub min_allowed: f64,
     pub max_allowed: f64,
     pub warnings: Vec<String>,
+    /// Число пар отверстий, чьи контуры пересекаются
+    pub overlaps: usize,
+    /// Во сколько раз нужно уменьшить размер, чтобы наложения исчезли (1 = наложений нет)
+    pub overlap_ratio: f64,
+    /// Маркеры на чертеже: центр (X, Y в мм) и радиус зоны подсветки
+    pub overlap_points: Vec<(f64, f64, f64)>,
 }
 
 pub struct GenResult {
@@ -1400,6 +1406,109 @@ pub fn bridge_violations(shapes: &[Shape], bridge: f64) -> Vec<(f64, f64, f64)> 
     out
 }
 
+/// Результат анализа наложений: счётчик, коэффициент уменьшения и маркеры для чертежа.
+#[derive(Clone, Debug)]
+pub struct OverlapInfo {
+    pub pairs: usize,
+    pub ratio: f64,
+    pub points: Vec<(f64, f64, f64)>,
+}
+
+/// Находит пары отверстий, контуры которых пересекаются, и минимальный коэффициент,
+/// до которого нужно уменьшить размер, чтобы они разошлись.
+pub fn analyze_overlaps(shapes: &[Shape]) -> OverlapInfo {
+    let empty = OverlapInfo {
+        pairs: 0,
+        ratio: 1.0,
+        points: Vec::new(),
+    };
+    if shapes.len() < 2 {
+        return empty;
+    }
+    let max_size = shapes.iter().map(|s| s.size()).fold(0.0f64, f64::max);
+    if max_size <= 1e-9 {
+        return empty;
+    }
+    // Размер ячейки — максимальный диаметр: центры пересекающихся фигур всегда
+    // лежат в этой или соседней ячейке.
+    let cell = max_size.max(0.5);
+    let mut grid: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+    for (i, s) in shapes.iter().enumerate() {
+        let (x, y) = s.center();
+        grid.entry(((x / cell).floor() as i64, (y / cell).floor() as i64))
+            .or_default()
+            .push(i);
+    }
+    let mut pairs = 0usize;
+    let mut ratio = 1.0f64;
+    let mut points: Vec<(f64, f64, f64)> = Vec::new();
+    for (key, idx) in &grid {
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                let Some(other) = grid.get(&(key.0 + dx, key.1 + dy)) else {
+                    continue;
+                };
+                for &i in idx {
+                    for &j in other {
+                        if i >= j {
+                            continue;
+                        }
+                        let a = &shapes[i];
+                        let b = &shapes[j];
+                        let (ax, ay) = a.center();
+                        let (bx, by) = b.center();
+                        let dist = ((ax - bx).powi(2) + (ay - by).powi(2)).sqrt();
+                        let need = (a.size() + b.size()) / 2.0;
+                        if dist + 1e-6 < need {
+                            pairs += 1;
+                            if need > 1e-9 {
+                                ratio = ratio.min(dist / need);
+                            }
+                            // Один маркер на пару, не больше 400, чтобы не перегружать холст
+                            if points.len() < 400 {
+                                points.push((
+                                    (ax + bx) / 2.0,
+                                    (ay + by) / 2.0,
+                                    (need / 2.0).max(0.5),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    OverlapInfo {
+        pairs,
+        ratio,
+        points,
+    }
+}
+
+/// Устраняет наложения: уменьшает размеры отверстий/прорезей и слегка увеличивает
+/// шаг, если материал не позволяет уменьшить размер ниже допустимого.
+pub fn fix_overlaps(p: &Params, shapes: &[Shape]) -> Params {
+    let info = analyze_overlaps(shapes);
+    let mut q = p.clone();
+    if info.pairs == 0 {
+        return q;
+    }
+    let ratio = info.ratio;
+    let min_size = (p.min_k * p.thickness).max(0.1);
+    let factor = (ratio * 0.96).clamp(0.25, 1.0);
+    q.d_min = (q.d_min * factor).max(min_size);
+    q.d_max = (q.d_max * factor).max(q.d_min);
+    q.w_min = (q.w_min * factor).max(min_size);
+    q.w_max = (q.w_max * factor).max(q.w_min);
+    // Если размер уперся в минимум по металлу — раздвигаем сетку.
+    if factor < 0.85 || q.d_min < p.d_min * factor - 1e-9 {
+        let spread = (1.0 / factor).clamp(1.0, 4.0);
+        q.pitch = (q.pitch * spread).min(1000.0);
+        q.line_pitch = (q.line_pitch * spread).min(1000.0);
+    }
+    q
+}
+
 fn finish(
     shapes: Vec<Shape>,
     mut warnings: Vec<String>,
@@ -1409,11 +1518,30 @@ fn finish(
     p: Params,
 ) -> GenResult {
     let (w, h) = (p.sheet_w, p.sheet_h);
+    // Отверстия, удалённые вручную, не попадают ни в статистику, ни в экспорт
+    let shapes: Vec<Shape> = if p.excluded.is_empty() {
+        shapes
+    } else {
+        shapes
+            .into_iter()
+            .filter(|s| {
+                let (x, y) = s.center();
+                let tol = s.size().max(1.0);
+                !p.excluded
+                    .iter()
+                    .any(|(ex, ey)| ((x - ex).powi(2) + (y - ey).powi(2)).sqrt() <= tol)
+            })
+            .collect()
+    };
     let mut st = Stats {
         count: shapes.len(),
         removed_edge,
         ..Stats::default()
     };
+    let info = analyze_overlaps(&shapes);
+    st.overlaps = info.pairs;
+    st.overlap_ratio = info.ratio;
+    st.overlap_points = info.points;
     st.min_allowed = round2(min_allowed);
     st.max_allowed = round2(max_allowed.max(0.0));
     let mut area = 0.0;

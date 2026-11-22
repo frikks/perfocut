@@ -961,6 +961,58 @@ mod tests {
     }
 
     #[test]
+    fn overlaps_detected_and_fixed() {
+        use gen::Shape;
+        let a = Shape::Circle {
+            x: 0.0,
+            y: 0.0,
+            d: 10.0,
+        };
+        let b = Shape::Circle {
+            x: 6.0,
+            y: 0.0,
+            d: 10.0,
+        };
+        let far = Shape::Circle {
+            x: 100.0,
+            y: 100.0,
+            d: 10.0,
+        };
+        let info = gen::analyze_overlaps(&[a.clone(), b.clone(), far]);
+        assert_eq!(info.pairs, 1);
+        assert!(
+            info.ratio > 0.5 && info.ratio < 0.7,
+            "ratio = {}",
+            info.ratio
+        );
+        assert_eq!(info.points.len(), 1);
+        assert!((info.points[0].0 - 3.0).abs() < 1e-6);
+
+        let info2 = gen::analyze_overlaps(&[
+            Shape::Circle {
+                x: 0.0,
+                y: 0.0,
+                d: 10.0,
+            },
+            Shape::Circle {
+                x: 40.0,
+                y: 0.0,
+                d: 10.0,
+            },
+        ]);
+        assert_eq!(info2.pairs, 0);
+        assert_eq!(info2.ratio, 1.0);
+        assert!(info2.points.is_empty());
+
+        let mut p = Params::default();
+        p.d_min = 10.0;
+        p.d_max = 10.0;
+        let fixed = gen::fix_overlaps(&p, &[a.clone(), b.clone()]);
+        assert!(fixed.d_max < p.d_max);
+        assert!(fixed.pitch > p.pitch);
+    }
+
+    #[test]
     fn new_grid_types_generate() {
         let g = gradient(200, 120);
         let grids = [

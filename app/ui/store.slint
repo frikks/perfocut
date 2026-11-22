@@ -24,10 +24,14 @@ export struct Template { id: string, name: string, desc: string, preview: string
 export struct TemplateRow { a: Template, b: Template, c: Template }
 export struct Machine { id: string, name: string, desc: string }
 export struct Material { id: string, name: string }
+export struct OverlapPoint { x: float, y: float, r: float }
+
 export struct StatsUI {
     has: bool, cost: string, currency: string, rows: [KV],
     count: string, pierces: string, cut: string, time: string, open: string, mass: string,
     sizes: [SizeRow], sizes-note: string, warnings: [string], ok-line: string, hud: string,
+    overlaps: int,
+    overlap-points: [OverlapPoint],
 }
 export struct Fmt { title: string, note: string, on: bool }
 
@@ -49,6 +53,7 @@ export global Store {
     // Строки по 3 карточки + фильтр категории и поиск
     in property <[TemplateRow]> template-rows;
     in-out property <string> template-category;
+    in-out property <int> template-category-index;
     in-out property <string> template-query;
     callback set-template-category(string);
     callback set-template-query(string);
@@ -153,6 +158,11 @@ export global Store {
     callback sketch-svg();
     // Картинку и штрихи убрать: сразу чистый холст по размеру листа
     callback image-clear();
+    // Устранить наложения отверстий: подобрать размеры и шаг заново
+    callback fix-overlaps();
+    // Ручное удаление отверстия по координатам центра (мм)
+    callback remove-overlap(float, float);
+    callback reset-exclusions();
 
     // Холст на весь экран: на телефоне горизонтально, на компьютере во всё окно
     in-out property <bool> full-canvas;
@@ -195,4 +205,13 @@ export global Prefs {
     callback changed();
     callback open-url(string);
     callback minimize();
+}
+
+// Диагностическая лента: 0 как было, 2 лента (только UI)
+export global View {
+    in-out property <int> check-mode: 2;
+    in-out property <bool> details-open: false;
+    in-out property <int> selected-overlap: -1;
+    in-out property <float> selected-x;
+    in-out property <float> selected-y;
 }

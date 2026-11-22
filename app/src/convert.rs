@@ -29,6 +29,7 @@ macro_rules! par_conv {
                 mjoint_n: par.mjoint_n.clamp(0, 24) as i64,
                 mount_n: par.mount_n.clamp(0, 8) as i64,
                 lang: prev.lang.clone(),
+                excluded: prev.excluded.clone(),
             }
         }
 
