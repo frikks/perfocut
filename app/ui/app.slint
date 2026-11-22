@@ -343,6 +343,8 @@ component Logo inherits HorizontalLayout {
 
 component Header inherits Rectangle {
     in property <bool> wide;
+    in property <int> layout;
+    callback cycle-layout();
     // Вырез экрана и системные панели: содержимое шапки не заезжает под них
     in property <length> pad-l;
     in property <length> pad-r;
@@ -416,6 +418,19 @@ component Header inherits Rectangle {
         }
         VerticalLayout {
             alignment: center;
+            // Быстрое переключение компоновок: A Студия / B Мастер / C Кокпит
+            Rectangle {
+                width: Theme.row;
+                height: Theme.row;
+                Btn {
+                    width: parent.width;
+                    height: parent.height;
+                    kind: 2;
+                    text: root.layout == 0 ? "A" : root.layout == 1 ? "B" : "C";
+                    tip: @tr("Компоновка");
+                    clicked => { root.cycle-layout(); }
+                }
+            }
             Rectangle {
                 width: Theme.row;
                 height: Theme.row;
@@ -958,10 +973,15 @@ export component AppWindow inherits Window {
 
     in-out property <int> tab: 0;
     in-out property <int> left-tab: 0;
-    // Компоновка «Студия»: рельс разделов слева и сворачиваемая панель
+    // Три компоновки для сравнения: 0 Студия, 1 Мастер, 2 Кокпит
+    in-out property <int> layout: 0;
     in-out property <bool> tools-open: true;
+    in-out property <bool> drawer-left: false;
+    in-out property <bool> drawer-right: false;
     property <length> rail-w: 44px;
-    property <length> status-h: wide ? 26px : 0px;
+    property <length> master-w: 360px;
+    property <length> stepper-h: wide ? 40px : 0px;
+    property <length> status-h: wide && layout != 2 ? 26px : 0px;
     property <length> panel-w: tools-open ? left-w : 0px;
     in-out property <int> color-target: -1;
     in-out property <bool> settings-open;
@@ -985,8 +1005,23 @@ export component AppWindow inherits Window {
     property <length> head-h: wide ? 56px : Theme.touch ? 40px : 48px;
     property <length> left-w: Theme.touch ? 340px : root.medium ? 284px : 316px;
     property <length> right-w: Theme.touch ? 320px : root.medium ? 264px : 300px;
+    // Геометрия холста зависит от выбранной компоновки
+    property <length> stage-x: Store.full-canvas ? 0px
+        : root.layout == 0 && root.wide ? root.inset-left + root.rail-w + root.panel-w
+        : root.layout == 1 && root.wide ? root.inset-left + root.master-w
+        : 0px;
+    property <length> stage-y: Store.full-canvas ? 0px
+        : root.layout == 1 && root.wide ? root.head-h + root.stepper-h
+        : root.head-h;
+    property <length> stage-w: Store.full-canvas ? root.width
+        : root.layout == 0 && root.wide ? root.width - root.inset-left - root.inset-right - root.rail-w - root.panel-w
+        : root.layout == 1 && root.wide ? root.width - root.inset-left - root.inset-right - root.master-w
+        : root.width - root.inset-left - root.inset-right;
     // На телефоне рисование занимает весь экран под шапкой: нижние вкладки спрятаны
-    property <length> stage-h: Store.full-canvas ? area-h : wide ? area-h - head-h - status-h : Store.drawing ? area-h - head-h : Math.round((area-h - head-h) * (kb-open ? 0.26 : 0.44) / 1px) * 1px;
+    property <length> stage-h: Store.full-canvas ? area-h
+        : root.wide ? area-h - root.head-h - (root.layout == 1 ? root.stepper-h : 0px) - root.status-h
+        : Store.drawing ? area-h - root.head-h
+        : Math.round((area-h - root.head-h) * (kb-open ? 0.26 : 0.44) / 1px) * 1px;
     property <[Preset]> sheet-a: [
         { c: #9a9ea3, hex: "#9a9ea3" }, { c: #c4c8cc, hex: "#c4c8cc" }, { c: #6e737a, hex: "#6e737a" },
         { c: #3a3c40, hex: "#3a3c40" }, { c: #e6e6e3, hex: "#e6e6e3" },
@@ -1094,6 +1129,12 @@ export component AppWindow inherits Window {
                 height: root.head-h;
                 visible: !Store.full-canvas;
                 wide: root.wide;
+                layout: root.layout;
+                cycle-layout => {
+                    root.layout = Math.mod(root.layout + 1, 3);
+                    root.drawer-left = false;
+                    root.drawer-right = false;
+                }
                 pad-l: root.inset-left;
                 pad-r: root.inset-right;
                 settings => {
@@ -1102,9 +1143,9 @@ export component AppWindow inherits Window {
             }
 
             stage := Stage {
-                x: Store.full-canvas ? 0px : root.wide ? root.inset-left + root.rail-w + root.panel-w : 0px;
-                y: Store.full-canvas ? 0px : root.head-h;
-                width: Store.full-canvas ? parent.width : root.wide ? parent.width - root.inset-left - root.inset-right - root.rail-w - root.panel-w : parent.width;
+                x: root.stage-x;
+                y: root.stage-y;
+                width: root.stage-w;
                 height: root.stage-h;
                 compact: !root.wide;
                 pad-l: root.inset-left;
@@ -1114,8 +1155,38 @@ export component AppWindow inherits Window {
                 }
             }
 
+            // Кокпит: кнопки выдвижения панелей плавают над холстом, не тесня шапку
+            if root.wide && root.layout == 2 && !Store.full-canvas: Rectangle {
+                x: root.stage-x + 8px;
+                y: root.stage-y + 8px;
+                width: Theme.row;
+                height: Theme.row;
+                border-radius: Theme.radius;
+                background: Theme.acc;
+                Btn {
+                    text: "<";
+                    kind: 1;
+                    tip: @tr("Панель настроек");
+                    clicked => { root.drawer-left = !root.drawer-left; }
+                }
+            }
+            if root.wide && root.layout == 2 && !Store.full-canvas: Rectangle {
+                x: root.stage-x + root.stage-w - Theme.row - 8px;
+                y: root.stage-y + 8px;
+                width: Theme.row;
+                height: Theme.row;
+                border-radius: Theme.radius;
+                background: Theme.acc;
+                Btn {
+                    text: ">";
+                    kind: 1;
+                    tip: @tr("Инспектор");
+                    clicked => { root.drawer-right = !root.drawer-right; }
+                }
+            }
+
             // Рельс разделов: та же навигация, что нижние вкладки на телефоне
-            if root.wide && !Store.full-canvas: Rectangle {
+            if root.wide && root.layout == 0 && !Store.full-canvas: Rectangle {
                 x: root.inset-left;
                 y: root.head-h;
                 width: root.rail-w;
@@ -1161,7 +1232,7 @@ export component AppWindow inherits Window {
             }
 
             // Один контекстный раздел вместо двух колонок — холсту остаётся больше места
-            if root.wide && !Store.full-canvas && root.tools-open: Rectangle {
+            if root.wide && root.layout == 0 && !Store.full-canvas && root.tools-open: Rectangle {
                 x: root.inset-left + root.rail-w;
                 y: root.head-h;
                 width: root.left-w;
@@ -1206,7 +1277,7 @@ export component AppWindow inherits Window {
             }
 
             // Статус-бар: живые моно-значения всегда под холстом
-            if root.wide && !Store.full-canvas: Rectangle {
+            if root.wide && root.layout == 0 && !Store.full-canvas: Rectangle {
                 x: root.inset-left;
                 y: parent.height - root.status-h;
                 width: parent.width - root.inset-left - root.inset-right;
@@ -1257,6 +1328,130 @@ export component AppWindow inherits Window {
                         font-size: Theme.fs-s;
                         vertical-alignment: center;
                     }
+                }
+            }
+
+            // ── Вариант B: «Мастер» — шаги сверху, настройки слева, живой холст справа ──
+            if root.wide && root.layout == 1 && !Store.full-canvas: Rectangle {
+                x: root.inset-left;
+                y: root.head-h;
+                width: root.width - root.inset-left - root.inset-right;
+                height: root.stepper-h;
+                background: Theme.shell-raised;
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    spacing: 10px;
+                    Text {
+                        text: @tr("Шаг") + " " + (root.tab + 1) + " / 4";
+                        color: Theme.acc-text;
+                        font-family: Theme.mono;
+                        font-size: Theme.fs-s;
+                        vertical-alignment: center;
+                    }
+                    Seg {
+                        horizontal-stretch: 1;
+                        items: [@tr("Картинка"), @tr("Узор"), @tr("Металл"), @tr("Результат")];
+                        current: root.tab;
+                        select(i) => { root.tab = i; }
+                    }
+                    Btn {
+                        text: @tr("Назад");
+                        enabled: root.tab > 0;
+                        clicked => { root.tab = root.tab - 1; }
+                    }
+                    Btn {
+                        text: @tr("Далее");
+                        kind: 1;
+                        enabled: root.tab < 3;
+                        clicked => { root.tab = root.tab + 1; }
+                    }
+                }
+                Rectangle {
+                    y: parent.height - 1px;
+                    height: 1px;
+                    background: Theme.neon-cyan-soft;
+                }
+            }
+
+            if root.wide && root.layout == 1 && !Store.full-canvas: Rectangle {
+                x: root.inset-left;
+                y: root.head-h + root.stepper-h;
+                width: root.master-w;
+                height: root.area-h - root.stepper-h - root.status-h;
+                background: Theme.shell;
+                mflick := Flickable {
+                    vertical-stretch: 1;
+                    content-height: msect.preferred-height;
+                    content-width: self.width;
+                    msect := VerticalLayout {
+                        width: mflick.width;
+                        if root.tab == 0: SettingsPanel { }
+                        if root.tab == 1: TemplatesPanel { vertical-stretch: 1; }
+                        if root.tab == 2: SummaryPanel { }
+                        if root.tab == 3: ExportPanel { }
+                    }
+                }
+                Rectangle {
+                    x: parent.width - 1px;
+                    width: 1px;
+                    background: Theme.line;
+                }
+            }
+
+            // ── Вариант C: «Кокпит» — холст на весь экран, панели выезжают по краям ──
+            if root.wide && root.layout == 2 && !Store.full-canvas: Rectangle {
+                x: root.inset-left + (root.drawer-left ? 0px : -320px);
+                y: root.head-h;
+                width: 320px;
+                height: root.area-h - root.head-h;
+                background: Theme.shell-raised;
+                opacity: root.drawer-left ? 1 : 0;
+                animate x { duration: 200ms; easing: ease-out; }
+                animate opacity { duration: 200ms; easing: ease-out; }
+                df := Flickable {
+                    vertical-stretch: 1;
+                    content-height: ds.preferred-height;
+                    content-width: self.width;
+                    ds := VerticalLayout {
+                        width: df.width;
+                        if root.tab == 0: SettingsPanel { }
+                        if root.tab == 1: TemplatesPanel { vertical-stretch: 1; }
+                        if root.tab == 2: SummaryPanel { }
+                        if root.tab == 3: ExportPanel { }
+                    }
+                }
+                Rectangle {
+                    x: parent.width - 1px;
+                    width: 1px;
+                    background: Theme.neon-cyan-soft;
+                }
+            }
+
+            if root.wide && root.layout == 2 && !Store.full-canvas: Rectangle {
+                x: root.width - root.inset-right - 300px + (root.drawer-right ? 0px : 300px);
+                y: root.head-h;
+                width: 300px;
+                height: root.area-h - root.head-h;
+                background: Theme.shell-raised;
+                opacity: root.drawer-right ? 1 : 0;
+                animate x { duration: 200ms; easing: ease-out; }
+                animate opacity { duration: 200ms; easing: ease-out; }
+                rf := Flickable {
+                    vertical-stretch: 1;
+                    content-height: rp2.preferred-height;
+                    content-width: self.width;
+                    rp2 := VerticalLayout {
+                        width: rf.width;
+                        SummaryPanel { }
+                        Rectangle { height: 1px; background: Theme.line; }
+                        ExportPanel { }
+                    }
+                }
+                Rectangle {
+                    x: 0;
+                    width: 1px;
+                    background: Theme.neon-cyan-soft;
                 }
             }
 
@@ -1395,6 +1590,21 @@ export component AppWindow inherits Window {
                 }
                 info => {
                     root.info-open = true;
+                }
+                VerticalLayout {
+                    spacing: 4px;
+                    Caption {
+                        text: @tr("Компоновка");
+                    }
+                    Seg {
+                        items: [@tr("Студия"), @tr("Мастер"), @tr("Кокпит")];
+                        current: root.layout;
+                        select(i) => {
+                            root.layout = i;
+                            root.drawer-left = false;
+                            root.drawer-right = false;
+                        }
+                    }
                 }
                 VerticalLayout {
                     spacing: 4px;

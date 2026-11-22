@@ -291,6 +291,39 @@ msgstr "Sheet weight"
 msgid "Масштаб"
 msgstr "Scale"
 
+msgid "Компоновка"
+msgstr "Layout"
+
+msgid "Студия"
+msgstr "Studio"
+
+msgid "Мастер"
+msgstr "Wizard"
+
+msgid "Кокпит"
+msgstr "Cockpit"
+
+msgid "Шаг"
+msgstr "Step"
+
+msgid "Картинка"
+msgstr "Image"
+
+msgid "Результат"
+msgstr "Result"
+
+msgid "Назад"
+msgstr "Back"
+
+msgid "Далее"
+msgstr "Next"
+
+msgid "Панель настроек"
+msgstr "Settings panel"
+
+msgid "Инспектор"
+msgstr "Inspector"
+
 msgid "Металл"
 msgstr "Metal"
 
