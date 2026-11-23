@@ -482,6 +482,7 @@ fn bind(ui: &AppWindow) {
         let cat = cat.to_string();
         with(|_st, ui| {
             let store = ui.global::<Store>();
+            store.set_template_category(cat.clone().into());
             let q = store.get_template_query();
             store.set_template_category_index(if cat.is_empty() {
                 0
@@ -500,7 +501,9 @@ fn bind(ui: &AppWindow) {
     s.on_set_template_query(|q| {
         let q = q.to_string();
         with(|_st, ui| {
-            let cat = ui.global::<Store>().get_template_category();
+            let store = ui.global::<Store>();
+            store.set_template_query(q.clone().into());
+            let cat = store.get_template_category();
             rebuild_template_rows(ui, &cat, &q);
         });
     });
@@ -1570,6 +1573,8 @@ fn stats_ui(st: &State) -> StatsUI {
 fn show_stats(st: &State, ui: &AppWindow) {
     let store = ui.global::<Store>();
     store.set_stats(stats_ui(st));
+    // Новый результат — старый выбор больше не существует
+    store.set_selected_overlap(-1);
     let ready = st.pic.is_some() && st.res.as_ref().is_some_and(|r| r.stats.count > 0);
     store.set_can_export(ready);
 }

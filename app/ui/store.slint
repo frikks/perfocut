@@ -163,6 +163,10 @@ export global Store {
     // Ручное удаление отверстия по координатам центра (мм)
     callback remove-overlap(float, float);
     callback reset-exclusions();
+    // Выбранное наложение (сбрасывается при каждом новом расчёте)
+    in-out property <int> selected-overlap: -1;
+    in-out property <float> selected-x;
+    in-out property <float> selected-y;
 
     // Холст на весь экран: на телефоне горизонтально, на компьютере во всё окно
     in-out property <bool> full-canvas;
@@ -211,7 +215,4 @@ export global Prefs {
 export global View {
     in-out property <int> check-mode: 2;
     in-out property <bool> details-open: false;
-    in-out property <int> selected-overlap: -1;
-    in-out property <float> selected-x;
-    in-out property <float> selected-y;
 }

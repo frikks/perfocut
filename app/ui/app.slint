@@ -1,4 +1,4 @@
-// Главное окно: шапка, настройки, предпросмотр, итог и экспорт.
+﻿// Главное окно: шапка, настройки, предпросмотр, итог и экспорт.
 // На широком экране всё в три колонки, на телефоне предпросмотр сверху и вкладки снизу.
 import "fonts/Inter-Regular.ttf";
 import "fonts/Inter-Medium.ttf";
@@ -692,14 +692,15 @@ component Stage inherits Rectangle {
                 width: pr * 2;
                 height: pr * 2;
                 border-radius: pr;
-                border-width: View.selected-overlap == i ? 3px : 2px;
-                border-color: View.selected-overlap == i ? Theme.acc : Theme.alert;
-                background: View.selected-overlap == i ? Theme.acc.with-alpha(0.3) : Theme.alert.with-alpha(0.16);
+                border-width: Store.selected-overlap == i ? 3px : 2px;
+                border-color: Store.selected-overlap == i ? Theme.acc : Theme.alert;
+                background: Store.selected-overlap == i ? Theme.acc.with-alpha(0.3) : Theme.alert.with-alpha(0.16);
                 TouchArea {
                     clicked => {
-                        View.selected-overlap = i;
-                        View.selected-x = m.x;
-                        View.selected-y = m.y;
+                        View.check-mode = 2;
+                        Store.selected-overlap = i;
+                        Store.selected-x = m.x;
+                        Store.selected-y = m.y;
                         View.details-open = true;
                     }
                 }
@@ -1300,10 +1301,10 @@ export component AppWindow inherits Window {
                         Btn {
                             text: @tr("Удалить выбранное");
                             kind: 1;
-                            enabled: View.selected-overlap >= 0;
+                            enabled: Store.selected-overlap >= 0;
                             clicked => {
-                                Store.remove-overlap(View.selected-x, View.selected-y);
-                                View.selected-overlap = -1;
+                                Store.remove-overlap(Store.selected-x, Store.selected-y);
+                                Store.selected-overlap = -1;
                             }
                         }
                         Btn {
@@ -1311,7 +1312,7 @@ export component AppWindow inherits Window {
                             kind: 2;
                             clicked => {
                                 Store.reset-exclusions();
-                                View.selected-overlap = -1;
+                                Store.selected-overlap = -1;
                             }
                         }
                     }
