@@ -961,6 +961,15 @@ mod tests {
     }
 
     #[test]
+    fn degenerate_sizes_do_not_panic() {
+        // clamp(min > max) раньше паниковал на маленьком листе с большим числом недорезов
+        let paths = export::sheet_paths(10.0, 10.0, 3000, 5.0, 0.0);
+        assert!(!paths.is_empty());
+        let empty = image::Gray::from_rgba(&[], 0, 0);
+        assert_eq!(empty.mean(0.0, 0.0, 1.0, 1.0), 0.0);
+    }
+
+    #[test]
     fn overlaps_detected_and_fixed() {
         use gen::Shape;
         let a = Shape::Circle {

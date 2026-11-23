@@ -21,7 +21,7 @@ fn open_path(path: &Path) {
         Ok(bytes) => {
             let name = file_name(path);
             if name.ends_with(".perfo") || name.ends_with(".zip") {
-                crate::app::remember_order(&name);
+                crate::app::remember_order(&path.display().to_string());
             }
             crate::app::open_bytes(name, bytes)
         }

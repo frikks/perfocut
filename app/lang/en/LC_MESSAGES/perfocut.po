@@ -669,6 +669,12 @@ msgstr "Shrink holes and increase pitch to remove overlaps"
 msgid "Наложений нет"
 msgstr "No overlaps"
 
+msgid "Не удалось открыть заказ: "
+msgstr "Could not open the order: "
+
+msgid "Файл заказа больше не существует"
+msgstr "The order file no longer exists"
+
 msgid "Удалить выбранное"
 msgstr "Delete selected"
 

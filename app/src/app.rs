@@ -180,13 +180,26 @@ fn rebuild_template_rows(ui: &AppWindow, category: &str, query: &str) {
 
 /// Запомнить открытый заказ в истории (не более 8).
 #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
-pub fn remember_order(name: &str) {
+pub fn remember_order(path: &str) {
+    let name = std::path::Path::new(path)
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.to_owned());
     with(|st, _| {
-        if let Some(pos) = st.saved.recent.iter().position(|x| x == name) {
+        if let Some(pos) = st.saved.recent.iter().position(|x| x == &name) {
             st.saved.recent.remove(pos);
+            if pos < st.saved.recent_paths.len() {
+                st.saved.recent_paths.remove(pos);
+            }
         }
-        st.saved.recent.insert(0, name.to_string());
+        st.saved.recent.insert(0, name);
+        st.saved.recent_paths.insert(0, path.to_owned());
         st.saved.recent.truncate(8);
+        st.saved.recent_paths.truncate(8);
+        // Старые записи могли не иметь пути — не даём спискам разъехаться
+        st.saved
+            .recent_paths
+            .resize(st.saved.recent.len(), String::new());
         st.saved.store();
     });
 }
@@ -632,13 +645,24 @@ fn bind(ui: &AppWindow) {
     s.on_open(platform::pick_file);
     s.on_open_recent(|name| {
         let name = name.to_string();
-        with(|st, ui| {
-            if let Some(path) = st.saved.recent.iter().find(|p| p.ends_with(&name)).cloned() {
-                ui.set_tab(1);
-                toast(st, ui, &tf("Открыть заказ: {n}", &[("n", &name)]), 2500);
-                let _ = path;
+        #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+        {
+            // Путь берём из отдельного списка — в recent лежит только имя для показа
+            let found = with(|st, _| {
+                let pos = st.saved.recent.iter().position(|x| x == &name)?;
+                st.saved.recent_paths.get(pos).cloned()
+            })
+            .flatten();
+            match found {
+                Some(path) if !path.is_empty() => match std::fs::read(&path) {
+                    Ok(bytes) => open_bytes(name, bytes),
+                    Err(e) => show_error(&t("Не удалось открыть заказ: "), &e.to_string()),
+                },
+                _ => show_error("", &t("Файл заказа больше не существует")),
             }
-        });
+        }
+        #[cfg(any(target_os = "android", target_arch = "wasm32"))]
+        let _ = name;
     });
     s.on_sample(|| match files::sample_png() {
         Ok(bytes) => {

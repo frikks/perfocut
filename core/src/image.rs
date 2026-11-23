@@ -33,6 +33,10 @@ impl Gray {
 
     /// Среднее значение в прямоугольнике пикселей [x0,x1) x [y0,y1) (дробные границы округляются).
     pub fn mean(&self, x0: f64, y0: f64, x1: f64, y1: f64) -> f64 {
+        // clamp(0, -1) тоже паникует — пустое изображение не имеет среднего
+        if self.w == 0 || self.h == 0 {
+            return 0.0;
+        }
         let wf = self.w as f64;
         let hf = self.h as f64;
         let mut ax = x0.floor().clamp(0.0, wf - 1.0) as usize;

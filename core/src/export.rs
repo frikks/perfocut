@@ -87,8 +87,11 @@ pub fn sheet_paths(w: f64, h: f64, tab_n: i64, tab_w: f64, offset: f64) -> Vec<V
     if n == 0 || per <= 0.0 {
         return vec![corners];
     }
-    // Ширина недореза не больше половины интервала между ними
-    let tw = tab_w.clamp(0.01, per / (2.0 * n as f64));
+    // Ширина недореза не больше половины интервала между ними.
+    // При очень мелком листе и большом числе недорезов верхняя граница
+    // может оказаться меньше 0.01 — clamp с min > max паникует.
+    let hi = per / (2.0 * n as f64);
+    let tw = tab_w.clamp(hi.min(0.01), hi);
     // Центры недорезов по дуге периметра, со сдвигом на полшага — чтобы не попадать на углы
     let centers: Vec<f64> = (0..n)
         .map(|i| {
@@ -172,7 +175,8 @@ fn split_closed(pts: &[(f64, f64)], n: usize, w: f64) -> Vec<Vec<(f64, f64)>> {
         return vec![pts.to_vec()];
     }
     let step = per / n as f64;
-    let gap = w.clamp(0.01, step * 0.8);
+    let hi = step * 0.8;
+    let gap = w.clamp(hi.min(0.01), hi);
     // Точка на контуре по пройденной длине дуги
     let at = |s: f64| -> (f64, f64) {
         let s = s.rem_euclid(per);

@@ -13,7 +13,9 @@ NDK=${ANDROID_NDK_ROOT:-${ANDROID_NDK_HOME:-$(ls -d "$SDK"/ndk/* | sort -V | tai
 MIN_API=24
 VERSION=$(sed -n 's/^version *= *"\([^"]*\)".*/\1/p' $ROOT/Cargo.toml | head -1)
 IFS=. read -r MA MI PA <<<"${VERSION%%-*}"
-CODE=$(( ${MA:-0}*10000 + ${MI:-0}*100 + ${PA:-0} ))
+# Пререлизы должны увеличивать versionCode, иначе Android не поставит новую APK поверх старой.
+PRE=$(printf '%s' "$VERSION" | sed -n 's/^.*-\(pre\.\)\{0,1\}\([0-9][0-9]*\)$/\2/p')
+CODE=$(( ${MA:-0}*100000 + ${MI:-0}*1000 + ${PA:-0}*100 + ${PRE:-0} ))
 KS_PASS=${ANDROID_KEYSTORE_PASS:-android}
 KS_ALIAS=${ANDROID_KEY_ALIAS:-perfocut}
 
