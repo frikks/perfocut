@@ -1441,7 +1441,9 @@ pub fn analyze_overlaps(shapes: &[Shape]) -> OverlapInfo {
     }
     let mut pairs = 0usize;
     let mut ratio = 1.0f64;
-    let mut points: Vec<(f64, f64, f64)> = Vec::new();
+    // Маркер ставится на каждое из пересекающихся отверстий, чтобы можно было
+    // выбрать конкретное, а не удалять сразу оба.
+    let mut involved: std::collections::HashSet<usize> = std::collections::HashSet::new();
     for (key, idx) in &grid {
         for dx in -1..=1 {
             for dy in -1..=1 {
@@ -1464,20 +1466,24 @@ pub fn analyze_overlaps(shapes: &[Shape]) -> OverlapInfo {
                             if need > 1e-9 {
                                 ratio = ratio.min(dist / need);
                             }
-                            // Один маркер на пару, не больше 400, чтобы не перегружать холст
-                            if points.len() < 400 {
-                                points.push((
-                                    (ax + bx) / 2.0,
-                                    (ay + by) / 2.0,
-                                    (need / 2.0).max(0.5),
-                                ));
-                            }
+                            involved.insert(i);
+                            involved.insert(j);
                         }
                     }
                 }
             }
         }
     }
+    let mut ids: Vec<usize> = involved.into_iter().collect();
+    ids.sort_unstable();
+    let points: Vec<(f64, f64, f64)> = ids
+        .into_iter()
+        .take(400)
+        .map(|i| {
+            let (x, y) = shapes[i].center();
+            (x, y, (shapes[i].size() / 2.0).max(0.5))
+        })
+        .collect();
     OverlapInfo {
         pairs,
         ratio,
@@ -1526,7 +1532,9 @@ fn finish(
             .into_iter()
             .filter(|s| {
                 let (x, y) = s.center();
-                let tol = s.size().max(1.0);
+                // Маркер стоит ровно в центре отверстия: радиус его половины
+                // гарантированно не достанется соседнему отверстию.
+                let tol = (s.size() / 2.0 * 0.9).max(0.25);
                 !p.excluded
                     .iter()
                     .any(|(ex, ey)| ((x - ex).powi(2) + (y - ey).powi(2)).sqrt() <= tol)

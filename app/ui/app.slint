@@ -686,7 +686,7 @@ component Stage inherits Rectangle {
             for m[i] in Store.stats.overlap-points: Rectangle {
                 property <length> px: Store.sx + (m.x / Math.max(1, Store.p.sheet-w)) * Store.sw;
                 property <length> py: Store.sy + (1 - m.y / Math.max(1, Store.p.sheet-h)) * Store.sh;
-                property <length> pr: Math.max(10px, (m.r / Math.max(1, Store.p.sheet-w)) * Store.sw * 1.5);
+                property <length> pr: Math.max(9px, (m.r / Math.max(1, Store.p.sheet-w)) * Store.sw * 0.9);
                 x: px - pr;
                 y: py - pr;
                 width: pr * 2;

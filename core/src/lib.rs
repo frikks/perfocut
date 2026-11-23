@@ -985,8 +985,11 @@ mod tests {
             "ratio = {}",
             info.ratio
         );
-        assert_eq!(info.points.len(), 1);
-        assert!((info.points[0].0 - 3.0).abs() < 1e-6);
+        // Маркеры стоят в центрах обоих отверстий, а не посередине между ними
+        assert_eq!(info.points.len(), 2);
+        let xs: Vec<f64> = info.points.iter().map(|p| p.0).collect();
+        assert!(xs.contains(&0.0));
+        assert!(xs.contains(&6.0));
 
         let info2 = gen::analyze_overlaps(&[
             Shape::Circle {
