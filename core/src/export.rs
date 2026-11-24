@@ -436,8 +436,13 @@ pub fn svg(r: &GenResult) -> String {
     for s in hole_shapes(r) {
         if p.mjoint_n > 0 && p.pattern != "lines" {
             for seg in &shape_segments(s, p.mjoint_n, p.mjoint_w) {
-                let _ = write!(o, "<path d=\"M");
-                for q in seg {
+                if seg.is_empty() {
+                    continue;
+                }
+                // Команда M обязана содержать координаты первой точки, иначе
+                // path невалиден и дуга с перемычками не отрисуется.
+                let _ = write!(o, "<path d=\"M{} {}", n4(seg[0].0), n4(h - seg[0].1));
+                for q in seg.iter().skip(1) {
                     let _ = write!(o, "L{} {}", n4(q.0), n4(h - q.1));
                 }
                 let _ = writeln!(o, "\"/>");
@@ -534,11 +539,15 @@ pub fn gcode(r: &GenResult) -> String {
     let p = &r.params;
     let (w, h) = (p.sheet_w, p.sheet_h);
     let dec = p.gc_decimals as usize;
-    let (ox, oy) = match p.origin.as_str() {
-        "center" => (w / 2.0, h / 2.0),
-        "tl" => (0.0, h),
-        _ => (0.0, 0.0),
+    // Для tl ось Y направлена вниз: Y = h - y, а не y - h.
+    // Остальные режимы сохраняют прежнюю формулу y - oy.
+    let (ox, oy, sy) = match p.origin.as_str() {
+        "center" => (w / 2.0, h / 2.0, 1.0),
+        "tl" => (0.0, h, -1.0),
+        _ => (0.0, 0.0, 1.0),
     };
+    let fx = |x: f64| x - ox;
+    let fy = |y: f64| sy * (y - oy);
     let f = |v: f64| num(v, dec);
     let feed = num(p.cut_speed, 0);
     let mut o = String::with_capacity(r.shapes.len() * 140 + 1000);
@@ -590,28 +599,22 @@ pub fn gcode(r: &GenResult) -> String {
                     .fold((0.0, 0.0), |(ax, ay), q| (ax + q.0, ay + q.1));
                 (sx / n, sy / n)
             });
-            line(o, &format!("G00 X{} Y{}", f(cx - ox), f(cy - oy)));
+            line(o, &format!("G00 X{} Y{}", f(fx(cx)), f(fy(cy))));
             line(o, &p.gc_on);
-            line(
-                o,
-                &format!("G01 X{} Y{} F{}", f(s.0 - ox), f(s.1 - oy), feed),
-            );
+            line(o, &format!("G01 X{} Y{} F{}", f(fx(s.0)), f(fy(s.1)), feed));
         } else {
-            line(o, &format!("G00 X{} Y{}", f(s.0 - ox), f(s.1 - oy)));
+            line(o, &format!("G00 X{} Y{}", f(fx(s.0)), f(fy(s.1))));
             line(o, &p.gc_on);
         }
         for (i, q) in pts.iter().enumerate().skip(1) {
             if i == 1 && !center_pierce {
-                line(
-                    o,
-                    &format!("G01 X{} Y{} F{}", f(q.0 - ox), f(q.1 - oy), feed),
-                );
+                line(o, &format!("G01 X{} Y{} F{}", f(fx(q.0)), f(fy(q.1)), feed));
             } else {
-                line(o, &format!("G01 X{} Y{}", f(q.0 - ox), f(q.1 - oy)));
+                line(o, &format!("G01 X{} Y{}", f(fx(q.0)), f(fy(q.1))));
             }
         }
         if close {
-            line(o, &format!("G01 X{} Y{}", f(s.0 - ox), f(s.1 - oy)));
+            line(o, &format!("G01 X{} Y{}", f(fx(s.0)), f(fy(s.1))));
         }
         line(o, &p.gc_off);
     };
@@ -625,21 +628,21 @@ pub fn gcode(r: &GenResult) -> String {
         } else {
             match s {
                 Shape::Circle { x, y, d } => {
-                    let rr = d / 2.0;
+                    let rr = *d / 2.0;
                     if p.gc_arcs {
-                        line(&mut o, &format!("G00 X{} Y{}", f(x - ox), f(y - oy)));
+                        line(&mut o, &format!("G00 X{} Y{}", f(fx(*x)), f(fy(*y))));
                         line(&mut o, &p.gc_on);
                         line(
                             &mut o,
-                            &format!("G01 X{} Y{} F{}", f(x + rr - ox), f(y - oy), feed),
+                            &format!("G01 X{} Y{} F{}", f(fx(*x + rr)), f(fy(*y)), feed),
                         );
                         line(
                             &mut o,
-                            &format!("G02 X{} Y{} I{} J0", f(x - rr - ox), f(y - oy), f(-rr)),
+                            &format!("G02 X{} Y{} I{} J0", f(fx(*x - rr)), f(fy(*y)), f(-rr)),
                         );
                         line(
                             &mut o,
-                            &format!("G02 X{} Y{} I{} J0", f(x + rr - ox), f(y - oy), f(rr)),
+                            &format!("G02 X{} Y{} I{} J0", f(fx(*x + rr)), f(fy(*y)), f(rr)),
                         );
                         line(&mut o, &p.gc_off);
                     } else {
@@ -667,7 +670,13 @@ pub fn gcode(r: &GenResult) -> String {
             cut_poly(&mut o, &mut line, &sheet_outline(w, h), false, true);
         }
     }
-    line(&mut o, &format!("G00 X{} Y{}", f(-ox), f(-oy)));
+    // Возврат в начало координат станка: для tl это верхний левый угол листа
+    let (hx, hy) = if p.origin == "tl" {
+        (0.0, h)
+    } else {
+        (0.0, 0.0)
+    };
+    line(&mut o, &format!("G00 X{} Y{}", f(fx(hx)), f(fy(hy))));
     for l in p.gc_footer.lines() {
         line(&mut o, l.trim());
     }

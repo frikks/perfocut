@@ -683,7 +683,17 @@ export component Modal inherits Rectangle {
                     }
                 }
             }
-            @children
+            // Содержимое прокручивается: на низких экранах настройки не обрезаются
+            Flickable {
+                vertical-stretch: 1;
+                content-height: body.preferred-height;
+                content-width: self.width;
+                body := VerticalLayout {
+                    width: parent.width;
+                    spacing: Theme.touch ? 12px : 16px;
+                    @children
+                }
+            }
         }
     }
 }

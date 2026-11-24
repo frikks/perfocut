@@ -141,12 +141,13 @@ pub fn init(ui: &AppWindow) {
     over.forget();
     let drop = Closure::<dyn FnMut(web_sys::DragEvent)>::new(|e: web_sys::DragEvent| {
         e.prevent_default();
-        if let Some(f) = e
-            .data_transfer()
-            .and_then(|d| d.files())
-            .and_then(|l| l.get(0))
-        {
-            read_file(f);
+        // Перетаскивание нескольких картинок должно открывать все, а не только первую
+        if let Some(list) = e.data_transfer().and_then(|d| d.files()) {
+            for i in 0..list.length() {
+                if let Some(f) = list.get(i) {
+                    read_file(f);
+                }
+            }
         }
     });
     let _ = doc.add_event_listener_with_callback("drop", drop.as_ref().unchecked_ref());
@@ -209,7 +210,7 @@ pub fn save_file(name: &str, mime: &str, bytes: Vec<u8>) -> SaveOutcome {
     };
     match run() {
         Some(()) => SaveOutcome::Downloaded(name.to_owned()),
-        None => SaveOutcome::Failed(name.to_owned()),
+        None => SaveOutcome::Failed("не удалось создать Blob или ссылку для скачивания".into()),
     }
 }
 
@@ -308,8 +309,13 @@ pub fn now_ms() -> f64 {
 }
 
 pub fn now_iso() -> String {
-    js_sys::Date::new_0()
+    // Формат должен совпадать с desktop: без миллисекунд, с Z на конце
+    let s = js_sys::Date::new_0()
         .to_iso_string()
         .as_string()
-        .unwrap_or_default()
+        .unwrap_or_default();
+    match s.split_once('.') {
+        Some((head, _)) => format!("{}Z", head),
+        None => s.trim_end_matches('Z').to_owned() + "Z",
+    }
 }

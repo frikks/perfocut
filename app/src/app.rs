@@ -456,6 +456,30 @@ fn batch_from_files(p: &Params, files: &[(String, Vec<u8>)]) -> usize {
     done
 }
 
+/// Опрос результата пакетной обработки, чтобы не блокировать поток интерфейса.
+#[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+fn poll_batch(rx: std::sync::mpsc::Receiver<Result<usize, String>>) {
+    match rx.try_recv() {
+        Ok(Ok(n)) => {
+            with(|st, ui| {
+                toast(
+                    st,
+                    ui,
+                    &tf("Обработано файлов: {n}", &[("n", &n.to_string())]),
+                    3500,
+                );
+            });
+        }
+        Ok(Err(e)) => {
+            show_error("", &e);
+        }
+        Err(std::sync::mpsc::TryRecvError::Empty) => {
+            Timer::single_shot(Duration::from_millis(120), move || poll_batch(rx));
+        }
+        Err(std::sync::mpsc::TryRecvError::Disconnected) => {}
+    }
+}
+
 fn bind(ui: &AppWindow) {
     let b = ui.global::<Bridge>();
     b.on_fmt(|v, d| i18n::fmt_field(f64::from(v), d.clamp(0, 6) as usize).into());
@@ -592,19 +616,19 @@ fn bind(ui: &AppWindow) {
     });
     s.on_batch(|| {
         #[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
-        with(|st, ui| {
-            if let Some(dir) = platform::pick_folder() {
-                match platform::batch_process(&dir, &st.p) {
-                    Ok(n) => toast(
-                        st,
-                        ui,
-                        &tf("Обработано файлов: {n}", &[("n", &n.to_string())]),
-                        3500,
-                    ),
-                    Err(e) => show_error("", &e),
-                }
-            }
-        });
+        {
+            let Some(dir) = platform::pick_folder() else {
+                return;
+            };
+            let Some(params) = with(|st, _| st.p.clone()) else {
+                return;
+            };
+            let (tx, rx) = std::sync::mpsc::channel::<Result<usize, String>>();
+            std::thread::spawn(move || {
+                let _ = tx.send(platform::batch_process(&dir, &params));
+            });
+            poll_batch(rx);
+        }
         #[cfg(any(target_os = "android", target_arch = "wasm32"))]
         platform::pick_batch_files(|files| {
             with(|st, ui| {
@@ -629,6 +653,19 @@ fn bind(ui: &AppWindow) {
                 let mut p = st.p.clone();
                 m.apply_to(&mut p);
                 set_params(st, ui, p, true);
+                let idx = [
+                    "steel1",
+                    "steel2",
+                    "steel3",
+                    "inox15",
+                    "aluminium",
+                    "galvanized",
+                    "copper",
+                ]
+                .iter()
+                .position(|x| *x == m.id)
+                .unwrap_or(7) as i32;
+                ui.global::<Store>().set_material_current(idx);
                 toast(st, ui, m.name, 2200);
             }
         });
@@ -998,11 +1035,15 @@ fn params_changed(st: &mut State, ui: &AppWindow) {
 }
 
 fn set_params(st: &mut State, ui: &AppWindow, p: Params, push: bool) {
+    // Интерфейс не должен показывать значения, которые ядро молча поправит
+    let p = p.sanitized();
     st.p = p;
     st.p_ver += 1;
     if push {
         ui.global::<Store>().set_p(convert::to_par(&st.p));
     }
+    // Любая смена параметров, кроме прямого выбора материала, — «Своё»
+    ui.global::<Store>().set_material_current(7);
     show_meta(st, ui);
     schedule_gen(st);
 }

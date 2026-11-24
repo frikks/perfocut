@@ -726,6 +726,30 @@ msgstr "Ventilation"
 msgid "Декор"
 msgstr "Decor"
 
+msgid "Сталь 1"
+msgstr "Steel 1"
+
+msgid "Сталь 2"
+msgstr "Steel 2"
+
+msgid "Сталь 3"
+msgstr "Steel 3"
+
+msgid "Нерж. 1,5"
+msgstr "Inox 1.5"
+
+msgid "Алюминий"
+msgstr "Aluminium"
+
+msgid "Оцинковка"
+msgstr "Galvanized"
+
+msgid "Медь 1"
+msgstr "Copper 1"
+
+msgid "Своё"
+msgstr "Custom"
+
 msgid "Материал и цена за кг"
 msgstr "Material and price per kg"
 

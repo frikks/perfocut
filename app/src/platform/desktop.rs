@@ -44,9 +44,9 @@ pub fn init(ui: &AppWindow) {
         }
         EventResult::Propagate
     });
-    // Файл из командной строки: так Windows открывает .perfo двойным щелчком
-    if let Some(path) = std::env::args_os()
-        .nth(1)
+    // Файлы из командной строки: Windows может передать несколько .perfo сразу
+    for path in std::env::args_os()
+        .skip(1)
         .map(PathBuf::from)
         .filter(|p| p.is_file())
     {

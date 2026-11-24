@@ -961,6 +961,61 @@ mod tests {
     }
 
     #[test]
+    fn svg_mjoint_and_gcode_tl_are_valid() {
+        let g = gradient(120, 120);
+        let mut p = Params {
+            pattern: "dots".into(),
+            grid: "square".into(),
+            pitch: 14.0,
+            d_min: 6.0,
+            d_max: 6.0,
+            mjoint_n: 3,
+            mjoint_w: 0.5,
+            ..Params::default()
+        };
+        let r = gen::generate(Some(&g), &p);
+        let svg = String::from_utf8(export_format(&r, "svg").unwrap()).unwrap();
+        assert!(!svg.contains("d=\"ML"), "M без координат: {svg}");
+        assert!(svg.contains("d=\"M"));
+
+        p.origin = "tl".into();
+        let r2 = gen::generate(Some(&g), &p);
+        let gcode = String::from_utf8(export_format(&r2, "nc").unwrap()).unwrap();
+        let neg = gcode.lines().any(|l| {
+            (l.starts_with("G00 X") || l.starts_with("G01 X"))
+                && l.split_whitespace()
+                    .any(|t| t.starts_with('Y') && t[1..].starts_with('-'))
+        });
+        assert!(!neg, "отрицательный Y в режиме tl");
+        assert!(
+            gcode.lines().any(|l| l.contains("G00 X0 Y0")),
+            "нет возврата в ноль: {}",
+            gcode.lines().rev().take(5).collect::<Vec<_>>().join(" | ")
+        );
+    }
+
+    #[test]
+    fn dense_grids_cap_hole_size() {
+        let g = gradient(240, 240);
+        let p = Params {
+            pattern: "dots".into(),
+            grid: "mosaic".into(),
+            pitch: 12.0,
+            bridge: 1.5,
+            d_min: 10.0,
+            d_max: 10.0,
+            ..Params::default()
+        };
+        let r = gen::generate(Some(&g), &p);
+        assert!(
+            r.stats.max_allowed < 12.0,
+            "cap не ограничен: {}",
+            r.stats.max_allowed
+        );
+        assert_eq!(r.stats.overlaps, 0);
+    }
+
+    #[test]
     fn degenerate_sizes_do_not_panic() {
         // clamp(min > max) раньше паниковал на маленьком листе с большим числом недорезов
         let paths = export::sheet_paths(10.0, 10.0, 3000, 5.0, 0.0);

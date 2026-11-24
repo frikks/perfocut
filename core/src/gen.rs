@@ -904,14 +904,20 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         // Кольца: расстояние между центрами соседних отверстий не меньше шага
         // (по хорде кольца и по радиусу между кольцами), как у квадратной сетки.
         // У стиппла и плотностного режима шаг никогда не меньше размера плюс перемычки.
+        // Расстояние до ближайшего соседа: для rect с aspect < 1 и mosaic оно
+        // меньше pitch. Высота строки из grid_cell здесь не подходит — у tri
+        // она 0.866*pch, хотя ближайший сосед всё равно на расстоянии pch.
+        let spacing = match p.grid.as_str() {
+            "rect" => pch * p.grid_aspect.min(1.0).max(0.01),
+            "mosaic" => pch * 0.8,
+            _ => pch,
+        };
         let cap = if ring_mode || dense || stipple {
             pch - p.bridge
+        } else if p.shape == "square" && p.grid != "square" {
+            (spacing - p.bridge) / std::f64::consts::SQRT_2
         } else {
-            match (p.shape.as_str(), p.grid.as_str()) {
-                ("square", "square") => pch - p.bridge,
-                ("square", _) => (pch - p.bridge) / std::f64::consts::SQRT_2,
-                _ => pch - p.bridge,
-            }
+            spacing - p.bridge
         };
         max_allowed = cap;
         let mut dmax = p.d_max;

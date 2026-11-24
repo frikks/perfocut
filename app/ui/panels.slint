@@ -964,8 +964,9 @@ export component SettingsPanel inherits VerticalLayout {
         }
         Seg {
             columns: 3;
-            items: ["Сталь 1", "Сталь 2", "Сталь 3", "Нерж. 1,5", "Алюминий", "Оцинковка", "Медь 1", "Своё"];
-            current: 7;
+            items: [@tr("Сталь 1"), @tr("Сталь 2"), @tr("Сталь 3"), @tr("Нерж. 1,5"),
+                    @tr("Алюминий"), @tr("Оцинковка"), @tr("Медь 1"), @tr("Своё")];
+            current: Store.material-current;
             select(i) => {
                 if i < 7 {
                     Store.apply-material(i == 0 ? "steel1" : i == 1 ? "steel2" : i == 2 ? "steel3"
