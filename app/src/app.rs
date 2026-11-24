@@ -577,6 +577,10 @@ fn bind(ui: &AppWindow) {
             if let Some(t) = templates::find(&id) {
                 let p = t.apply_to(&st.p);
                 set_params(st, ui, p, true);
+                // Шаблон меняет габариты — под них нужно обновить заблокированное соотношение
+                if st.saved.lock_ratio && st.p.sheet_h > 0.0 {
+                    st.saved.ratio = st.p.sheet_w / st.p.sheet_h;
+                }
                 st.saved.template_id = id.to_string();
                 st.saved.store();
                 ui.global::<Store>().set_current_template(id);
@@ -853,7 +857,9 @@ fn bind(ui: &AppWindow) {
     pr.on_changed(|| {
         with(prefs_changed);
     });
-    pr.on_open_url(|url| platform::open_url(&url));
+    pr.on_open_url(|url| {
+        platform::open_url(&url);
+    });
     pr.on_minimize(|| {
         with(|_, ui| platform::minimize(ui));
     });

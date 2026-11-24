@@ -5,6 +5,9 @@ use crate::i18n::t;
 use crate::{AppWindow, Prefs};
 use slint::ComponentHandle;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static SETTINGS_SEQ: AtomicUsize = AtomicUsize::new(0);
 
 const OPEN_EXT: [&str; 10] = [
     "jpg", "jpeg", "png", "webp", "bmp", "gif", "tif", "tiff", "perfo", "zip",
@@ -183,7 +186,12 @@ pub fn store_settings(s: &str) {
         let _ = std::fs::create_dir_all(dir);
     }
     // Через временный файл, чтобы при сбое не остаться с половиной настроек
-    let tmp = path.with_extension("tmp");
+    // Уникальное имя: два экземпляра программы не перетирают друг друга
+    let tmp = path.with_file_name(format!(
+        "settings.{}.{}.tmp",
+        std::process::id(),
+        SETTINGS_SEQ.fetch_add(1, Ordering::Relaxed)
+    ));
     if std::fs::write(&tmp, s).is_ok() {
         let _ = std::fs::rename(&tmp, &path);
     }

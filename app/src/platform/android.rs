@@ -12,6 +12,7 @@ use std::sync::{Mutex, OnceLock};
 static VM: AtomicUsize = AtomicUsize::new(0);
 static ACTIVITY: AtomicUsize = AtomicUsize::new(0);
 static DATA_DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
+static SETTINGS_SEQ: AtomicUsize = AtomicUsize::new(0);
 
 type ProfileCb = Box<dyn FnOnce(Option<Vec<u8>>) + Send + 'static>;
 type BatchCb = Box<dyn FnOnce(Vec<(String, Vec<u8>)>) + Send + 'static>;
@@ -174,7 +175,11 @@ pub fn store_settings(s: &str) {
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    let tmp = path.with_extension("tmp");
+    // Уникальное имя на случай параллельных записей
+    let tmp = path.with_file_name(format!(
+        "settings.{}.tmp",
+        SETTINGS_SEQ.fetch_add(1, Ordering::Relaxed)
+    ));
     if std::fs::write(&tmp, s).is_ok() {
         let _ = std::fs::rename(&tmp, &path);
     }

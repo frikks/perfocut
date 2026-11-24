@@ -222,15 +222,20 @@ pub fn vibrate(kind: &str) {
     }
 }
 
-pub fn open_url(url: &str) {
-    if let Some(w) = window() {
-        let _ = w.open_with_url_and_target(url, "_blank");
-    }
+pub fn open_url(url: &str) -> bool {
+    window()
+        .and_then(|w| w.open_with_url_and_target(url, "_blank").ok())
+        .flatten()
+        .is_some()
 }
 
 pub fn download_update(url: &str, _version: &str) {
-    open_url(url);
-    crate::app::update_page_opened();
+    // Браузер может заблокировать popup — не сообщаем об успехе в этом случае
+    if open_url(url) {
+        crate::app::update_page_opened();
+    } else {
+        crate::app::update_failed("popup_blocked");
+    }
 }
 
 pub fn minimize(_ui: &AppWindow) {}

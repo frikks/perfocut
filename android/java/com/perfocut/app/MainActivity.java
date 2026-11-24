@@ -162,12 +162,21 @@ public class MainActivity extends NativeActivity {
             if (c.moveToFirst() && !c.isNull(0)) name = c.getString(0);
             c.close();
         }
-        InputStream in = getContentResolver().openInputStream(uri);
+        // Ограничиваем размер и всегда закрываем поток: иначе большой файл
+        // роняет процесс, а при ошибке утекает дескриптор.
+        final long LIMIT = 256L * 1024L * 1024L;
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         byte[] buf = new byte[65536];
         int n;
-        while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-        in.close();
+        try (InputStream in = getContentResolver().openInputStream(uri)) {
+            if (in == null) throw new java.io.IOException("Пустой поток файла");
+            long total = 0;
+            while ((n = in.read(buf)) > 0) {
+                total += n;
+                if (total > LIMIT) throw new java.io.IOException("Файл больше 256 МБ");
+                out.write(buf, 0, n);
+            }
+        }
         Picked p = new Picked();
         p.name = name;
         p.data = out.toByteArray();
@@ -185,7 +194,12 @@ public class MainActivity extends NativeActivity {
             super.onActivityResult(req, res, data);
             return;
         }
-        if (res != RESULT_OK || data == null) return;
+        if (res != RESULT_OK || data == null) {
+            // Всегда возвращаем результат: иначе Rust-слот с колбэком остаётся занятым
+            if (req == PICK_PROFILE) onProfilePicked(new byte[0]);
+            else if (req == PICK_BATCH) onBatchPicked(new String[0], new byte[0][]);
+            return;
+        }
         final int request = req;
 
         if (req == PICK_BATCH) {

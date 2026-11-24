@@ -234,6 +234,14 @@ impl Params {
         p.engrave_h = fin(p.engrave_h, 8.0).clamp(1.0, 100.0);
         p.target_open = fin(p.target_open, 0.0).clamp(0.0, 90.0);
         p.img_scale = fin(p.img_scale, 1.0).clamp(0.05, 20.0);
+        // Смещения входит в радиус обхода узора. Без ограничения очень большое
+        // значение превращает генерацию в бесконечный цикл, а защита по числу
+        // отверстий его не ловит (оценка от смещений не зависит).
+        let reach = p.sheet_w.max(p.sheet_h) * 4.0;
+        p.offset_x = fin(p.offset_x, 0.0).clamp(-reach, reach);
+        p.offset_y = fin(p.offset_y, 0.0).clamp(-reach, reach);
+        p.angle = fin(p.angle, 0.0).rem_euclid(360.0);
+        p.line_angle = fin(p.line_angle, 0.0).rem_euclid(360.0);
         p.brightness = fin(p.brightness, 0.0).clamp(-1.0, 1.0);
         p.contrast = fin(p.contrast, 0.0).clamp(-1.0, 3.0);
         p.gamma = fin(p.gamma, 1.0).clamp(0.1, 5.0);
@@ -262,6 +270,10 @@ impl Params {
         p.cut_speed = fin(p.cut_speed, 4000.0).clamp(1.0, 1e6);
         p.rapid_speed = fin(p.rapid_speed, 30000.0).clamp(1.0, 1e7);
         p.pierce_time = fin(p.pierce_time, 0.3).clamp(0.0, 60.0);
+        p.price_m = fin(p.price_m, 0.0).max(0.0);
+        p.price_pierce = fin(p.price_pierce, 0.0).max(0.0);
+        p.price_kg = fin(p.price_kg, 0.0).max(0.0);
+        p.price_fixed = fin(p.price_fixed, 0.0).max(0.0);
         p.gc_decimals = p.gc_decimals.clamp(1, 6);
         p
     }

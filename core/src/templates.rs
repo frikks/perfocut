@@ -436,7 +436,7 @@ impl Template {
     pub fn category(&self) -> &'static str {
         match self.id {
             "speaker" | "micro" | "large" => "dynamic",
-            "vent" | "louver" | "galvanized" => "vent",
+            "vent" | "louver" => "vent",
             "radial" | "mosaic" | "rhomb" | "sine" | "rings" | "stipple" | "star" => "decor",
             _ => "structure",
         }

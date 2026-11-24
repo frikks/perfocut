@@ -961,6 +961,31 @@ mod tests {
     }
 
     #[test]
+    fn extreme_offsets_and_slots_are_safe() {
+        let mut p = Params {
+            pattern: "dots".into(),
+            grid: "square".into(),
+            pitch: 12.0,
+            offset_x: 1e12,
+            offset_y: -1e12,
+            d_min: 10.0,
+            d_max: 10.0,
+            ..Params::default()
+        };
+        let s = p.sanitized();
+        assert!(s.offset_x.abs() < 100_000.0);
+        assert!(s.offset_y.abs() < 100_000.0);
+
+        p.offset_x = 0.0;
+        p.offset_y = 0.0;
+        p.shape = "slot".into();
+        p.shape_aspect = 5.0;
+        let g = gradient(240, 240);
+        let r = gen::generate(Some(&g), &p);
+        assert_eq!(r.stats.overlaps, 0, "вытянутые прорези пересекаются");
+    }
+
+    #[test]
     fn svg_mjoint_and_gcode_tl_are_valid() {
         let g = gradient(120, 120);
         let mut p = Params {

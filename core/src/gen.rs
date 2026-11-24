@@ -40,7 +40,7 @@ impl Shape {
     pub fn start(&self) -> (f64, f64) {
         match self {
             Shape::Circle { x, y, .. } => (*x, *y),
-            Shape::Poly { pts, .. } => pts[0],
+            Shape::Poly { pts, .. } => pts.first().copied().unwrap_or((0.0, 0.0)),
         }
     }
     pub fn perimeter(&self) -> f64 {
@@ -919,23 +919,32 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
         } else {
             spacing - p.bridge
         };
-        max_allowed = cap;
+        // У вытянутых фигур реальный габарит больше номинального диаметра —
+        // прорезь длиной d*aspect легко перекроет соседнюю при том же cap.
+        let extent =
+            if p.pattern != "lines" && matches!(p.shape.as_str(), "slot" | "oval" | "triangle") {
+                p.shape_aspect.max(1.0)
+            } else {
+                1.0
+            };
+        let dcap = (cap / extent).max(0.01);
+        max_allowed = dcap;
         let mut dmax = p.d_max;
-        if dmax > cap {
+        if dmax > dcap {
             warnings.push(if en {
                 format!(
                     "Max size limited to {} mm to keep the bridge at least {} mm",
-                    dec(cap.max(0.0), en),
+                    dec(dcap.max(0.0), en),
                     dec(p.bridge, en)
                 )
             } else {
                 format!(
                     "Макс. размер ограничен до {} мм, чтобы перемычка была не меньше {} мм",
-                    dec(cap.max(0.0), en),
+                    dec(dcap.max(0.0), en),
                     dec(p.bridge, en)
                 )
             });
-            dmax = cap;
+            dmax = dcap;
         }
         let mut dmin = p.d_min.max(min_allowed);
         if p.d_min < min_allowed {
@@ -953,22 +962,22 @@ pub fn generate(img: Option<&Gray>, params: &Params) -> GenResult {
                 )
             });
         }
-        if dense && dmin > cap {
+        if dense && dmin > dcap {
             // Постоянный размер ограничен: иначе перемычка рвётся даже в светлых местах.
             warnings.push(if en {
                 format!(
                     "Hole size limited to {} mm to keep the bridge at least {} mm",
-                    dec(cap.max(0.0), en),
+                    dec(dcap.max(0.0), en),
                     dec(p.bridge, en)
                 )
             } else {
                 format!(
                     "Размер отверстий ограничен до {} мм, чтобы перемычка была не меньше {} мм",
-                    dec(cap.max(0.0), en),
+                    dec(dcap.max(0.0), en),
                     dec(p.bridge, en)
                 )
             });
-            dmin = cap.max(0.0);
+            dmin = dcap.max(0.0);
         }
         // В плотностном режиме и стиппле размер постоянный: минимум и максимум совпадают.
         let dmax = if dense || stipple { dmin } else { dmax };
