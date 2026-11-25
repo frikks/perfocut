@@ -1,10 +1,10 @@
 [workspace]
-members = ["core", "app"]
+members = ["core", "app", "worker"]
 resolver = "2"
 
 # Единая версия программы. Поменяйте её и отправьте в main: GitHub соберёт релиз vX.Y.Z.
 [workspace.package]
-version = "0.4.5-pre.12"
+version = "0.4.5-pre.13"
 edition = "2021"
 
 # prerelease = true: GitHub выпустит версию как предварительную (Pre-release)

@@ -1,13 +1,13 @@
 use crate::image::Gray;
 use crate::params::Params;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::f64::consts::PI;
 
 /// Отрезок между двумя точками: (начало, конец)
 type Segment = ((f64, f64), (f64, f64));
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Shape {
     Circle { x: f64, y: f64, d: f64 },
     Poly { pts: Vec<(f64, f64)>, size: f64 },
@@ -73,13 +73,13 @@ impl Shape {
     }
 }
 
-#[derive(Serialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct SizeCount {
     pub size: f64,
     pub count: usize,
 }
 
-#[derive(Serialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Stats {
     pub count: usize,
     pub by_size: Vec<SizeCount>,
@@ -108,6 +108,7 @@ pub struct Stats {
     pub overlap_points: Vec<(f64, f64, f64)>,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct GenResult {
     pub shapes: Vec<Shape>,
     pub stats: Stats,

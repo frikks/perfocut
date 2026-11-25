@@ -15,6 +15,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "target" / "web"
 WASM = ROOT / "target" / "wasm32-unknown-unknown" / "release" / "perfocut.wasm"
+WORKER_WASM = ROOT / "target" / "wasm32-unknown-unknown" / "release" / "perfocut_worker.wasm"
+WORKER_OUT = ROOT / "target" / "web-worker"
 
 
 def run(*cmd: str) -> None:
@@ -31,17 +33,32 @@ def main() -> int:
     if "--no-cargo" not in sys.argv:
         run("cargo", "rustc", "-p", "perfocut", "--lib", "--release",
             "--target", "wasm32-unknown-unknown", "--crate-type", "cdylib")
+    # Второй wasm-модуль для Web Worker: генерация идёт вне потока интерфейса
+    if "--no-cargo" not in sys.argv:
+        run("cargo", "rustc", "-p", "perfocut_worker", "--lib", "--release",
+            "--target", "wasm32-unknown-unknown", "--crate-type", "cdylib")
     shutil.rmtree(OUT, ignore_errors=True)
+    shutil.rmtree(WORKER_OUT, ignore_errors=True)
     run("wasm-bindgen", "--target", "no-modules", "--no-typescript",
         "--out-dir", str(OUT), str(WASM))
+    run("wasm-bindgen", "--target", "no-modules", "--no-typescript",
+        "--out-dir", str(WORKER_OUT), str(WORKER_WASM))
     wasm = OUT / "perfocut_bg.wasm"
+    worker_wasm_file = WORKER_OUT / "perfocut_worker_bg.wasm"
     if shutil.which("wasm-opt"):
-        run("wasm-opt", "-Oz", "--enable-bulk-memory", "--enable-nontrapping-float-to-int",
-            "-o", str(wasm), str(wasm))
+        for f in (wasm, worker_wasm_file):
+            run("wasm-opt", "-Oz", "--enable-bulk-memory", "--enable-nontrapping-float-to-int",
+                "-o", str(f), str(f))
     glue = (OUT / "perfocut.js").read_text(encoding="utf-8").replace("</script", "<\\/script")
+    worker_glue = (WORKER_OUT / "perfocut_worker.js").read_text(encoding="utf-8").replace("</script", "<\\/script")
     packed = base64.b64encode(gzip.compress(wasm.read_bytes(), 9, mtime=0)).decode()
+    worker_packed = base64.b64encode(gzip.compress(worker_wasm_file.read_bytes(), 9, mtime=0)).decode()
     page = (Path(__file__).parent / "index.html").read_text(encoding="utf-8")
-    page = page.replace("{{VERSION}}", version()).replace("{{GLUE}}", glue).replace("{{WASM_GZ_B64}}", packed)
+    page = (page.replace("{{VERSION}}", version())
+                .replace("{{GLUE}}", glue)
+                .replace("{{WASM_GZ_B64}}", packed)
+                .replace("{{WORKER_GLUE}}", worker_glue)
+                .replace("{{WORKER_WASM_GZ_B64}}", worker_packed))
     dist = ROOT / "dist"
     dist.mkdir(exist_ok=True)
     (dist / "PerfoCut.html").write_text(page, encoding="utf-8")

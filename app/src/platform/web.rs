@@ -4,8 +4,49 @@ use super::SaveOutcome;
 use crate::{AppWindow, Prefs, Theme};
 use slint::ComponentHandle;
 use wasm_bindgen::closure::Closure;
+use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
+
+std::thread_local! {
+    static GEN_HANDLER: std::cell::RefCell<Option<Box<dyn FnMut(u64, String)>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Web Worker отправил готовый результат генерации.
+#[wasm_bindgen]
+pub fn worker_result(ver: u32, json: String) {
+    GEN_HANDLER.with(|h| {
+        if let Some(cb) = h.borrow_mut().as_mut() {
+            cb(ver as u64, json);
+        }
+    });
+}
+
+/// Обработчик результата устанавливается один раз при запуске программы.
+pub fn set_gen_handler(cb: impl FnMut(u64, String) + 'static) {
+    GEN_HANDLER.with(|h| *h.borrow_mut() = Some(Box::new(cb)));
+}
+
+/// Отправить задание в Web Worker, чтобы не блокировать поток интерфейса.
+pub fn generate_in_worker(rgba: &[u8], w: u32, h: u32, params_json: &str, ver: u64) {
+    let Some(win) = window() else { return };
+    let Ok(start) =
+        js_sys::Reflect::get(&win, &wasm_bindgen::JsValue::from_str("__perfocutGenStart"))
+    else {
+        return;
+    };
+    let start: js_sys::Function = start.unchecked_into();
+    let bytes = js_sys::Uint8Array::from(rgba);
+    let _ = start.call5(
+        &wasm_bindgen::JsValue::NULL,
+        &wasm_bindgen::JsValue::from_f64(ver as f64),
+        &wasm_bindgen::JsValue::from_f64(w as f64),
+        &wasm_bindgen::JsValue::from_f64(h as f64),
+        &wasm_bindgen::JsValue::from_str(params_json),
+        &bytes,
+    );
+}
 
 const KEY: &str = "perfocut.v3";
 

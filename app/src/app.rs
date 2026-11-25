@@ -481,6 +481,10 @@ fn poll_batch(rx: std::sync::mpsc::Receiver<Result<usize, String>>) {
 }
 
 fn bind(ui: &AppWindow) {
+    #[cfg(target_arch = "wasm32")]
+    platform::set_gen_handler(|ver, json| {
+        let _ = slint::invoke_from_event_loop(move || apply_worker_result(ver, json));
+    });
     let b = ui.global::<Bridge>();
     b.on_fmt(|v, d| i18n::fmt_field(f64::from(v), d.clamp(0, 6) as usize).into());
     b.on_fmt_n(|v, d| i18n::fmt_short(f64::from(v), d.clamp(0, 6) as usize).into());
@@ -1473,8 +1477,18 @@ fn run_gen(st: &mut State, ui: &AppWindow) {
     let ver = st.p_ver;
     #[cfg(target_arch = "wasm32")]
     {
-        let r = gen::generate(Some(&pic.gray), &st.p);
-        apply_result(st, ui, ver, r);
+        // Генерация в Web Worker: поток интерфейса остаётся отзывчивым
+        let Ok(params_json) = serde_json::to_string(&st.p) else {
+            return;
+        };
+        let pix = &pic.pix;
+        platform::generate_in_worker(
+            pix.data(),
+            pix.width() as u32,
+            pix.height() as u32,
+            &params_json,
+            ver,
+        );
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -1488,6 +1502,20 @@ fn run_gen(st: &mut State, ui: &AppWindow) {
             apply_result(st, ui, ver, r);
         }
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn apply_worker_result(ver: u64, json: String) {
+    with(|st, ui| {
+        if let Some(err) = json.strip_prefix("ERR:") {
+            show_error("", err);
+            return;
+        }
+        match serde_json::from_str::<GenResult>(&json) {
+            Ok(r) => apply_result(st, ui, ver, r),
+            Err(e) => show_error("", &e.to_string()),
+        }
+    });
 }
 
 fn apply_result(st: &mut State, ui: &AppWindow, ver: u64, r: GenResult) {

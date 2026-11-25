@@ -39,5 +39,43 @@
   }
 })();
 </script>
+<script id="worker-glue" type="text/plain">{{WORKER_GLUE}}</script>
+<script>
+(() => {
+  const glue = document.getElementById("worker-glue").textContent;
+  const wasmB64 = "{{WORKER_WASM_GZ_B64}}";
+  const src = glue + `
+let ready = false;
+async function init() {
+  const raw = Uint8Array.from(atob("` + wasmB64 + `"), (c) => c.charCodeAt(0));
+  const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream("gzip"));
+  const bytes = await new Response(stream).arrayBuffer();
+  await wasm_bindgen({ module_or_path: bytes });
+  ready = true;
+}
+onmessage = async (e) => {
+  try {
+    if (!ready) await init();
+    const d = e.data;
+    const json = wasm_bindgen.generate(new Uint8Array(d.rgba), d.w, d.h, d.paramsJson);
+    postMessage({ ver: d.ver, json });
+  } catch (err) {
+    postMessage({ ver: e.data.ver, json: "ERR:" + (err && err.message ? err.message : err) });
+  }
+};`;
+  let worker;
+  try {
+    worker = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+  } catch (e) {
+    // Worker недоступен — приложение продолжит работать без фонового расчёта
+    window.__perfocutGenStart = () => {};
+    return;
+  }
+  worker.onmessage = (e) => wasm_bindgen.worker_result(e.data.ver, e.data.json);
+  window.__perfocutGenStart = (ver, w, h, paramsJson, rgba) => {
+    worker.postMessage({ ver, w, h, paramsJson, rgba: Array.from(rgba) });
+  };
+})();
+</script>
 </body>
 </html>
